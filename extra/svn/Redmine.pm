@@ -312,6 +312,8 @@ sub access_handler {
       $r->log_reason("No authentication has been configured");
       return FORBIDDEN;
   }
+  
+  return OK unless $r->is_initial_req;
 
   return OK unless request_is_read_only($r);
 
@@ -325,6 +327,8 @@ sub access_handler {
 
 sub authen_handler {
   my $r = shift;
+  
+  return OK unless $r->is_initial_req;
   
   my ($res, $redmine_pass) =  $r->get_basic_auth_pw();
   return $res unless $res == OK;
