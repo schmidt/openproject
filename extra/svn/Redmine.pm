@@ -296,7 +296,7 @@ sub request_is_read_only {
   if (defined $cfg->{RedmineGitSmartHttp} and $cfg->{RedmineGitSmartHttp}) {
     my $uri = $r->unparsed_uri;
     my $location = $r->location;
-    my $is_read_only = $uri !~ m{^$location/*[^/]+/(info/refs\?service=)?git\-receive\-pack$}o;
+    my $is_read_only = $uri !~ m{^$location/*[^/]+/+(info/refs\?service=)?git\-receive\-pack$}o;
     return $is_read_only;
   } else {
     # Old behaviour: check the HTTP method
