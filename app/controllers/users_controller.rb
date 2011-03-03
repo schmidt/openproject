@@ -98,6 +98,7 @@ class UsersController < ApplicationController
     @user.pref.attributes = params[:pref]
     @user.pref[:no_self_notified] = (params[:no_self_notified] == '1')
 
+    call_hook(:users_controller_create_before_save, {:user => @user})
     if @user.save
       @user.pref.save
       @user.notified_project_ids = (@user.mail_notification == 'selected' ? params[:notified_project_ids] : [])
@@ -145,6 +146,7 @@ class UsersController < ApplicationController
     @user.pref.attributes = params[:pref]
     @user.pref[:no_self_notified] = (params[:no_self_notified] == '1')
 
+    call_hook(:users_controller_update_before_save, {:user => @user})
     if @user.save
       @user.pref.save
       @user.notified_project_ids = (@user.mail_notification == 'selected' ? params[:notified_project_ids] : [])
@@ -155,6 +157,7 @@ class UsersController < ApplicationController
         Mailer.deliver_account_information(@user, params[:user][:password])
       end
       
+      call_hook(:users_controller_update_after_save, {:user => @user})
       respond_to do |format|
         format.html {
           flash[:notice] = l(:notice_successful_update)
