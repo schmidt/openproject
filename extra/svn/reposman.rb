@@ -7,7 +7,7 @@
 # == Usage
 #
 #    reposman [OPTIONS...] -s [DIR] -r [HOST]
-#     
+#
 #  Examples:
 #    reposman --svn-dir=/var/svn --redmine-host=redmine.example.net --scm subversion
 #    reposman -s /var/git -r redmine.example.net -u http://svn.example.net --scm git
@@ -57,7 +57,7 @@
 #   -q, --quiet               no log
 #
 # == References
-# 
+#
 # You can find more information on the redmine's wiki : http://www.redmine.org/wiki/redmine/HowTos
 
 
@@ -225,23 +225,15 @@ end
 def owner_name(file)
   mswin? ?
     $svn_owner :
-    Etc.getpwuid( File.stat(file).uid ).name  
+    Etc.getpwuid( File.stat(file).uid ).name
 end
-  
+
 def mswin?
   (RUBY_PLATFORM =~ /(:?mswin|mingw)/) || (RUBY_PLATFORM == 'java' && (ENV['OS'] || ENV['os']) =~ /windows/i)
 end
 
 projects.each do |project|
   log("treating project #{project.name}", :level => 1)
-
-  if project.identifier.empty?
-    log("\tno identifier for project #{project.name}")
-    next
-  elsif not project.identifier.match(/^[a-z0-9\-]+$/)
-    log("\tinvalid identifier for project #{project.name} : #{project.identifier}");
-    next;
-  end
 
   repos_path = File.join($repos_base, project.identifier).gsub(File::SEPARATOR, File::ALT_SEPARATOR || File::SEPARATOR)
 
@@ -309,4 +301,3 @@ projects.each do |project|
   end
 
 end
-  
