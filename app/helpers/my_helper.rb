@@ -16,8 +16,4 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 module MyHelper
-
-  def password_complexity_requirements
-    "<em>" + l(:text_caracters_minimum, :count => Setting.password_min_length) + "</em>"
-  end
 end
