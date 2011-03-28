@@ -50,6 +50,10 @@ Rails::Initializer.run do |config|
   # It will automatically turn deliveries on
   config.action_mailer.perform_deliveries = false
 
+  # Use redmine's custom plugin locater
+  require File.join(RAILS_ROOT, "lib/redmine_plugin_locator")
+  config.plugin_locators << RedminePluginLocator
+
   config.gem 'rubytree', :lib => 'tree'
   config.gem 'coderay', :version => '~>0.9.7'
   
