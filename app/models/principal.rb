@@ -5,12 +5,12 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -24,18 +24,24 @@ class Principal < ActiveRecord::Base
 
   # Groups and active users
   named_scope :active, :conditions => "#{Principal.table_name}.type='Group' OR (#{Principal.table_name}.type='User' AND #{Principal.table_name}.status = 1)"
-  
-  named_scope :like, lambda {|q| 
+
+  named_scope :active_or_registered, :conditions => "#{Principal.table_name}.type='Group' OR (#{Principal.table_name}.type='User' AND (#{Principal.table_name}.status = 1 OR #{Principal.table_name}.status = 2))"
+
+  named_scope :like, lambda {|q|
     s = "%#{q.to_s.strip.downcase}%"
     {:conditions => ["LOWER(login) LIKE :s OR LOWER(firstname) LIKE :s OR LOWER(lastname) LIKE :s OR LOWER(mail) LIKE :s", {:s => s}],
      :order => 'type, login, lastname, firstname, mail'
     }
   }
-  
+
   before_create :set_default_empty_values
 
   def name(formatter = nil)
     to_s
+  end
+
+  def self.possible_members(criteria, limit)
+    Principal.active_or_registered.like(criteria).find(:all, :limit => limit)
   end
 
   def <=>(principal)
@@ -46,9 +52,9 @@ class Principal < ActiveRecord::Base
       principal.class.name <=> self.class.name
     end
   end
-  
+
   protected
-  
+
   # Make sure we don't try to insert NULL values (see #4632)
   def set_default_empty_values
     self.login ||= ''
