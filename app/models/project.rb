@@ -43,7 +43,7 @@ class Project < ActiveRecord::Base
   has_many :time_entries, :dependent => :delete_all
   has_many :queries, :dependent => :delete_all
   has_many :documents, :dependent => :destroy
-  has_many :news, :dependent => :delete_all, :include => :author
+  has_many :news, :dependent => :destroy, :include => :author
   has_many :issue_categories, :dependent => :delete_all, :order => "#{IssueCategory.table_name}.name"
   has_many :boards, :dependent => :destroy, :order => "position ASC"
   has_one :repository, :dependent => :destroy
@@ -56,7 +56,7 @@ class Project < ActiveRecord::Base
                           :join_table => "#{table_name_prefix}custom_fields_projects#{table_name_suffix}",
                           :association_foreign_key => 'custom_field_id'
                           
-  acts_as_nested_set :order => 'name'
+  acts_as_nested_set :order => 'name', :dependent => :destroy
   acts_as_attachable :view_permission => :view_files,
                      :delete_permission => :manage_files
 
@@ -79,7 +79,7 @@ class Project < ActiveRecord::Base
   # reserved words
   validates_exclusion_of :identifier, :in => %w( new )
 
-  before_destroy :delete_all_members, :destroy_children
+  before_destroy :delete_all_members
 
   named_scope :has_module, lambda { |mod| { :conditions => ["#{Project.table_name}.id IN (SELECT em.project_id FROM #{EnabledModule.table_name} em WHERE em.name=?)", mod.to_s] } }
   named_scope :active, { :conditions => "#{Project.table_name}.status = #{STATUS_ACTIVE}"}
@@ -509,10 +509,7 @@ class Project < ActiveRecord::Base
   def enabled_module_names=(module_names)
     if module_names && module_names.is_a?(Array)
       module_names = module_names.collect(&:to_s).reject(&:blank?)
-      # remove disabled modules
-      enabled_modules.each {|mod| mod.destroy unless module_names.include?(mod.name)}
-      # add new modules
-      module_names.reject {|name| module_enabled?(name)}.each {|name| enabled_modules << EnabledModule.new(:name => name)}
+      self.enabled_modules = module_names.collect {|name| enabled_modules.detect {|mod| mod.name == name} || EnabledModule.new(:name => name)}
     else
       enabled_modules.clear
     end
@@ -620,13 +617,6 @@ class Project < ActiveRecord::Base
   end
   
   private
-  
-  # Destroys children before destroying self
-  def destroy_children
-    children.each do |child|
-      child.destroy
-    end
-  end
   
   # Copies wiki from +project+
   def copy_wiki(project)

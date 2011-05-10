@@ -155,6 +155,42 @@ class WikiControllerTest < ActionController::TestCase
     assert_tag :tag => 'input', :attributes => {:id => 'content_version', :value => '1'}
   end
   
+  def test_update_stale_page_should_not_raise_an_error
+    @request.session[:user_id] = 2
+    c = Wiki.find(1).find_page('Another_page').content
+    c.text = 'Previous text'
+    c.save!
+    assert_equal 2, c.version
+    
+    assert_no_difference 'WikiPage.count' do
+      assert_no_difference 'WikiContent.count' do
+        assert_no_difference 'WikiContent::Version.count' do
+          put :update, :project_id => 1,
+            :id => 'Another_page',
+            :content => {
+              :comments => 'My comments',
+              :text => 'Text should not be lost',
+              :version => 1
+            }
+        end
+      end
+    end
+    assert_response :success
+    assert_template 'edit'
+    assert_tag :div,
+      :attributes => { :class => /error/ },
+      :content => /Data has been updated by another user/
+    assert_tag 'textarea', 
+      :attributes => { :name => 'content[text]' },
+      :content => /Text should not be lost/
+    assert_tag 'input', 
+      :attributes => { :name => 'content[comments]', :value => 'My comments' }
+    
+    c.reload
+    assert_equal 'Previous text', c.text
+    assert_equal 2, c.version
+  end
+  
   def test_preview
     @request.session[:user_id] = 2
     xhr :post, :preview, :project_id => 1, :id => 'CookBook_documentation',
@@ -350,6 +386,11 @@ class WikiControllerTest < ActionController::TestCase
                     :child => { :tag => 'li', :child => { :tag => 'a', :attributes => { :href => '/projects/ecookbook/wiki/Another_page' },
                                                                        :content => 'Another page' } }
   end
+  
+  def test_index_should_include_atom_link
+    get :index, :project_id => 'ecookbook'
+    assert_tag 'a', :attributes => { :href => '/projects/ecookbook/activity.atom?show_wiki_edits=1'}
+  end
 
   context "GET :export" do
     context "with an authorized user to export the wiki" do
@@ -389,6 +430,9 @@ class WikiControllerTest < ActionController::TestCase
     should_assign_to :pages_by_date
     should_render_template 'wiki/date_index'
     
+    should "include atom link" do
+      assert_tag 'a', :attributes => { :href => '/projects/ecookbook/activity.atom?show_wiki_edits=1'}
+    end
   end
   
   def test_not_found

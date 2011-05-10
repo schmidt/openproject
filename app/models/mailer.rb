@@ -85,7 +85,7 @@ class Mailer < ActionMailer::Base
     subject l(:mail_subject_reminder, :count => issues.size, :days => days)
     body :issues => issues,
          :days => days,
-         :issues_url => url_for(:controller => 'issues', :action => 'index', :set_filter => 1, :assigned_to_id => user.id, :sort_key => 'due_date', :sort_order => 'asc')
+         :issues_url => url_for(:controller => 'issues', :action => 'index', :set_filter => 1, :assigned_to_id => user.id, :sort => 'due_date:asc')
     render_multipart('reminder', body)
   end
 
@@ -114,11 +114,11 @@ class Mailer < ActionMailer::Base
     added_to_url = ''
     case container.class.name
     when 'Project'
-      added_to_url = url_for(:controller => 'projects', :action => 'list_files', :id => container)
+      added_to_url = url_for(:controller => 'files', :action => 'index', :project_id => container)
       added_to = "#{l(:label_project)}: #{container}"
       recipients container.project.notified_users.select {|user| user.allowed_to?(:view_files, container.project)}.collect  {|u| u.mail}
     when 'Version'
-      added_to_url = url_for(:controller => 'projects', :action => 'list_files', :id => container.project_id)
+      added_to_url = url_for(:controller => 'files', :action => 'index', :project_id => container.project)
       added_to = "#{l(:label_version)}: #{container.name}"
       recipients container.project.notified_users.select {|user| user.allowed_to?(:view_files, container.project)}.collect  {|u| u.mail}
     when 'Document'
@@ -326,7 +326,7 @@ class Mailer < ActionMailer::Base
                                           :conditions => s.conditions
                                     ).group_by(&:assigned_to)
     issues_by_assignee.each do |assignee, issues|
-      deliver_reminder(assignee, issues, days) unless assignee.nil?
+      deliver_reminder(assignee, issues, days) if assignee && assignee.active?
     end
   end
   
