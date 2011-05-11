@@ -25,9 +25,7 @@ class News < ActiveRecord::Base
   validates_length_of :summary, :maximum => 255
 
   acts_as_searchable :columns => ["#{table_name}.title", "#{table_name}.summary", "#{table_name}.description"], :include => :project
-  acts_as_event :url => Proc.new {|o| {:controller => 'news', :action => 'show', :id => o.id}}
-  acts_as_activity_provider :find_options => {:include => [:project, :author]},
-                            :author_key => :author_id
+  acts_as_journalized :event_url => Proc.new {|o| {:controller => 'news', :action => 'show', :id => o.journaled_id} }
   
   named_scope :visible, lambda {|*args| { 
     :include => :project,
