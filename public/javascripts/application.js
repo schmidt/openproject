@@ -270,4 +270,22 @@ function hideOnLoad() {
 	});
 }
 
+Event.observe(window, "load", function(){
+  if(Prototype.Browser.IE) {
+    var quickSelect = $$("#quick-search/select")[0];
+    if(quickSelect) {
+      var originalWidth = quickSelect.getStyle("width");
+      var collapseSelect = function() {
+        this.setStyle({width: originalWidth, minWidth: originalWidth});
+      };
+      var expandSelect = function() {
+        this.setStyle({width: "auto", minWidth: originalWidth});
+      };
+      Event.observe(quickSelect, "mousedown", expandSelect);
+      Event.observe(quickSelect, "blur", collapseSelect);
+      Event.observe(quickSelect, "change", collapseSelect);
+    }
+  }
+});
+
 Event.observe(window, 'load', hideOnLoad);
