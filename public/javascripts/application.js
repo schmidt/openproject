@@ -276,10 +276,10 @@ Event.observe(window, "load", function(){
     if(quickSelect) {
       var originalWidth = quickSelect.getStyle("width");
       var collapseSelect = function() {
-        this.setStyle({width: originalWidth});
+        this.setStyle({width: originalWidth, minWidth: originalWidth});
       };
       var expandSelect = function() {
-        this.setStyle({width: "auto"});
+        this.setStyle({width: "auto", minWidth: originalWidth});
       };
       Event.observe(quickSelect, "mousedown", expandSelect);
       Event.observe(quickSelect, "blur", collapseSelect);
