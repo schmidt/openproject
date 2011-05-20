@@ -407,6 +407,7 @@ class User < Principal
   
   safe_attributes 'status',
     'auth_source_id',
+    'remote_uid',
     :if => lambda {|user, current_user| current_user.admin?}
   
   safe_attributes 'group_ids',
