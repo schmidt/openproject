@@ -78,6 +78,7 @@ class AuthSourceLdap < AuthSource
      :firstname => AuthSourceLdap.get_attr(entry, self.attr_firstname),
      :lastname => AuthSourceLdap.get_attr(entry, self.attr_lastname),
      :mail => AuthSourceLdap.get_attr(entry, self.attr_mail),
+     :unique_uid => AuthSourceLdap.get_attr(entry, self.attr_unique_uid),
      :auth_source_id => self.id
     }
   end
