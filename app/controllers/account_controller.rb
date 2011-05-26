@@ -88,6 +88,7 @@ class AccountController < ApplicationController
         @user.activate
         @user.login = session[:auth_source_registration][:login]
         @user.auth_source_id = session[:auth_source_registration][:auth_source_id]
+        @user.unique_uid = session[:auth_source_registration][:unique_uid]
         if @user.save
           session[:auth_source_registration] = nil
           self.logged_user = @user
@@ -149,7 +150,7 @@ class AccountController < ApplicationController
     if user.nil?
       invalid_credentials
     elsif user.new_record?
-      onthefly_creation_failed(user, {:login => user.login, :auth_source_id => user.auth_source_id })
+      onthefly_creation_failed(user, {:login => user.login, :auth_source_id => user.auth_source_id, :remote_uid => user.remote_uid })
     else
       # Valid user
       successful_authentication(user)
