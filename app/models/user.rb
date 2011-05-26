@@ -76,6 +76,7 @@ class User < Principal
 
   def before_create
     self.mail_notification = Setting.default_notification_option if self.mail_notification.blank?
+    self.language ||= Setting.default_language
     true
   end
   
@@ -124,22 +125,31 @@ class User < Principal
     else
       # user is not yet registered, try to authenticate with available sources
       attrs = AuthSource.authenticate(login, password)
-      if attrs
-        user = new(attrs)
-        user.login = login
-        user.language = Setting.default_language
-        if user.save
-          user.reload
-          logger.info("User '#{user.login}' created from external auth source: #{user.auth_source.type} - #{user.auth_source.name}") if logger && user.auth_source
-        end
-      end
-    end    
+      user = update_or_create_from_auth_source(login, attrs) if attrs
+    end
     user.update_attribute(:last_login_on, Time.now) if user && !user.new_record?
     user
   rescue => text
     raise text
   end
-  
+
+  def self.update_or_create_from_auth_source(login, attrs)
+    user = attrs[:unique_uid] ? find_by_unique_uid(attrs[:unique_uid]) : nil
+    require 'ruby-debug'; debugger
+    if user
+      if user.update_attributes(attrs)
+        logger.info("User '#{user.login}' updated from external auth source: #{user.auth_source.type} - #{user.auth_source.name}") if logger && user.auth_source
+      end
+    else
+      user = new(attrs)
+      user.login = attrs[:login] || login
+      if user.save
+        logger.info("User '#{user.login}' created from external auth source: #{user.auth_source.type} - #{user.auth_source.name}") if logger && user.auth_source
+      end
+    end
+    user
+  end
+
   # Returns the user who matches the given autologin +key+ or nil
   def self.try_to_autologin(key)
     tokens = Token.find_all_by_action_and_value('autologin', key)
@@ -407,7 +417,7 @@ class User < Principal
   
   safe_attributes 'status',
     'auth_source_id',
-    'remote_uid',
+    'unique_uid',
     :if => lambda {|user, current_user| current_user.admin?}
   
   safe_attributes 'group_ids',

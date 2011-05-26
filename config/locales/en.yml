@@ -270,7 +270,7 @@ en:
   field_start_date: Start date
   field_done_ratio: % Done
   field_auth_source: Authentication mode
-  field_remote_uid: Remote UID
+  field_unique_uid: Unique identifier
   field_hide_mail: Hide my email address
   field_comments: Comment
   field_url: URL
