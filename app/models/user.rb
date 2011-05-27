@@ -117,7 +117,9 @@ class User < Principal
       return nil if !user.active?
       if user.auth_source
         # user has an external authentication method
-        return nil unless user.auth_source.authenticate(login, password)
+        # TODO should use uuid here
+        attrs = user.auth_source.authenticate(login, password)
+        return nil unless attrs and user.update_from_auth_source(login, attrs)
       else
         # authentication with local password
         return nil unless User.hash_password(password) == user.hashed_password        
@@ -135,19 +137,22 @@ class User < Principal
 
   def self.update_or_create_from_auth_source(login, attrs)
     user = attrs[:unique_uid] ? find_by_unique_uid(attrs[:unique_uid]) : nil
-    require 'ruby-debug'; debugger
-    if user
-      if user.update_attributes(attrs)
-        logger.info("User '#{user.login}' updated from external auth source: #{user.auth_source.type} - #{user.auth_source.name}") if logger && user.auth_source
-      end
+    user = new unless user
+    user.update_from_auth_source(login, attrs) ? user : nil
+  end
+  
+  def update_from_auth_source(login_name, attrs)
+    safe_attributes = attrs
+    login = attrs[:login] || login_name
+
+    is_new = new_record?
+    if save
+      logger.info("User '#{login}' #{is_new ? "created" : "updated"} from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and auth_source
+      return true
     else
-      user = new(attrs)
-      user.login = attrs[:login] || login
-      if user.save
-        logger.info("User '#{user.login}' created from external auth source: #{user.auth_source.type} - #{user.auth_source.name}") if logger && user.auth_source
-      end
+      logger.info("Failed to #{is_new ? "create" : "update"} user '#{login}' from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and auth_source
+      return false
     end
-    user
   end
 
   # Returns the user who matches the given autologin +key+ or nil
