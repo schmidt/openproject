@@ -65,6 +65,7 @@ class User < Principal
   validates_presence_of :login, :firstname, :lastname, :mail, :if => Proc.new { |user| !user.is_a?(AnonymousUser) }
   validates_uniqueness_of :login, :if => Proc.new { |user| !user.login.blank? }, :case_sensitive => false
   validates_uniqueness_of :mail, :if => Proc.new { |user| !user.mail.blank? }, :case_sensitive => false
+  validates_uniqueness_of :unique_uid, :if => Proc.new { |user| !user.unique_uid.blank? }, :case_sensitive => true
   # Login must contain lettres, numbers, underscores only
   validates_format_of :login, :with => /^[a-z0-9_\-@\.]*$/i
   validates_length_of :login, :maximum => 30
@@ -126,6 +127,7 @@ class User < Principal
       end
     else
       # user is not yet registered, try to authenticate with available sources
+      require 'ruby-debug'; debugger
       attrs = AuthSource.authenticate(login, password)
       user = update_or_create_from_auth_source(login, attrs) if attrs
     end
@@ -139,20 +141,31 @@ class User < Principal
     user = attrs[:unique_uid] ? find_by_unique_uid(attrs[:unique_uid]) : nil
     user = new unless user
     user.update_from_auth_source(login, attrs) ? user : nil
+    
+  end
+  
+  def update_attributes_from_auth_source(&block)
+    return true if self.auth_source.blank?
+    attrs = self.auth_source.user_attributes(user.login, user.unique_uid)
+    user.safe_attributes = attrs if attrs
   end
   
   def update_from_auth_source(login_name, attrs)
-    safe_attributes = attrs
-    login = attrs[:login] || login_name
+    return false if self.unique_uid and self.unique_uid != attrs[:unique_uid]
 
-    is_new = new_record?
-    if save
-      logger.info("User '#{login}' #{is_new ? "created" : "updated"} from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and auth_source
-      return true
-    else
-      logger.info("Failed to #{is_new ? "create" : "update"} user '#{login}' from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and auth_source
-      return false
-    end
+    self.safe_attributes = attrs
+    self.unique_uid ||= attrs[:unique_uid]
+    self.login = attrs[:login] || login_name
+
+    # is_new = new_record?
+        # 
+        #   logger.info("User '#{login}' #{is_new ? "created" : "updated"} from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and self.auth_source
+        #   return true
+        # else
+        #   logger.info("Failed to #{is_new ? "create" : "update"} user '#{login}' from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and self.auth_source
+        #   return false
+        # end
+    true
   end
 
   # Returns the user who matches the given autologin +key+ or nil
@@ -422,7 +435,6 @@ class User < Principal
   
   safe_attributes 'status',
     'auth_source_id',
-    'unique_uid',
     :if => lambda {|user, current_user| current_user.admin?}
   
   safe_attributes 'group_ids',
