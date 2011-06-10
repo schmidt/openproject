@@ -118,54 +118,49 @@ class User < Principal
       return nil if !user.active?
       if user.auth_source
         # user has an external authentication method
-        # TODO should use uuid here
         attrs = user.auth_source.authenticate(login, password)
-        return nil unless attrs and user.update_from_auth_source(login, attrs)
+        return nil unless attrs
+        user.update_from_auth_source({:login => login}.merge(attrs))
       else
         # authentication with local password
         return nil unless User.hash_password(password) == user.hashed_password        
       end
     else
       # user is not yet registered, try to authenticate with available sources
-      require 'ruby-debug'; debugger
       attrs = AuthSource.authenticate(login, password)
       user = update_or_create_from_auth_source(login, attrs) if attrs
     end
-    user.update_attribute(:last_login_on, Time.now) if user && !user.new_record?
+    user.update_attribute(:last_login_on, Time.now) if user && !user.new_record? && !user.changed?
     user
   rescue => text
     raise text
   end
 
   def self.update_or_create_from_auth_source(login, attrs)
-    user = attrs[:unique_uid] ? find_by_unique_uid(attrs[:unique_uid]) : nil
+    user =
+      if attrs[:unique_uid] and attrs[:auth_source_id]
+        find(:first, :conditions => attrs.slice(:unique_uid, :auth_source_id))
+      else
+        nil
+      end
     user = new unless user
-    user.update_from_auth_source(login, attrs) ? user : nil
-    
+    user.update_from_auth_source({:login => login}.merge(attrs))
+    user
   end
   
-  def update_attributes_from_auth_source(&block)
-    return true if self.auth_source.blank?
-    attrs = self.auth_source.user_attributes(user.login, user.unique_uid)
-    user.safe_attributes = attrs if attrs
-  end
-  
-  def update_from_auth_source(login_name, attrs)
-    return false if self.unique_uid and self.unique_uid != attrs[:unique_uid]
+  def update_from_auth_source(attrs)
+    if self.unique_uid.blank? or self.unique_uid == attrs[:unique_uid]
+      self.safe_attributes = attrs
+      self.unique_uid ||= attrs[:unique_uid]
+      self.login = attrs[:login] if attrs[:login]
+    end
 
-    self.safe_attributes = attrs
-    self.unique_uid ||= attrs[:unique_uid]
-    self.login = attrs[:login] || login_name
-
-    # is_new = new_record?
-        # 
-        #   logger.info("User '#{login}' #{is_new ? "created" : "updated"} from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and self.auth_source
-        #   return true
-        # else
-        #   logger.info("Failed to #{is_new ? "create" : "update"} user '#{login}' from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and self.auth_source
-        #   return false
-        # end
-    true
+    is_new = new_record?
+    if save
+      logger.info("#{is_new ? "Created" : "Updated"} user '#{self.login}' from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and self.auth_source
+    else
+      logger.info("Failed to #{is_new ? "create" : "update"} user '#{login}' from external auth source: #{auth_source.type} - #{auth_source.name}") if logger and self.auth_source
+    end
   end
 
   # Returns the user who matches the given autologin +key+ or nil
