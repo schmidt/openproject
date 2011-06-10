@@ -152,6 +152,7 @@ class User < Principal
     if self.unique_uid.blank? or self.unique_uid == attrs[:unique_uid]
       self.safe_attributes = attrs
       self.unique_uid ||= attrs[:unique_uid]
+      self.auth_source_id = attrs[:auth_source_id] if attrs[:auth_source_id]
       self.login = attrs[:login] if attrs[:login]
     end
 
