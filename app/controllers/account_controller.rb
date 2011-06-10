@@ -151,26 +151,17 @@ class AccountController < ApplicationController
       invalid_credentials
     elsif user.new_record?
       onthefly_creation_failed(user, {:login => user.login, :auth_source_id => user.auth_source_id, :unique_uid => user.unique_uid })
+    elsif user.changed?
+      update_account_failed(user)
     else
-      # Valid user
-      if update_from_auth_source(user)
-        successful_authentication(user)
-      else
-        invalid_credentials
-      end
+      successful_authentication(user)
     end
   end
   
-  def update_from_auth_source(user)
-    return true if user.auth_source.blank?
-    user.update_attributes_from_auth_source do |attrs, errors|
-      if logger
-        logger.info "Updated attributes for user '#{user.login}': #{attrs.map{|k,v| "#{k}: #{v}"}.join(", ")}"
-        logger.error "Failed to update attributes for user '#{user.login}': #{errors.join(', ')}"
-      end
-    end
+  def update_account_failed(user)
+    logger.warn "Failed to update account information for '#{params[:username]}'"
+    flash.now[:error] = l(:notice_account_update_failed)
   end
-
   
   def open_id_authenticate(openid_url)
     authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email], :return_to => signin_url) do |result, identity_url, registration|
