@@ -125,6 +125,7 @@ ca:
         even: "ha de ser parell"
         greater_than_start_date: "ha de ser superior que la data inicial"
         not_same_project: "no pertany al mateix projecte"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Aquesta relació crearia una dependència circular"
         cant_link_an_issue_with_a_descendant: "Un assumpte no es pot enllaçar a una de les seves subtasques"
 

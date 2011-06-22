@@ -128,6 +128,7 @@ pl:
         even: "musi być parzyste"
         greater_than_start_date: "musi być większe niż początkowa data"
         not_same_project: "nie należy do tego samego projektu"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Ta relacja może wytworzyć kołową zależność"
         cant_link_an_issue_with_a_descendant: "Zagadnienie nie może zostać powiązane z jednym z własnych podzagadnień"
       

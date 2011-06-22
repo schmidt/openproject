@@ -142,6 +142,7 @@
         even: "páros kell legyen"
         greater_than_start_date: "nagyobbnak kell lennie, mint az indítás dátuma"
         not_same_project: "nem azonos projekthez tartozik"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Ez a kapcsolat egy körkörös függőséget eredményez"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

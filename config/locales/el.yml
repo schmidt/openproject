@@ -122,6 +122,7 @@ el:
         even: "πρέπει να είναι ζυγός"
         greater_than_start_date: "πρέπει να είναι αργότερα από την ημερομηνία έναρξης"
         not_same_project: "δεν ανήκει στο ίδιο έργο"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Αυτή η σχέση θα δημιουργήσει κυκλικές εξαρτήσεις"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

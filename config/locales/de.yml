@@ -139,6 +139,7 @@ de:
         even: "muss gerade sein"
         greater_than_start_date: "muss größer als Anfangsdatum sein"
         not_same_project: "gehört nicht zum selben Projekt"
+        not_visible_by_user: "kann nicht vom gegenwärtigen Benutzer gewählt werden"
         circular_dependency: "Diese Beziehung würde eine zyklische Abhängigkeit erzeugen"
         cant_link_an_issue_with_a_descendant: "Ein Ticket kann nicht mit einer ihrer Unteraufgaben verlinkt werden"
 
