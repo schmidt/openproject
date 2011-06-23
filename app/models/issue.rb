@@ -267,7 +267,7 @@ class Issue < ActiveRecord::Base
       if !user.allowed_to?(:manage_subtasks, project)
         attrs.delete('parent_issue_id')
       elsif !attrs['parent_issue_id'].blank?
-        attrs.delete('parent_issue_id') unless Issue.exists?(attrs['parent_issue_id'].to_i)
+        attrs.delete('parent_issue_id') unless Issue.visible(user).exists?(attrs['parent_issue_id'].to_i)
       end
     end
     
@@ -320,9 +320,7 @@ class Issue < ActiveRecord::Base
     
     # Checks parent issue assignment
     if @parent_issue
-      if @parent_issue.id != self.parent_id && !User.current.allowed_to?(:view_issues, @parent_issue.project)
-        errors.add :parent_issue_id, :not_visible_by_user
-      elsif !new_record?
+      if !new_record?
         # moving an existing issue
         if @parent_issue.root_id != root_id
           # we can always move to another tree
