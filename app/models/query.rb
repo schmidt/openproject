@@ -628,6 +628,8 @@ class Query < ActiveRecord::Base
     
     custom_fields.select(&:is_filter?).each do |field|
       case field.field_format
+      when "int", "float"
+        options = { :type => :integer, :order => 20 }
       when "text"
         options = { :type => :text, :order => 20 }
       when "list"
