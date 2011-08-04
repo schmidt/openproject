@@ -122,6 +122,7 @@ sr:
         even: "мора бити непаран"
         greater_than_start_date: "мора бити већи од почетног датума"
         not_same_project: "не припада истом пројекту"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Ова веза ће створити кружну референцу"
         cant_link_an_issue_with_a_descendant: "Проблем не може бити повезан са једним од својих подзадатака"
 

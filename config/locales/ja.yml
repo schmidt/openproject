@@ -143,6 +143,7 @@ ja:
         even: "は偶数にしてください。"
         greater_than_start_date: "を開始日より後にしてください"
         not_same_project: "同じプロジェクトに属していません"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "この関係では、循環依存になります"
         cant_link_an_issue_with_a_descendant: "指定したチケットとは親子関係になっているため関連づけられません"
 

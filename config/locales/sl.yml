@@ -119,6 +119,7 @@ sl:
         even: "must be even"
         greater_than_start_date: "mora biti kasnejši kot začeten datum"
         not_same_project: "ne pripada istemu projektu"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Ta odnos bi povzročil krožno odvisnost"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

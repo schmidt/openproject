@@ -126,6 +126,7 @@ he:
         even: "חייב להיות זוגי"
         greater_than_start_date: "חייב להיות מאוחר יותר מתאריך ההתחלה"
         not_same_project: "לא שייך לאותו הפרויקט"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "קשר זה יצור תלות מעגלית"
         cant_link_an_issue_with_a_descendant: "לא ניתן לקשר נושא לתת־משימה שלו"
 

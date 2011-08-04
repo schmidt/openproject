@@ -131,6 +131,7 @@ es:
         even: "debe ser par"
         greater_than_start_date: "debe ser posterior a la fecha de comienzo"
         not_same_project: "no pertenece al mismo proyecto"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Esta relación podría crear una dependencia circular"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

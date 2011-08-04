@@ -138,6 +138,7 @@ vi:
         even: "phải là số lẻ"
         greater_than_start_date: "phải đi sau ngày bắt đầu"
         not_same_project: "không thuộc cùng dự án"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "quan hệ có thể gây ra lặp vô tận"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

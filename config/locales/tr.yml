@@ -142,6 +142,7 @@ tr:
         even: "çift olmalı"
         greater_than_start_date: "başlangıç tarihinden büyük olmalı"
         not_same_project: "aynı projeye ait değil"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Bu ilişki döngüsel bağımlılık meydana getirecektir"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
       models:

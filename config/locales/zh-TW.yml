@@ -176,6 +176,7 @@
         # Append your own errors here or at the model/attributes scope.
         greater_than_start_date: "必須在開始日期之後"
         not_same_project: "不屬於同一個專案"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "這個關聯會導致環狀相依"
         cant_link_an_issue_with_a_descendant: "項目無法被連結至自己的子項目"
 
