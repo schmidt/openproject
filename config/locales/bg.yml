@@ -122,6 +122,7 @@ bg:
         even: "трябва да бъде четен[a/o]"
         greater_than_start_date: "трябва да е след началната дата"
         not_same_project: "не е от същия проект"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Тази релация ще доведе до безкрайна зависимост"
         cant_link_an_issue_with_a_descendant: "Една задача не може да бъде свързвана към своя подзадача"
 

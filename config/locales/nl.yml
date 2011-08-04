@@ -119,6 +119,7 @@ nl:
         even: "moet even zijn"
         greater_than_start_date: "moet na de startdatum liggen"
         not_same_project: "hoort niet bij hetzelfde project"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Deze relatie zou een circulaire afhankelijkheid tot gevolg hebben"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

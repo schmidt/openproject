@@ -178,6 +178,7 @@ lt:
         even: "turi būti lyginis"
         greater_than_start_date: "turi būti didesnė negu pradžios data"
         not_same_project: "nepriklauso tam pačiam projektui"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Šis ryšys sukurtų ciklinę priklausomybę"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
     

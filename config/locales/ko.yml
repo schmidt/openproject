@@ -172,6 +172,7 @@ ko:
         even: "은 짝수여야 합니다"
         greater_than_start_date: "는 시작날짜보다 커야 합니다"
         not_same_project: "는 같은 프로젝트에 속해 있지 않습니다"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "이 관계는 순환 의존관계를 만들 수 있습니다"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

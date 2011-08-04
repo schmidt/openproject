@@ -142,6 +142,7 @@ pt-BR:
         even: "precisa ser par"
         greater_than_start_date: "deve ser maior que a data inicial"
         not_same_project: "não pertence ao mesmo projeto"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Esta relação geraria uma dependência circular"
         cant_link_an_issue_with_a_descendant: "Uma tarefa não pode ser relaciona a uma de suas subtarefas"
 

@@ -149,6 +149,7 @@ gl:
         even: "debe ser impar"
         greater_than_start_date: "debe ser posterior á data de comezo"
         not_same_project: "non pertence ao mesmo proxecto"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Esta relación podería crear unha dependencia circular"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

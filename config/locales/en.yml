@@ -122,6 +122,7 @@ en:
         even: "must be even"
         greater_than_start_date: "must be greater than start date"
         not_same_project: "doesn't belong to the same project"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "This relation would create a circular dependency"
         cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
 

@@ -196,6 +196,7 @@ ru:
         even: "может иметь лишь четное значение"
         greater_than_start_date: "должна быть позднее даты начала"
         not_same_project: "не относится к одному проекту"
+        not_visible_by_user: "isn't selectable by the current user"
         circular_dependency: "Такая связь приведет к циклической зависимости"
         cant_link_an_issue_with_a_descendant: "Задача не может быть связана со своей подзадачей"
 
