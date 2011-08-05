@@ -272,7 +272,7 @@ function hideOnLoad() {
 
 Event.observe(window, "load", function(){
   if(Prototype.Browser.IE) {
-    var quickSelect = $$("#quick-search/select")[0];
+    var quickSelect = $$("#quick-search select")[0];
     if(quickSelect) {
       var originalWidth = quickSelect.getStyle("width");
       var collapseSelect = function() {
