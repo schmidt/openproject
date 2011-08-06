@@ -11,8 +11,6 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-require 'source_annotation_extractor'
-
 # Modified version of the SourceAnnotationExtractor in railties
 # Will search for runable code that uses <tt>call_hook</tt>
 class PluginSourceAnnotationExtractor < SourceAnnotationExtractor
