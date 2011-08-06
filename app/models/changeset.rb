@@ -36,7 +36,7 @@ class Changeset < ActiveRecord::Base
   validates_uniqueness_of :revision, :scope => :repository_id
   validates_uniqueness_of :scmid, :scope => :repository_id, :allow_nil => true
 
-  named_scope :visible, lambda {|*args| { :include => {:repository => :project},
+  scope :visible, lambda {|*args| { :include => {:repository => :project},
                                           :conditions => Project.allowed_to_condition(args.first || User.current, :view_changesets) } }
 
   def revision=(r)
@@ -82,7 +82,7 @@ class Changeset < ActiveRecord::Base
       nil
     end
   end
-  
+
   # Committer of the Changeset
   #
   # Attribute reader for committer that encodes the committer string to

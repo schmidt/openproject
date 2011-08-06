@@ -49,7 +49,7 @@ class User < Principal
   belongs_to :auth_source
 
   # Active non-anonymous users scope
-  named_scope :active, :conditions => "#{User.table_name}.status = #{STATUS_ACTIVE}"
+  scope :active, :conditions => "#{User.table_name}.status = #{STATUS_ACTIVE}"
 
   acts_as_customizable
 
@@ -70,11 +70,11 @@ class User < Principal
   validates_confirmation_of :password, :allow_nil => true
   validates_inclusion_of :mail_notification, :in => MAIL_NOTIFICATION_OPTIONS.collect(&:first), :allow_blank => true
 
-  named_scope :in_group, lambda {|group|
+  scope :in_group, lambda {|group|
     group_id = group.is_a?(Group) ? group.id : group.to_i
     { :conditions => ["#{User.table_name}.id IN (SELECT gu.user_id FROM #{table_name_prefix}groups_users#{table_name_suffix} gu WHERE gu.group_id = ?)", group_id] }
   }
-  named_scope :not_in_group, lambda {|group|
+  scope :not_in_group, lambda {|group|
     group_id = group.is_a?(Group) ? group.id : group.to_i
     { :conditions => ["#{User.table_name}.id NOT IN (SELECT gu.user_id FROM #{table_name_prefix}groups_users#{table_name_suffix} gu WHERE gu.group_id = ?)", group_id] }
   }
@@ -543,7 +543,9 @@ end
 
 class AnonymousUser < User
 
-  def validate_on_create
+  validate :create_validation, :on => :create
+
+  def create_validation
     # There should be only one AnonymousUser in the database
     errors.add_to_base 'An anonymous user already exists.' if AnonymousUser.find(:first)
   end

@@ -44,14 +44,15 @@ class Message < ActiveRecord::Base
 
   after_create :add_author_as_watcher
 
-  named_scope :visible, lambda {|*args| { :include => {:board => :project},
+  scope :visible, lambda {|*args| { :include => {:board => :project},
                                           :conditions => Project.allowed_to_condition(args.first || User.current, :view_messages) } }
 
   def visible?(user=User.current)
     !user.nil? && user.allowed_to?(:view_messages, project)
   end
 
-  def validate_on_create
+  validate :on_create_validation, :on => :create
+  def on_create_validation
     # Can not reply to a locked topic
     errors.add_to_base 'Topic is locked' if root.locked? && self != root
   end
