@@ -12,6 +12,10 @@
 #++
 
 require 'redmine/access_control'
+require 'redmine/version'
+require 'redmine/access_keys'
+require 'redmine/info'
+require 'redmine/views'
 require 'redmine/menu_manager'
 require 'redmine/activity'
 require 'redmine/search'
@@ -24,6 +28,9 @@ require 'redmine/plugin'
 require 'redmine/notifiable'
 require 'redmine/wiki_formatting'
 require 'redmine/scm/base'
+require 'redmine/configuration'
+require 'redmine/safe_attributes'
+require 'redmine/ciphering'
 
 begin
   require_library_or_gem 'RMagick' unless Object.const_defined?(:Magick)

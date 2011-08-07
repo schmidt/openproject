@@ -26,3 +26,10 @@ module Redmine::MenuManager
     @items[menu_name.to_sym] || Redmine::MenuManager::TreeNode.new(:root, {})
   end
 end
+
+require 'redmine/menu_manager/mapper'
+require 'redmine/menu_manager/tree_node'
+require 'redmine/menu_manager/menu_controller'
+require 'redmine/menu_manager/menu_error'
+require 'redmine/menu_manager/menu_helper'
+require 'redmine/menu_manager/menu_item'

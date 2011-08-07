@@ -11,6 +11,10 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
+require 'redmine/wiki_formatting/macros'
+require 'redmine/wiki_formatting/textile/formatter'
+require 'redmine/wiki_formatting/textile/helper'
+
 module Redmine
   module WikiFormatting
     @@formatters = {}
