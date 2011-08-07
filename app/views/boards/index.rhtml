@@ -11,7 +11,7 @@
 <% for board in @boards %>
   <tr class="<%= cycle 'odd', 'even' %>">
     <td>
-      <%= link_to h(board.name), {:action => 'show', :id => board}, :class => "board"  %><br />
+      <%= link_to board.name, {:action => 'show', :id => board}, :class => "board"  %><br />
       <%=h board.description %>
     </td>
     <td align="center"><%= board.topics_count %></td>
@@ -30,7 +30,7 @@
 </table>
 
 <% other_formats_links do |f| %>
-	<%= f.link_to 'Atom', :url => {:controller => 'activities', :action => 'index', :id => @project, :show_messages => 1, :key => User.current.rss_key} %>
+        <%= f.link_to 'Atom', :url => {:controller => 'activities', :action => 'index', :id => @project, :show_messages => 1, :key => User.current.rss_key} %>
 <% end %>
 
 <% content_for :header_tags do %>

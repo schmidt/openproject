@@ -8,13 +8,13 @@
 
 <% if IssueCustomField.all.any? %>
 <p>
-	<label><%= l(:label_custom_field_plural) %></label>
-	<% IssueCustomField.all.each do |field| %>
-		<label class="block">
-			<%= check_box_tag 'tracker[custom_field_ids][]',field.id, @tracker.custom_fields.include?(field) %>
-			<%=h field.name %>
-		</label>
-	<% end %>
+        <label><%= l(:label_custom_field_plural) %></label>
+        <% IssueCustomField.all.each do |field| %>
+                <label class="block">
+                        <%= check_box_tag 'tracker[custom_field_ids][]',field.id, @tracker.custom_fields.include?(field) %>
+                        <%=h field.name %>
+                </label>
+        <% end %>
 </p>
 <%= hidden_field_tag 'tracker[custom_field_ids][]', '' %>
 <% end %>
@@ -32,7 +32,7 @@
 <% if @projects.any? %>
 <fieldset class="box" id="tracker_project_ids"><legend><%= l(:label_project_plural) %></legend>
 <%= project_nested_ul(@projects) do |p|
-  content_tag('label', check_box_tag('tracker[project_ids][]', p.id, @tracker.projects.include?(p), :id => nil) + ' ' + h(p))
+  content_tag('label', (check_box_tag('tracker[project_ids][]', p.id, @tracker.projects.include?(p), :id => nil) + ' ' + h(p)).html_safe)
 end %>
 <%= hidden_field_tag('tracker[project_ids][]', '', :id => nil) %>
 <p><%= check_all_links 'tracker_project_ids' %></p>
