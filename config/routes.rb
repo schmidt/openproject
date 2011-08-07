@@ -188,50 +188,32 @@ Chiliproject::Application.routes.draw do
 
   match 'projects/:project_id/issue_categories/new', :to => 'issue_categories#new'
 
-  # map.with_options :controller => 'repositories' do |repositories|
-  #   repositories.with_options :conditions => {:method => :get} do |repository_views|
-  #     repository_views.connect 'projects/:id/repository', :action => 'show'
-  #     repository_views.connect 'projects/:id/repository/edit', :action => 'edit'
-  #     repository_views.connect 'projects/:id/repository/statistics', :action => 'stats'
-  #     repository_views.connect 'projects/:id/repository/revisions', :action => 'revisions'
-  #     repository_views.connect 'projects/:id/repository/revisions.:format', :action => 'revisions'
-  #     repository_views.connect 'projects/:id/repository/revisions/:rev', :action => 'revision'
-  #     repository_views.connect 'projects/:id/repository/revisions/:rev/diff', :action => 'diff'
-  #     repository_views.connect 'projects/:id/repository/revisions/:rev/diff.:format', :action => 'diff'
-  #     repository_views.connect 'projects/:id/repository/revisions/:rev/raw/*path', :action => 'entry', :format => 'raw', :requirements => { :rev => /[a-z0-9\.\-_]+/ }
-  #     repository_views.connect 'projects/:id/repository/revisions/:rev/:action/*path', :requirements => { :rev => /[a-z0-9\.\-_]+/ }
-  #     repository_views.connect 'projects/:id/repository/raw/*path', :action => 'entry', :format => 'raw'
-  #     # TODO: why the following route is required?
-  #     repository_views.connect 'projects/:id/repository/entry/*path', :action => 'entry'
-  #     repository_views.connect 'projects/:id/repository/:action/*path'
-  #   end
+  controller :repositories do
+    scope 'projects/:id/repository' do
+      root :to => :show
+      get 'edit' => :edit
+      get 'statistics' => :statistics
+      get 'revisions(.:format)(/:rev)' => :revisions
+      get 'revisions/:rev/diff(.:format)' => :diff
+      get 'revisions/:rev/raw/*path' => :entry, :format => :raw, :rev => /[a-z0-9\.\-_]+/
+      get 'revisions/:rev/:action/*path' => :entry, :format => :raw, :rev => /[a-z0-9\.\-_]+/
+      get 'raw/*path' => :entry, :format => :raw
+      # TODO: why the following route is required?
+      get 'entry/*path' => :entry
+      get ':action/*path'
 
-  #   repositories.connect 'projects/:id/repository/:action', :conditions => {:method => :post}
-  # end
+      post ':action'
+    end
+  end
 
-  # map.connect 'attachments/:id', :controller => 'attachments', :action => 'show', :id => /\d+/
-  # map.connect 'attachments/:id/:filename', :controller => 'attachments', :action => 'show', :id => /\d+/, :filename => /.*/
-  # map.connect 'attachments/download/:id/:filename', :controller => 'attachments', :action => 'download', :id => /\d+/, :filename => /.*/
+  scope 'attachments/:id', :id => /\d+/ do
+    controller :attachments do
+      match '(:filename)' => :show
+    end
+  end
+  match 'attachments/download/:id/:filename', :to => 'attachments#download', :id => /\d+/
 
   resources :groups
-
-  # #left old routes at the bottom for backwards compat
-  # map.connect 'projects/:project_id/issues/:action', :controller => 'issues'
-  # map.connect 'projects/:project_id/documents/:action', :controller => 'documents'
-  # map.connect 'projects/:project_id/boards/:action/:id', :controller => 'boards'
-  # map.connect 'boards/:board_id/topics/:action/:id', :controller => 'messages'
-  # map.connect 'wiki/:id/:page/:action', :page => nil, :controller => 'wiki'
-  # map.connect 'issues/:issue_id/relations/:action/:id', :controller => 'issue_relations'
-  # map.connect 'projects/:project_id/news/:action', :controller => 'news'
-  # map.connect 'projects/:project_id/timelog/:action/:id', :controller => 'timelog', :project_id => /.+/
-  # map.with_options :controller => 'repositories' do |omap|
-  #   omap.repositories_show 'repositories/browse/:id/*path', :action => 'browse'
-  #   omap.repositories_changes 'repositories/changes/:id/*path', :action => 'changes'
-  #   omap.repositories_diff 'repositories/diff/:id/*path', :action => 'diff'
-  #   omap.repositories_entry 'repositories/entry/:id/*path', :action => 'entry'
-  #   omap.repositories_entry 'repositories/annotate/:id/*path', :action => 'annotate'
-  #   omap.connect 'repositories/revision/:id/:rev', :action => 'revision'
-  # end
 
   controller :sys do
     get 'sys/projects.:format' => :projects
