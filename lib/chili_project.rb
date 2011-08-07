@@ -11,5 +11,8 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
+require 'chili_project/database'
+require 'chili_project/compatibility'
+
 module ChiliProject
 end
