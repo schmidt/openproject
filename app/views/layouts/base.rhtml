@@ -9,8 +9,8 @@
 <%= favicon %>
 <%= stylesheet_link_tag 'application', :media => 'all' %>
 <%= stylesheet_link_tag 'rtl', :media => 'all' if l(:direction) == 'rtl' %>
-<%= (javascript_heads || "").html_safe %>
-<%= (heads_for_theme || "").html_safe %>
+<%= javascript_heads %>
+<%= heads_for_theme %>
 <!--[if IE 6]>
     <style type="text/css">
       * html body{ width: expression( document.documentElement.clientWidth < 900 ? '900px' : '100%' ); }
@@ -21,7 +21,7 @@
 <!-- page specific tags -->
 <%= yield :header_tags -%>
 </head>
-<body class="<%= body_css_classes %>">
+<body class="<%=h body_css_classes %>">
 <div id="wrapper">
 <div id="wrapper2">
 <div id="top-menu">
@@ -60,10 +60,10 @@
     </div>
 
     <div id="content">
-                                <%= render_flash_messages %>
+				<%= render_flash_messages %>
         <%= yield %>
         <%= call_hook :view_layouts_base_content %>
-                                <div style="clear:both;"></div>
+				<div style="clear:both;"></div>
     </div>
 </div>
 

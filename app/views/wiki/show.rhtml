@@ -11,7 +11,7 @@
 <%= link_to_if_authorized(l(:label_history), {:action => 'history', :id => @page.title}, :class => 'icon icon-history') %>
 </div>
 
-<%= breadcrumb(@page.ancestors.reverse.collect {|parent| link_to parent.pretty_title, {:id => parent.title, :project_id => parent.project}}) %>
+<%= breadcrumb(@page.ancestors.reverse.collect {|parent| link_to h(parent.pretty_title), {:id => parent.title, :project_id => parent.project}}) %>
 
 <% if @content.version != @page.content.version %>
     <p>
@@ -61,4 +61,4 @@
   <%= render :partial => 'wiki/sidebar' %>
 <% end %>
 
-<% html_title @page.pretty_title %>
+<% html_title h(@page.pretty_title) %>

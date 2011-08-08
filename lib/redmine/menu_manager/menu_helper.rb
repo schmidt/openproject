@@ -19,7 +19,7 @@ module Redmine::MenuManager::MenuHelper
 
   # Renders the application main menu
   def render_main_menu(project)
-    render_menu((project && !project.new_record?) ? :project_menu : :application_menu, project).html_safe
+    render_menu((project && !project.new_record?) ? :project_menu : :application_menu, project)
   end
 
   def display_main_menu?(project)
@@ -32,7 +32,7 @@ module Redmine::MenuManager::MenuHelper
     menu_items_for(menu, project) do |node|
       links << render_menu_node(node, project)
     end
-    links.empty? ? nil : content_tag('ul', links.join("\n").html_safe)
+    links.empty? ? nil : content_tag('ul', links.join("\n"))
   end
 
   def render_menu_node(node, project=nil)
@@ -60,7 +60,7 @@ module Redmine::MenuManager::MenuHelper
         end
       end
 
-      html << content_tag(:ul, standard_children_list.html_safe, :class => 'menu-children') unless standard_children_list.empty?
+      html << content_tag(:ul, standard_children_list, :class => 'menu-children') unless standard_children_list.empty?
 
       # Unattached children
       unattached_children_list = render_unattached_children_menu(node, project)
@@ -68,7 +68,7 @@ module Redmine::MenuManager::MenuHelper
 
       html << '</li>'
     end
-    return html.join("\n").html_safe
+    return html.join("\n")
   end
 
   # Returns a list of unattached children menu items
@@ -89,14 +89,14 @@ module Redmine::MenuManager::MenuHelper
   end
 
   def render_single_menu_node(item, caption, url, selected)
-    link_to(caption, url, item.html_options(:selected => selected))
+    link_to(h(caption), url, item.html_options(:selected => selected))
   end
 
   def render_unattached_menu_item(menu_item, project)
     raise Redmine::MenuManager::MenuError, ":child_menus must be an array of MenuItems" unless menu_item.is_a? Redmine::MenuManager::MenuItem
 
     if User.current.allowed_to?(menu_item.url, project)
-      link_to(menu_item.caption,
+      link_to(h(menu_item.caption),
               menu_item.url,
               menu_item.html_options)
     end

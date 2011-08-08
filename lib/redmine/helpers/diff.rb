@@ -61,7 +61,7 @@ module Redmine
             words_del = 0
           end
         end
-        words.join(' ').html_safe
+        words.join(' ')
       end
     end
   end
