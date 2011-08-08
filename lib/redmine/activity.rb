@@ -11,6 +11,8 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
+require 'redmine/activity/fetcher'
+
 module Redmine
   module Activity
 

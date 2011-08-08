@@ -32,6 +32,7 @@ require 'redmine/configuration'
 require 'redmine/safe_attributes'
 require 'redmine/ciphering'
 require 'redmine/export'
+require 'redmine/default_data/loader'
 
 begin
   require_library_or_gem 'RMagick' unless Object.const_defined?(:Magick)
