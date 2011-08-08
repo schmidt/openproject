@@ -6,10 +6,10 @@ gem "coderay", "~> 0.9.7"
 gem "i18n", "~> 0.4.2"
 gem "rubytree", "~> 0.5.2", :require => 'tree'
 gem "rdoc", ">= 2.4.2"
-gem "builder"
 
-gem "ruby2ruby"
-gem "ParseTree", :require => 'parse_tree'
+gem "tzinfo"
+gem "builder"
+gem "ruby-mysql"
 
 group :test do
   gem 'shoulda', '~> 2.10.3'
@@ -51,6 +51,11 @@ platforms :mri do
 end
 
 platforms :mri_18 do
+  group :rails3_conversion do
+    gem "ruby2ruby"
+    gem "ParseTree", :require => 'parse_tree'
+  end
+
   group :sqlite do
     gem "sqlite3-ruby", "< 1.3", :require => "sqlite3"
   end
