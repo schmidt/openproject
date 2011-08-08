@@ -102,3 +102,13 @@ module ActionController
     end
   end
 end
+
+class String
+  def html_safe?
+    true
+  end
+
+  def html_safe
+    self
+  end
+end
