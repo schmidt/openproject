@@ -13,14 +13,24 @@
 
 module Redmine #:nodoc:
 
-  class PluginNotFound < StandardError
+  class PluginError < StandardError
     attr_reader :plugin_id
     def initialize(plug_id=nil)
       super
       @plugin_id = plug_id
     end
   end
-  class PluginRequirementError < StandardError; end
+  class PluginNotFound < PluginError
+    def to_s
+      "Missing the plugin #{@plugin_id}"
+    end
+  end
+  class PluginCircularDependency < PluginError
+    def to_s
+      "Circular plugin dependency in #{@plugin_id}"
+    end
+  end
+  class PluginRequirementError < PluginError; end
 
   # Base class for Redmine plugins.
   # Plugins are registered using the <tt>register</tt> class method that acts as the public constructor.
@@ -67,36 +77,43 @@ module Redmine #:nodoc:
 
     # Plugin constructor
     def self.register(id, &block)
-      begin
-        id = id.to_sym
-        p = new(id)
-        p.instance_eval(&block)
-        # Set a default name if it was not provided during registration
-        p.name(id.to_s.humanize) if p.name.nil?
-        # Adds plugin locales if any
-        # YAML translation files should be found under <plugin>/config/locales/
-        ::I18n.load_path += Dir.glob(File.join(RAILS_ROOT, 'vendor', 'plugins', id.to_s, 'config', 'locales', '*.yml'))
-        registered_plugins[id] = p
+      id = id.to_sym
+      p = new(id)
+      p.instance_eval(&block)
+      # Set a default name if it was not provided during registration
+      p.name(id.to_s.humanize) if p.name.nil?
+      # Adds plugin locales if any
+      # YAML translation files should be found under <plugin>/config/locales/
+      ::I18n.load_path += Dir.glob(File.join(RAILS_ROOT, 'vendor', 'plugins', id.to_s, 'config', 'locales', '*.yml'))
+      registered_plugins[id] = p
 
-        # If there are plugins waiting for us to be loaded, we try loading those, again
-        if deferred_plugins[id]
-          deferred_plugins[id].each do |ary|
-            plugin_id, block = ary
-            register(plugin_id, &block)
-          end
-          deferred_plugins.delete(id)
+      # If there are plugins waiting for us to be loaded, we try loading those, again
+      if deferred_plugins[id]
+        deferred_plugins[id].each do |ary|
+          plugin_id, block = ary
+          register(plugin_id, &block)
         end
-
-        return p
-      rescue PluginNotFound => e
-        if RedminePluginLocator.instance.has_plugin? e.plugin_id
-          # The required plugin is going to be loaded later, defer loading this plugin
-          (deferred_plugins[e.plugin_id] ||= []) << [id, block]
-          return p
-        else
-          raise e
-        end
+        deferred_plugins.delete(id)
       end
+
+      return p
+    rescue PluginNotFound => e
+      # find circular dependencies
+      raise PluginCircularDependency.new(id) if self.dependencies_for(e.plugin_id).include?(id)
+      if RedminePluginLocator.instance.has_plugin? e.plugin_id
+        # The required plugin is going to be loaded later, defer loading this plugin
+        (deferred_plugins[e.plugin_id] ||= []) << [id, block]
+        return p
+      else
+        raise
+      end
+    end
+
+    # returns an array of all dependencies we know of for plugin id
+    # (might not be complete at all times!)
+    def self.dependencies_for(id)
+      direct_deps = deferred_plugins.keys.find_all{|k| deferred_plugins[k].collect(&:first).include?(id)}
+      direct_deps.inject([]) {|deps,v| deps << v; deps += self.dependencies_for(v)}
     end
 
     # Returns an array of all registered plugins
