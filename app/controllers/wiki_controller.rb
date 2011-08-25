@@ -132,6 +132,7 @@ class WikiController < ApplicationController
   rescue ActiveRecord::StaleObjectError
     # Optimistic locking exception
     flash[:error] = l(:notice_locking_conflict)
+    render 'wiki/edit'
   end
 
   # rename a page
