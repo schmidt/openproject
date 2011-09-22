@@ -942,6 +942,8 @@ module ApplicationHelper
       case 
       when params[:controller] == "timelog"
         "reports"
+      when params[:controller] == 'reports'
+        'issues'
       when params[:controller] == 'projects' && params[:action] == 'changelog'
         "reports"
       when params[:controller] == 'issues' && ['calendar','gantt'].include?(params[:action])
