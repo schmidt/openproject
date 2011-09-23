@@ -26,6 +26,14 @@ jQuery(document).ready(function($) {
 		return false;
 	});
 
+        // show/hide login box
+	$("#account a.login").click(function() {
+		$(this).toggleClass("open");
+		$("#nav-login").slideToggle(animRate);
+
+		return false;
+	});
+
 	// issue table info tooltips
 	$(".js-tooltip").wrapInner("<div class='js-tooltip-inner'></div>").append("<span class='arrow'></span>"); // give an extra div for styling
 
