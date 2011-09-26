@@ -18,7 +18,7 @@
 
 <%= javascript_heads %>
 <%= stylesheet_link_tag 'jstoolbar' %>
-<%= javascript_include_tag 'jquery.1.3.2.min.js' %>
+<%= javascript_include_tag 'jquery-1.6.4.min.js' %>
 <%= javascript_include_tag 'jquery.hoverIntent.minified.js' %>
 <%= javascript_include_tag 'thickbox.min.js' %>
 <%= javascript_tag("var tb_pathToImage='#{image_path('loadingAnimation.gif')}'") %>
@@ -91,7 +91,10 @@
           <% unless User.current.logged? %>
             <li>
               <%= link_to l(:label_login), {:controller => 'account', :action => 'login'}, :class => 'login' %>
-              <%= render :partial => 'account/login' %>
+              <!-- IE7 Fix - extra div needed for slideToggle animation -->
+              <div id="nav-login">
+                <%= render :partial => 'account/login' %>
+              </div>
             </li>
           <% else %>
             <%= content_tag('li', "#{link_to_user(User.current)}", :id => '') %>
