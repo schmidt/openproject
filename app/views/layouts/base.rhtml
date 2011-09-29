@@ -34,6 +34,7 @@
 <div id="wrapper">
   <div id="top-menu">
     <div id="account">
+      <div id="logo"></div>
       <div id="top-menu-items">
       <div id="search">
         <% form_tag({:controller => 'search', :action => 'index', :id => @project}, :method => :get) do %>
@@ -84,9 +85,7 @@
             <% end %>
           </ul>
         </li>
-        <li>
           <%= render_menu_node(help_menu_item) %>
-        </li>
           <% unless User.current.logged? %>
             <li>
               <%= link_to l(:label_login), {:controller => 'account', :action => 'login'}, :class => 'login' %>
