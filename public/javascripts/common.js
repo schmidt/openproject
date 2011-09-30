@@ -1,3 +1,5 @@
+/*jslint white:false */
+/*global jQuery,document */
 jQuery.noConflict();
 
 jQuery(document).ready(function($) {
@@ -23,10 +25,9 @@ jQuery(document).ready(function($) {
                 // Focus the username field if the login field has opened
                 $("#nav-login").slideToggle(animRate, function () {
                     if ($(this).parent().hasClass("open")) {
-                      $("input#username").focus()
+                      $("input#username").focus();
                     }
                   });
-                $("#account .drop-down.open").toggleClass("open").find("ul").mySlide();
 		return false;
 	});
 
@@ -248,6 +249,9 @@ jQuery(document).ready(function($) {
       parent.find('select.chzn-select').chosen({allow_single_deselect:true});
       parent.find('div.chzn-container').trigger(jQuery.Event("mousedown"))
       parent.find('a.chzn-single').hide();
+      jQuery('div.chzn-search').click(function(event){
+           event.stopPropagation();
+       });
     });
   });
 
