@@ -246,43 +246,43 @@ jQuery(document).ready(function($) {
      });
   });
 
-        $('html').click(function() {
-          $("#account .drop-down.open").toggleClass("open").find("ul").mySlide();
-          $("#account-nav.hover").toggleClass("hover");
-         });
-        // Do not close the login window when using it
-        $('#account-nav li li').click(function(event){
-             event.stopPropagation();
-         });
-        $('#nav-login-content').click(function(event){
-             event.stopPropagation();
-         });
+  $('html').click(function() {
+    $("#account .drop-down.open").toggleClass("open").find("ul").mySlide();
+    $("#account-nav.hover").toggleClass("hover");
+   });
+  // Do not close the login window when using it
+  $('#account-nav li li').click(function(event){
+       event.stopPropagation();
+   });
+  $('#nav-login-content').click(function(event){
+       event.stopPropagation();
+   });
 
-	// header animation replacement - no animation, straight appear/hide
-	$("#account .drop-down").unbind('mouseenter').unbind("mouseleave"); //remove the current animated handlers
+  // header animation replacement - no animation, straight appear/hide
+  $("#account .drop-down").unbind('mouseenter').unbind("mouseleave"); //remove the current animated handlers
 
-	jQuery("#account-nav > li").hover(function() {
-          if ($("#account-nav").hasClass("hover") && ($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))){
-                //Close all other open menus
+  jQuery("#account-nav > li").hover(function() {
+    if ($("#account-nav").hasClass("hover") && ($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))) {
+      //Close all other open menus
 
-                //Used to work around the rendering bug
-                jQuery("input#username").blur();
-                $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
-                $(this).slideAndFocus();
-                return false;
-            }
-        },
-        function(){
-          return false;
-          });
-	jQuery("#account-nav > li.drop-down").click(function() {
-          if (($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))){
-                $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
-          }
-                $(this).slideAndFocus();
-                $("#account-nav").toggleClass("hover");
-                return false;
-        });
+      //Used to work around the rendering bug
+      jQuery("input#username").blur();
+      $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
+      $(this).slideAndFocus();
+      return false;
+    }
+  },
+  function(){
+    return false;
+  });
+  jQuery("#account-nav > li.drop-down").click(function() {
+    if (($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))) {
+          $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
+    }
+    $(this).slideAndFocus();
+    $("#account-nav").toggleClass("hover");
+    return false;
+  });
 
 		//// wraps long dropdown menu in an overflow:auto div to keep long project lists on the page
 		//var $projectDrop = $("#account .drop-down:has(.projects) ul");
