@@ -237,54 +237,52 @@ function issuesPageActions() {
 jQuery(document).ready(function($) {
   $('#header li.drop-down select.chzn-select').each(function (ix, select) {
     // trigger an artificial mousedown event
-    jQuery(select).parents("li.drop-down").first().mousedown(function(event) {
-      var parent = jQuery(event.target).parents('li.drop-down');
-      parent.find('select.chzn-select').chosen({allow_single_deselect:true});
-      parent.find('div.chzn-container').trigger(jQuery.Event("mousedown"))
-      parent.find('a.chzn-single').hide();
-      jQuery('div.chzn-search').click(function(event){
-           event.stopPropagation();
-       });
-    });
+    var parent = $(select).parents('li.drop-down');
+    parent.find('select.chzn-select').chosen({allow_single_deselect:true});
+    parent.find('div.chzn-container').trigger(jQuery.Event("mousedown"))
+    parent.find('a.chzn-single').hide();
+    jQuery('div.chzn-search').click(function(event){
+       event.stopPropagation();
+     });
   });
 
-        $('html').click(function() {
-          $("#header .drop-down.open").toggleClass("open").find("ul").mySlide();
-          $("#account-nav.hover").toggleClass("hover");
-         });
-        // Do not close the login window when using it
-        $('#account-nav li li').click(function(event){
-             event.stopPropagation();
-         });
-        $('#nav-login-content').click(function(event){
-             event.stopPropagation();
-         });
+  $('html').click(function() {
+    $("#header .drop-down.open").toggleClass("open").find("ul").mySlide();
+    $("#account-nav.hover").toggleClass("hover");
+   });
+  // Do not close the login window when using it
+  $('#account-nav li li').click(function(event){
+       event.stopPropagation();
+   });
+  $('#nav-login-content').click(function(event){
+       event.stopPropagation();
+   });
 
-	// header animation replacement - no animation, straight appear/hide
-	$("#header .drop-down").unbind('mouseenter').unbind("mouseleave"); //remove the current animated handlers
+  // header animation replacement - no animation, straight appear/hide
+  $("#header .drop-down").unbind('mouseenter').unbind("mouseleave"); //remove the current animated handlers
 
-	jQuery("#account-nav > li").hover(function() {
-          if ($("#account-nav").hasClass("hover") && ($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))){
-                //Close all other open menus
+  jQuery("#account-nav > li").hover(function() {
+    if ($("#account-nav").hasClass("hover") && ($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))) {
+      //Close all other open menus
 
-                //Used to work around the rendering bug
-                jQuery("input#username").blur();
-                $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
-                $(this).slideAndFocus();
-                return false;
-            }
-        },
-        function(){
-          return false;
-          });
-	jQuery("#account-nav > li.drop-down").click(function() {
-          if (($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))){
-                $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
-          }
-                $(this).slideAndFocus();
-                $("#account-nav").toggleClass("hover");
-                return false;
-        });
+      //Used to work around the rendering bug
+      jQuery("input#username").blur();
+      $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
+      $(this).slideAndFocus();
+      return false;
+    }
+  },
+  function(){
+    return false;
+  });
+  jQuery("#account-nav > li.drop-down").click(function() {
+    if (($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))) {
+          $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
+    }
+    $(this).slideAndFocus();
+    $("#account-nav").toggleClass("hover");
+    return false;
+  });
 
 		//// wraps long dropdown menu in an overflow:auto div to keep long project lists on the page
 		//var $projectDrop = $("#account .drop-down:has(.projects) ul");
