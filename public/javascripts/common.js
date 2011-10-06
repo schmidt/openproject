@@ -235,7 +235,7 @@ function issuesPageActions() {
 }
 
 jQuery(document).ready(function($) {
-  $('#account li.drop-down select.chzn-select').each(function (ix, select) {
+  $('#header li.drop-down select.chzn-select').each(function (ix, select) {
     // trigger an artificial mousedown event
     jQuery(select).parents("li.drop-down").first().mousedown(function(event) {
       var parent = jQuery(event.target).parents('li.drop-down');
@@ -249,7 +249,7 @@ jQuery(document).ready(function($) {
   });
 
         $('html').click(function() {
-          $("#account .drop-down.open").toggleClass("open").find("ul").mySlide();
+          $("#header .drop-down.open").toggleClass("open").find("ul").mySlide();
           $("#account-nav.hover").toggleClass("hover");
          });
         // Do not close the login window when using it
@@ -261,7 +261,7 @@ jQuery(document).ready(function($) {
          });
 
 	// header animation replacement - no animation, straight appear/hide
-	$("#account .drop-down").unbind('mouseenter').unbind("mouseleave"); //remove the current animated handlers
+	$("#header .drop-down").unbind('mouseenter').unbind("mouseleave"); //remove the current animated handlers
 
 	jQuery("#account-nav > li").hover(function() {
           if ($("#account-nav").hasClass("hover") && ($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))){
