@@ -275,7 +275,7 @@ jQuery(document).ready(function($) {
       //Close all other open menus
 
       //Used to work around the rendering bug TODO: fix
-      jQuery("input#username").blur();
+      jQuery("input#username-pulldown").blur();
       $("#account-nav > li.drop-down.open").toggleClass("open").find("> ul").mySlide();
       $(this).slideAndFocus();
       return false;
