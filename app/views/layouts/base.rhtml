@@ -116,6 +116,7 @@
   <% display_sidebar = false %>
   <% end %>
   <div id="main" class="<%= display_sidebar ? '' : "nosidebar" %>">
+    <% if !main_menu.blank? %>
     <div id="main-menu">
       <%= main_menu %>
       <%= yield :main_menu %>
@@ -129,7 +130,7 @@
     </div>
 
     <%= expand_current_menu %>
-
+    <% end %>
     <div class="<%= display_sidebar ? '' : "nosidebar" %>" id="content">
       <%= render_flash_messages %>
       <%= yield %>

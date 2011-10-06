@@ -80,10 +80,10 @@ jQuery(document).ready(function($) {
 
 	// custom function for sliding the main-menu. IE6 & IE7 don't handle sliding very well
 	$.fn.slideAndFocus = function() {
-            this.toggleClass("open").find("ul").mySlide(function(){
+            this.toggleClass("open").find("> ul").mySlide(function() {
               // actually a simple focus should be enough.
-              // The rest is only there to work around a rendering bug in webkit (as of Oct 2011) TODO: fix
-              var input = jQuery("input#username");
+              // The rest is only there to work around a rendering bug in webkit (as of Oct 2011)
+              var input = $(this).parents("li.open").find("input:visible").first();
               if (input.is(":visible")){
                 input.blur();
                 setTimeout(function() {
@@ -238,12 +238,21 @@ jQuery(document).ready(function($) {
   $('#header li.drop-down select.chzn-select').each(function (ix, select) {
     // trigger an artificial mousedown event
     var parent = $(select).parents('li.drop-down');
-    parent.find('select.chzn-select').chosen({allow_single_deselect:true});
+    // deselect all options
+    $(select + ":selected").each(function (ix, option) {
+      $(option).attr("selected", false);
+    });
+    $(select).chosen({allow_single_deselect:false});
     parent.find('div.chzn-container').trigger(jQuery.Event("mousedown"))
     parent.find('a.chzn-single').hide();
+    // prevent menu from getting closed prematurely
     jQuery('div.chzn-search').click(function(event){
        event.stopPropagation();
-     });
+    });
+    // remove highlights
+    parent.find(".chzn-results .active-result.highlighted").each(function (ix, option){
+      $(option).removeClass("highlighted");
+    });
   });
 
   $('html').click(function() {
@@ -267,7 +276,7 @@ jQuery(document).ready(function($) {
 
       //Used to work around the rendering bug TODO: fix
       jQuery("input#username").blur();
-      $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
+      $("#account-nav > li.drop-down.open").toggleClass("open").find("> ul").mySlide();
       $(this).slideAndFocus();
       return false;
     }
@@ -277,7 +286,7 @@ jQuery(document).ready(function($) {
   });
   jQuery("#account-nav > li.drop-down").click(function() {
     if (($("#account-nav > li.drop-down.open").get(0) !== $(this).get(0))) {
-          $("#account-nav > li.drop-down.open").toggleClass("open").find("ul").mySlide();
+          $("#account-nav > li.drop-down.open").toggleClass("open").find("> ul").mySlide();
     }
     $(this).slideAndFocus();
     $("#account-nav").toggleClass("hover");
