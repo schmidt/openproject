@@ -83,7 +83,12 @@ jQuery(document).ready(function($) {
             this.toggleClass("open").find("> ul").mySlide(function() {
               // actually a simple focus should be enough.
               // The rest is only there to work around a rendering bug in webkit (as of Oct 2011)
-              var input = $(this).parents("li.open").find("input:visible").first();
+              if ($("input#username-pulldown").is(":visible")) {
+                var input = $("input#username-pulldown");
+              }
+              else{
+                var input = $(".chzn-search input");
+                }
               if (input.is(":visible")){
                 input.blur();
                 setTimeout(function() {
