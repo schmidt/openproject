@@ -246,17 +246,15 @@ module ApplicationHelper
   end
 
   # Renders the project quick-jump box
-  def render_project_jump_box
-    projects = User.current.memberships.collect(&:project).compact.uniq
+  def render_project_jump_box(projects = [], html_options = {})
+    projects ||= User.current.memberships.collect(&:project).compact.uniq
     if projects.any?
-      s = '<select onchange="if (this.value != \'\') { window.location = this.value; }">' +
-            "<option value=''>#{ l(:label_jump_to_a_project) }</option>" +
-            '<option value="" disabled="disabled">---</option>'
-      s << project_tree_options_for_select(projects, :selected => @project) do |p|
-        { :value => url_for(:controller => 'projects', :action => 'show', :id => p, :jump => current_menu_item) }
-      end
-      s << '</select>'
-      s
+        # option_tags = content_tag :option, l(:label_jump_to_a_project), :value => ""
+        option_tags = (content_tag :option, "", :value => "" )
+        option_tags << project_tree_options_for_select(projects, :selected => @project) do |p|
+          { :value => url_for(:controller => 'projects', :action => 'show', :id => p, :jump => current_menu_item) }
+        end
+      select_tag "", option_tags, html_options.merge({ :onchange => "if (this.value != \'\') { window.location = this.value; }" })
     end
   end
 
@@ -411,7 +409,9 @@ module ApplicationHelper
   end
 
   def page_header_title
-    if @project.nil? || @project.new_record?
+    if @page_header_title.present?
+      h(@page_header_title)
+    elsif @project.nil? || @project.new_record?
       h(Setting.app_title)
     else
       b = []
@@ -957,6 +957,34 @@ module ApplicationHelper
     end
   end
 
+  # Expands the current menu item using JavaScript based on the params
+  def expand_current_menu
+    current_menu_class =
+      case 
+      when params[:controller] == "timelog"
+        "reports"
+      when params[:controller] == 'reports'
+        'issues'
+      when params[:controller] == 'projects' && params[:action] == 'changelog'
+        "reports"
+      when params[:controller] == 'issues' && ['calendar','gantt'].include?(params[:action])
+        "reports"
+      when params[:controller] == 'projects' && params[:action] == 'roadmap'
+        'roadmap'
+      when params[:controller] == 'versions' && params[:action] == 'show'
+        'roadmap'
+      when params[:controller] == 'projects' && params[:action] == 'settings'
+        'settings'
+      when params[:controller] == 'contracts' || params[:controller] == 'deliverables'
+        'contracts'
+      else
+        params[:controller]
+      end
+
+    
+    javascript_tag("jQuery.menu_expand({ menuItem: '.#{current_menu_class}' });")
+  end
+  
   private
 
   def wiki_helper
