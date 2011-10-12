@@ -244,7 +244,7 @@ jQuery(document).ready(function($) {
     // trigger an artificial mousedown event
     var parent = $(select).parents('li.drop-down');
     // deselect all options
-    $(select + ":selected").each(function (ix, option) {
+    $(select).find(":selected").each(function (ix, option) {
       $(option).attr("selected", false);
     });
     $(select).chosen({allow_single_deselect:false});
