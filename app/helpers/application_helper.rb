@@ -722,7 +722,8 @@ module ApplicationHelper
         div_class = 'toc'
         div_class << ' right' if $1 == '>'
         div_class << ' left' if $1 == '<'
-        out = "<ul class=\"#{div_class}\"><li>"
+        out = "<fieldset class='header_collapsible collapsible'><legend onclick='toggleFieldset(this);'></legend><div>"
+        out << "<ul class=\"#{div_class}\"><li>"
         root = headings.map(&:first).min
         current = root
         started = false
@@ -740,6 +741,7 @@ module ApplicationHelper
         end
         out << '</li></ul>' * (current - root)
         out << '</li></ul>'
+        out << '</div></fieldset>'
       end
     end
   end
