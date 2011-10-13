@@ -85,18 +85,20 @@ jQuery(document).ready(function($) {
               // The rest is only there to work around a rendering bug in webkit (as of Oct 2011)
               if ($("input#username-pulldown").is(":visible")) {
                 var input = $("input#username-pulldown");
-              }
-              else{
+              } else {
+                // reset input value and project search list
                 var input = $(".chzn-search input");
-                }
-              if (input.is(":visible")){
+                input.val("");
+                $("select#project-search").trigger($.Event("liszt:updated"));
+              }
+              if (input.is(":visible")) {
                 input.blur();
                 setTimeout(function() {
                     input.focus();
                   }, 100);
               }
             });
-            
+
             return false;
           };
 	// custom function for sliding the main-menu. IE6 & IE7 don't handle sliding very well
