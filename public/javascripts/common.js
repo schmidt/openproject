@@ -85,18 +85,20 @@ jQuery(document).ready(function($) {
               // The rest is only there to work around a rendering bug in webkit (as of Oct 2011)
               if ($("input#username-pulldown").is(":visible")) {
                 var input = $("input#username-pulldown");
-              }
-              else{
+              } else {
+                // reset input value and project search list
                 var input = $(".chzn-search input");
-                }
-              if (input.is(":visible")){
+                input.val("");
+                $("select#project-search").trigger($.Event("liszt:updated"));
+              }
+              if (input.is(":visible")) {
                 input.blur();
                 setTimeout(function() {
                     input.focus();
                   }, 100);
               }
             });
-            
+
             return false;
           };
 	// custom function for sliding the main-menu. IE6 & IE7 don't handle sliding very well
@@ -244,7 +246,7 @@ jQuery(document).ready(function($) {
     // trigger an artificial mousedown event
     var parent = $(select).parents('li.drop-down');
     // deselect all options
-    $(select + ":selected").each(function (ix, option) {
+    $(select).find(":selected").each(function (ix, option) {
       $(option).attr("selected", false);
     });
     $(select).chosen({allow_single_deselect:false});
@@ -261,7 +263,7 @@ jQuery(document).ready(function($) {
   });
 
   $('html').click(function() {
-    $("#header .drop-down.open").toggleClass("open").find("ul").mySlide();
+    $("#header .drop-down.open").toggleClass("open").find("> ul").mySlide();
     $("#account-nav.hover").toggleClass("hover");
    });
   // Do not close the login window when using it
@@ -298,35 +300,6 @@ jQuery(document).ready(function($) {
     return false;
   });
 
-		//// wraps long dropdown menu in an overflow:auto div to keep long project lists on the page
-		//var $projectDrop = $("#account .drop-down:has(.projects) ul");
-
-		//// only do the wrapping if it's the project dropdown, and more than 15 items
-		//if ( $projectDrop.children().size() > 15 && $(this).find("> a").hasClass("projects") ) {
-
-			//var overflowHeight = 15 * $projectDrop.find("li:eq(1)").outerHeight() - 2;
-
-			//$projectDrop
-				//.wrapInner("<div class='overflow'></div>").end()
-				//.find(".overflow").css({overflow: 'auto', height: overflowHeight, position: 'relative'})
-				//.find("li a").css('paddingRight', '25px');
-
-				//// do hack-y stuff for IE6 & 7. don't ask why, I don't know.
-				//if (parseInt($.browser.version, 10) < 8 && $.browser.msie) {
-
-					//$projectDrop.find(".overflow").css({width: 325, zoom: '1'});
-					//$projectDrop.find("li a").css('marginLeft', '-15px');
-					//$("#top-menu").css('z-index', '10000');
-				//}
-
-		//}
-
-
-	//}, function() {
-		//$(this).removeClass("open").find("ul").hide();
-		//$("#top-menu").removeClass("open");
-	//});
-
 	// first remove current event handlers for tooltips - overrides original common.js functionality. Remove this once common.js is merged with this.
 	$("table.issues td.issue").unbind('mouseenter').unbind("mouseleave");
 
@@ -342,10 +315,6 @@ jQuery(document).ready(function($) {
 		$("#issue-form-wrap #preview").remove();
 		$("#issue-form .box").append("<div id='preview' class='wiki'></div>");
 	}
-
-
-
-
 	// resize after a window resize.
 	$(window).resize(function() {
 		resizeNewIssue();

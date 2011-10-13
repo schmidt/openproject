@@ -50,7 +50,15 @@ h4, .wiki h3 {font-size: 13px;padding: 2px 10px 1px 0px;margin-bottom: 5px; bord
 * html #sidebar hr{ width: 95%; position: relative; left: -6px; color: #ccc; }
 #sidebar .contextual { margin-right: 1em; }
 
-#content { width: 75%; background-color: #fff; margin: 0px; border-right: 1px solid #ddd; padding: 6px 10px 10px 10px; z-index: 10; }
+#content {
+  width: 75%;
+  background-color: #fff;
+  margin: 0px;
+  border: 1px #ddd;
+  border-style: none solid solid solid;
+  padding: 6px 10px 10px 10px;
+  z-index: 10;
+}
 * html #content{ width: 75%; padding-left: 0; margin-top: 0px; padding: 6px 10px 10px 10px;}
 html>body #content { min-height: 600px; } 
 * html body #content { height: 600px; } /* IE */
@@ -79,7 +87,11 @@ input#openid_url { background: url(../images/openid-bg.gif) no-repeat; backgroun
 .clear:after{ content: "."; display: block; height: 0; clear: both; visibility: hidden; }
 
 /***** Links *****/
-a, a:link, a:visited{ text-decoration: none; }
+a, a:link, a:visited {
+        text-decoration: none;
+        color: #6a0406;
+        font-weight:bold;
+  }
 a:hover, a:active{ text-decoration: underline;}
 a img{ border: 0; }
 
@@ -240,7 +252,7 @@ div.square {
 .splitcontentright{float:right; width:49%;}
 form {display: inline;}
 input, select {vertical-align: middle; margin-top: 1px; margin-bottom: 1px;}
-fieldset {border: 1px solid #e4e4e4; margin:0;}
+fieldset {border: 1px solid #e4e4e4; margin:0; padding:4px;}
 hr { width: 100%; height: 1px; background: #ccc; border: 0;}
 blockquote { font-style: italic; border-left: 3px solid #e0e0e0; padding-left: 0.6em; margin-left: 2.4em;}
 blockquote blockquote { margin-left: 0;}
@@ -260,6 +272,9 @@ div.issue div.subject h3 {margin: 0; margin-bottom: 0.1em;}
 #issue_tree table.issues { border: 0; }
 #issue_tree td.checkbox {display:none;}
 
+#content fieldset#filters {
+    padding-bottom:10px;
+  }
 fieldset#filters legend {
     -moz-border-radius-bottomleft:0px;
     -moz-border-radius-bottomright:0px;
@@ -311,6 +326,10 @@ fieldset.collapsible.header_collapsible legend {
     -webkit-border-bottom-right-radius:0px;
     border-bottom-left-radius:0px;
     border-bottom-right-radius:0px;
+}
+
+fieldset.collapsible.header_collapsible legend:hover {
+  background-color:#d8d8d8;
 }
 
 fieldset.collapsible.collapsed.header_collapsible legend {
@@ -769,10 +788,6 @@ div.wiki pre {
 }
 
 div.wiki ul.toc {
-    background-color: #ffffdd;
-    border: 1px solid #e4e4e4;
-    padding: 4px;
-    line-height: 1.2em;
     margin-bottom: 12px;
     margin-right: 12px;
     margin-left: 0;
@@ -789,10 +804,11 @@ div.wiki ul.toc li li { margin-left: 1.5em; }
 
 div.wiki ul.toc a {
     font-weight: normal;
-    text-decoration: none;
-    color: #606060;
+    background-image: url(../images/arrow-down.png);
+    background-repeat: no-repeat;
+    background-position: 0% 60%;
+    padding-left: 16px;
 }
-div.wiki ul.toc a:hover { color: #c61a1a; text-decoration: underline;}
 
 a.wiki-anchor { display: none; margin-left: 6px; text-decoration: none; }
 a.wiki-anchor:hover { color: #aaa !important; text-decoration: none; }
@@ -1058,8 +1074,6 @@ h5 {
 	margin-bottom:18px;
 }
 a {
-  color:#8C8C8C;
-	text-decoration:none;
 }
 a:hover {
 	text-decoration:underline;
@@ -1076,13 +1090,18 @@ a:hover {
 #top-menu {
 	height: 81px;
 	position:relative;
+        z-index:21;
 }
 #top-menu.open { /*IE 6-7 z-index stacking issue*/
 	z-index:5;
 }
 #account-nav {
         display:block;
-        background:url(../images/background_top_navigation.png) repeat-x left top;
+        background: -khtml-gradient(linear, left top, left bottom, from(#a0070b), to(#6a0406)); /* Konqueror */
+        background: -webkit-gradient(linear, left top, left bottom, from(#a0070b), to(#6a0406));   /* Webkit (Chrome, Safari, ...) */
+        background: -moz-linear-gradient(top,  #a0070b,  #6a0406); /* Gecko (Firefox, ...) */
+        filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#a0070b', endColorstr='#6a0406'); /* IE 5.5 - 7 */
+        -ms-filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#a0070b', endColorstr='#6a0406'); /* IE 8 */
 }
 #logo {
         float:left;
@@ -1095,7 +1114,7 @@ a:hover {
         padding-right:15px;
 }
 #header {
-	background: url(../images/background_header.png) repeat-x 20px;
+	background-color: #1E1E1E;
 	height:43px;
 	font: arial,19px,white;
 }
@@ -1109,6 +1128,7 @@ a:hover {
         color:#ffffff;
 	height:43px;
 	border-top:0;
+  position:relative;
         }
 
 #header ul#account-info {
@@ -1127,6 +1147,7 @@ a:hover {
 	text-decoration:none;
         color:#FFFFFF;
 	height:43px;
+        font-weight:normal;
 }
 #header li.drop-down select {
   width:100%;
@@ -1246,14 +1267,21 @@ input:-moz-placeholder {
   font-family:"Arial", Arial, sans-serif;
   font-style:normal;
   font-weight:normal;
-  margin:6px;
-  height:20px;
-  line-height:20px;
+  margin-top:3px;
+  margin-bottom:3px;
+  margin-left:6px;
+  margin-right:6px;
+  height:15px;
+  line-height:15px;
 }
 #breadcrumb {
 	height:38px;
         line-height:38px;
-        background:url(../images/background_breadcrumb.png) repeat-x left top;
+        background: -khtml-gradient(linear, left top, left bottom, from(#ffffff), to(#e4e4e4)); /* Konqueror */
+        background: -webkit-gradient(linear, left top, left bottom, from(#ffffff), to(#e4e4e4));   /* Webkit (Chrome, Safari, ...) */
+        background: -moz-linear-gradient(top,  #ffffff,  #e4e4e4); /* Gecko (Firefox, ...) */
+        filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#e4e4e4'); /* IE 5.5 - 7 */
+        -ms-filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#e4e4e4'); /* IE 8 */
         border-bottom: 1px #d9d9d9;
         color:#777777;
         padding-left:15px;
@@ -1264,6 +1292,7 @@ input:-moz-placeholder {
 }
 #breadcrumb a {
         text-decoration:underline;
+        color:#777777;
 }
 #nav-search {
         float: right;
@@ -1292,12 +1321,13 @@ input:-moz-placeholder {
 }
 #nav-login-content  div a {
         display: inline;
-        padding-left: 2px;
         color:black;
+        padding:0;
 }
 div#optional_login_fields {
   top:10px;
   white-space:nowrap;
+  margin-left:2px;
 }
 /*-------------------------------------------------------------------------------
  * =02 - Main Menu
@@ -1307,11 +1337,9 @@ div#optional_login_fields {
 
 #main-menu {
 	width:185px;
-        height:auto;
+        height:100%;
 	position:absolute;
 	left:0;
-        border-right:1px solid #d0d0d0;
-        border-bottom:1px solid #d0d0d0;
 }
 #main-menu ul ul {
 	display:none;
@@ -1438,7 +1466,11 @@ div#optional_login_fields {
  *
  * This section includes the layout and styles for the main content area.
  ------------------------------------------------------------------------------*/
-#main {background:#f3f3f3;}
+#main {
+        background:#f3f3f3;
+        position:relative;
+        z-index:20;
+ }
 #footer { color: #aaa; padding-left: 186px }
 
 h1.title {
@@ -1448,7 +1480,7 @@ h1.title {
 	margin:0 15px 10px 186px;
 	padding:10px;
 	font-size:11px;
-    width: auto;
+        width: auto;
 }
 #content .title-bar {
 	position:relative;
@@ -1458,7 +1490,6 @@ h1.title {
 	padding:9px 100px 9px 12px;
 	color:#000;
 	font-weight:normal;
-	font-size:14px;
 	font-weight:bold;
 }
 .title-bar h2 span {
@@ -1476,9 +1507,8 @@ h1.title {
 
 .button-large a {
 	padding:3px 9px;
-	text-decoration:none;
 	display:block;
-	color:#333;
+	color:#6a0406;
 }
 .title-bar .add-filter {
 	right:155px;
@@ -1580,10 +1610,6 @@ form#issue-list {
 #content table tr.context-menu-selection {
 	background:#FEFBD0 url(../images/selected-gradient.jpg) repeat-x left top;
 }
-#content table td a {
-	color:#333;
-	text-decoration:none;
-}
 #content table td.priority {
 	text-align:center;
 }
@@ -1609,7 +1635,7 @@ form#issue-list {
 	margin-right:10px;
 }
 .pagination, .other-formats {
-	float:right;
+	float:left;
 	clear:right;
 	margin:10px 0;
 }
@@ -1625,21 +1651,21 @@ form#issue-list {
 
 .title-bar-actions {
 	position:absolute;
-	right:10px;
+	right:0px;
 	top:0;
 	padding:0 100px 0 10px;
 	height:100%;
 }
 .title-bar .title-bar-actions .contextual {
 /*	line-height:3.5;*/
-   padding-right: 100px;
+        padding-right:0px;
 }
 .title-bar-actions .contextual a {
 /*	color:#fff;*/
 }
 .title-bar .title-bar-actions .contextual a.icon {
 	color:#000000;
-        margin-right: 0px;
+  margin-right: 0px;
 }
 .title-bar .update {
 	right:0;
@@ -2306,8 +2332,6 @@ fieldset#filters div.add-filter {
 	margin:0;
 }
 .title-bar .contextual a.icon {
-	color:#fff;
-	font-size:11px;
 	line-height:3.5;
 	margin-right:16px;
 }

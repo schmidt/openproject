@@ -231,7 +231,7 @@
 }
 .chzn-container .chzn-results li {
   line-height: 80%;
-  padding: 7px 7px 8px;
+  padding: 7px 7px 8px !important;
   margin: 0;
   list-style: none;
 }
@@ -247,8 +247,11 @@
   font-family:"Arial", Arial, sans-serif;
   font-style:normal;
   font-weight:normal;
-  margin:6px !important;
-  line-height:20px;
+  margin-top:3px !important;
+  margin-bottom:3px !important;
+  margin-left:6px !important;
+  margin-right:6px !important;
+  line-height:15px;
 }
 .chzn-container .chzn-results .highlighted {
   -moz-border-radius-topleft:5px;
