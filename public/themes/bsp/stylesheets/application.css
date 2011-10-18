@@ -1,0 +1,223 @@
+
+
+
+/* load the default Redmine stylesheet */
+@import url(../../../stylesheets/application.css?1318602373);
+
+body {
+  color: #4b4b4b;
+}
+/***** Layout *****/
+
+#header {
+  background-color: #FFFFFF;
+}
+
+#breadcrumb {
+  border-top: 1px solid #99004f;
+}
+
+#header li > ul {
+  /* the border on the breadcrumb moves the layout by 1 px
+     this fixes the layout  */
+  top: 44px;
+}
+
+#logo {
+  background: url(../images/telekom_logo.png) no-repeat 15px;
+  width: 245px;
+}
+
+li a.home  {
+  background: url(../images/bsp_instance.png) no-repeat 50% 50%;
+  width: 35px;
+}
+
+#header .search_field {
+  background: transparent url(../images/bsp_search.png) no-repeat;
+  color: #4b4b4b; 
+}
+
+#account-nav {
+  display:block;
+  background: -khtml-gradient(linear, left top, left bottom, from(#ff128c), to(#99004f)); /* Konqueror */
+  background: -webkit-gradient(linear, left top, left bottom, from(#ff128c), to(#99004f));   /* Webkit (Chrome, Safari, ...) */
+  background: -moz-linear-gradient(top,  #ff128c,  #99004f); /* Gecko (Firefox, ...) */
+  filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#ff128c', endColorstr='#99004f'); /* IE 5.5 - 7 */
+  -ms-filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ff128c', endColorstr='#99004f'); /* IE 8 */
+}
+
+#header li > a {
+  height: 44px;
+}
+#account-nav > li.last-child {
+  border-right: 1px solid  #e13c92;
+}
+#account-nav > li.open.last-child {
+  border-right: 1px solid #B7B7B7;
+}
+#header li {
+  border-right:1px solid #e13c92;
+}
+#header li.drop-down > a:hover, #header li > a:hover {
+  background-color: #99004f;
+}
+#header li.drop-down.open > a {
+  background-color: white;
+}
+#header li.drop-down li > a:hover, #main-menu li a.selected, #main-menu li a:hover {
+  background-color:  #e20074;
+}
+
+/***** Links *****/  /* TODO */
+a, a:link, a:visited {
+  color: #e20074;
+}
+a:hover, a:active {
+  color: #e20074;
+}
+
+a.sort.asc {
+  background-image: url(../images/red_web_icons/arrow_D_up.gif?1318602373);
+}
+
+a.sort.desc {
+  background-image: url(../images/red_web_icons/arrow_D_down.gif?1318602373);
+}
+
+#content #history {
+  background:url("../images/dotted-separator.gif"?1318602373) repeat-x scroll 0 bottom   transparent;
+  padding-bottom: 11px;
+}
+
+#history .journal {
+  width: 500px;
+  background:url("../images/dotted-separator.gif"?1318602373) repeat-x scroll 0 0   transparent;
+  margin-top: 11px;
+  padding-top: 11px;
+}
+
+.my-project {
+  background: url(../images/red_web_icons/star_B.gif?1318602373) no-repeat 0 50%;
+}
+
+dt.issue { background-image: url(../images/ticket.gif?1318602373); }
+dt.issue-edit { background-image: url(../images/ticket_edit.gif?1318602373); }
+dt.issue-closed { background-image: url(../images/ticket_checked.gif?1318602373); }
+dt.issue-note { background-image: url(../images/ticket_note.gif?1318602373); }
+
+.required {color: #e20074;} /* changed to Siemens red! */
+
+/***** Flash & error messages ****/
+
+
+div.flash {
+  margin-top: 0;
+}
+
+div.flash.error, #errorExplanation { /* red */
+  background: #FAAA96 url(../images/red_web_icons/traffic_light_B.gif?1318602373) 17px 4px no-repeat;
+  border: none;
+  color: #000000;
+}
+
+#errorExplanation {
+  background-position: 40px 14px;
+}
+
+div.flash.notice { /* green */
+  background: #C8F0BE url(../images/red_web_icons/check_B.gif?1318602373) 8px 7px no-repeat;
+  border: none;
+  color: #000000;
+}
+
+div.flash.warning { /* orange */
+  background: #FFC38C url(../images/red_web_icons/lamp.gif?1318602373) 14px 5px no-repeat;
+  border: none;
+  color: #000000;
+  text-align: left;
+}
+
+.nodata, .warning { /* softer orange?? */
+  background-color: #FFD7B4;
+  border: none;
+  color: #000000;
+  font-size: 11px;
+}
+
+.buttons {
+  margin-top: 0;
+}
+
+/***** Icons *****/
+
+
+.icon {
+ background-position: 5px 1px;
+}
+
+a.icon {
+  color: #4b4b4b;
+  font-weight: normal;
+}
+a.icon:hover {
+  color: #e20074;
+  text-decoration: underline;
+}
+
+
+.icon-add { background: transparent url(../images/red_web_icons/plus_B.gif?1318602373) no-repeat 3px 3px; }
+.icon-edit { background-image: url(../images/red_web_icons/edit.gif?1318602373); }
+.icon-copy { background-image: url(../images/red_web_icons/window_new.gif?1318602373); } .icon-del { background-image: url(../images/red_web_icons/trash.gif?1318602373); }
+.icon-history  { background-image: url(../images/red_web_icons/book.gif?1318602373); }
+.icon-history  { background-image: url(../images/red_web_icons/book.gif?1318602373); }
+.icon-time  { background-image: url(../images/red_web_icons/clock.gif?1318602373); }
+.icon-time-add  { background-image: url(../images/red_web_icons/clock.gif?1318602373); } .icon-fav  { background-image: url(../images/red_web_icons/star_B.gif?1318602373); }
+.icon-fav-off  { background-image: url(../images/red_web_icons/star_A.gif?1318602373); }
+.icon-reload  { background-image: url(../images/red_web_icons/arrow_circle.gif?1318602373); }
+.icon-lock  { background-image: url(../images/red_web_icons/key.gif?1318602373); }
+.icon-checked  { background-image: url(../images/red_web_icons/check_B.gif?1318602373); }
+.icon-comment  { background-image: url(../images/red_web_icons/chat_A.gif?1318602373); }
+.icon-notification  { background-image: url(../images/red_web_icons/envelope_A.gif?1318602373); }
+.icon-package { background-position: 1px 0px; }
+.icon-duplicate { background-image: url(../images/red_web_icons/plus_A.gif?1318602373);}
+.icon-folder { background-image: url(../images/red_web_icons/folder_B.gif?1318602373);}
+.open .icon-folder { background-image: url(../images/red_web_icons/folder_A.gif?1318602373);}
+.icon-file { background-image: url(../images/red_web_icons/paper_A.gif?1318602373);}
+.icon-file.text-plain { background-image: url(../images/red_web_icons/paper_B.gif?1318602373);}
+
+a.atom {
+  background-image: url(../images/red_web_icons/rss_A.gif?1318602373);
+  padding: 2px 0 1px 14px;
+}
+
+/***** Ajax indicator ******/
+#ajax-indicator {
+  position: absolute; /* fixed not supported by IE */
+  background-color:#d9d9d9;
+  border: 1px solid #8f8f8f;
+  top:35%;
+  left:40%;
+  width:20%;
+  font-weight:bold;
+  text-align:center;
+  padding:0.6em;
+  z-index:100;
+  filter:alpha(opacity=70);
+  opacity: 0.7;
+}
+
+
+/*Gannt chart fix IE 6*/
+.task {
+  line-height: 1em;
+}
+
+/*Cost-Plugin specific styles*/
+.icon-pieces {
+  background-image: url(../images/pieces.gif?1318602373) !important;
+}
+
+.icon-pieces-time {
+  background-image: url(../images/pieces-time.gif?1318602373) !important;
+}
