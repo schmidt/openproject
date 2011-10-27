@@ -24,9 +24,9 @@ class IssuesController < ApplicationController
   before_filter :find_optional_project, :only => [:index, :all]
   before_filter :check_for_default_issue_status, :only => [:new, :create]
   before_filter :build_new_issue_from_params, :only => [:new, :create]
-  before_filter :retrieve_query, :only => :index
+  before_filter :retrieve_query, :only => [:index, :all]
 
-  accept_key_auth :index, :show, :create, :update, :destroy
+  accept_key_auth :index, :all, :show, :create, :update, :destroy
 
   rescue_from Query::StatementInvalid, :with => :query_statement_invalid
 
