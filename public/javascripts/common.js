@@ -337,7 +337,11 @@ jQuery(document).ready(function($) {
 		.click(function(event) {
 
 			if (!$(event.target).hasClass("toggle-follow") ) {
-				$(this).toggleClass("open").parent().find("ul").not("ul ul ul").mySlide();
+                                var menuParent = $(this).toggleClass("open").parent().find("ul").not("ul ul ul");
+                                menuParent.mySlide();
+                                if ($(this).hasClass("open")) {
+                                  menuParent.find("li > a:first").focus();
+                                }
 				return false;
 			}
 		});
