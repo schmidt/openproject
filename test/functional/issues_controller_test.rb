@@ -78,17 +78,6 @@ class IssuesControllerTest < ActionController::TestCase
     assert_tag :tag => 'a', :content => /Subproject issue/
   end
 
-  def test_index_should_not_list_issues_when_module_disabled
-    EnabledModule.delete_all("name = 'issue_tracking' AND project_id = 1")
-    get :index
-    assert_response :success
-    assert_template 'index.rhtml'
-    assert_not_nil assigns(:issues)
-    assert_nil assigns(:project)
-    assert_no_tag :tag => 'a', :content => /Can't print recipes/
-    assert_tag :tag => 'a', :content => /Subproject issue/
-  end
-
   def test_index_should_list_visible_issues_only
     get :index, :per_page => 100
     assert_response :success
@@ -294,6 +283,27 @@ class IssuesControllerTest < ActionController::TestCase
                                  :children => { :count => 3 }
     assert_no_tag :tag => 'option', :attributes => { :value => 'project' },
                                     :parent => { :tag => 'select', :attributes => { :id => "selected_columns" } }
+  end
+
+  def test_index_without_project_should_implicitly_add_project_column_to_default_columns
+    Setting.issue_list_default_columns = ['tracker', 'subject', 'assigned_to']
+    get :index, :set_filter => 1
+
+    # query should use specified columns
+    query = assigns(:query)
+    assert_kind_of Query, query
+    assert_equal [:project, :tracker, :subject, :assigned_to], query.columns.map(&:name)
+  end
+
+  def test_index_without_project_and_explicit_default_columns_should_not_add_project_column
+    Setting.issue_list_default_columns = ['tracker', 'subject', 'assigned_to']
+    columns = ['tracker', 'subject', 'assigned_to']
+    get :index, :set_filter => 1, :c => columns
+
+    # query should use specified columns
+    query = assigns(:query)
+    assert_kind_of Query, query
+    assert_equal columns.map(&:to_sym), query.columns.map(&:name)
   end
 
   def test_index_with_custom_field_column
@@ -1258,7 +1268,7 @@ class IssuesControllerTest < ActionController::TestCase
       :attributes => {:name => "issue[custom_field_values][#{field.id}]"},
       :children => {
         :only => {:tag => 'option'},
-        :count => Project.find(1).versions.count + 1
+        :count => Project.find(1).shared_versions.count + 1
       }
   end
 

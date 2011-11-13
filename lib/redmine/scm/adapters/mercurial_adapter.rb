@@ -39,7 +39,7 @@ module Redmine
           end
 
           def sq_bin
-            @@sq_bin ||= shell_quote(HG_BIN)
+            @@sq_bin ||= shell_quote_command
           end
 
           def client_version
@@ -47,7 +47,7 @@ module Redmine
           end
 
           def client_available
-            client_version_above?([0, 9, 5])
+            client_version_above?([1, 2])
           end
 
           def hgversion
@@ -72,12 +72,7 @@ module Redmine
           end
 
           def template_path_for(version)
-            if ((version <=> [0,9,5]) > 0) || version.empty?
-              ver = "1.0"
-            else
-              ver = "0.9.5"
-            end
-            "#{HELPERS_DIR}/#{TEMPLATE_NAME}-#{ver}.#{TEMPLATE_EXTENSION}"
+            "#{HELPERS_DIR}/#{TEMPLATE_NAME}-1.0.#{TEMPLATE_EXTENSION}"
           end
         end
 
@@ -294,11 +289,14 @@ module Redmine
         # Runs 'hg' command with the given args
         def hg(*args, &block)
           repo_path = root_url || url
-          full_args = [HG_BIN, '-R', repo_path, '--encoding', 'utf-8']
+          full_args = ['-R', repo_path, '--encoding', 'utf-8']
           full_args << '--config' << "extensions.redminehelper=#{HG_HELPER_EXT}"
           full_args << '--config' << 'diff.git=false'
           full_args += args
-          ret = shellout(full_args.map { |e| shell_quote e.to_s }.join(' '), &block)
+          ret = shellout(
+                   self.class.sq_bin + ' ' + full_args.map { |e| shell_quote e.to_s }.join(' '),
+                   &block
+                   )
           if $? && $?.exitstatus != 0
             raise HgCommandAborted, "hg exited with non-zero status: #{$?.exitstatus}"
           end

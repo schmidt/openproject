@@ -42,6 +42,14 @@ class CustomField < ActiveRecord::Base
       errors.add(:possible_values, :invalid) unless self.possible_values.is_a? Array
     end
     
+    if regexp.present?
+      begin
+        Regexp.new(regexp)
+      rescue
+        errors.add(:regexp, :invalid)
+      end
+    end
+    
     # validate default value
     v = CustomValue.new(:custom_field => self.clone, :value => default_value, :customized => nil)
     v.custom_field.is_required = false
@@ -56,7 +64,7 @@ class CustomField < ActiveRecord::Base
         when 'user'
           obj.project.users.sort.collect {|u| [u.to_s, u.id.to_s]}
         when 'version'
-          obj.project.versions.sort.collect {|u| [u.to_s, u.id.to_s]}
+          obj.project.shared_versions.sort.collect {|u| [u.to_s, u.id.to_s]}
         end
       elsif obj.is_a?(Array)
         obj.collect {|o| possible_values_options(o)}.inject {|memo, v| memo & v}
