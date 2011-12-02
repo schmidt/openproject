@@ -983,3 +983,23 @@ bg:
   description_choose_project: Projects
   description_date_from: Enter start date
   label_deleted_custom_field: (deleted custom field)
+  setting_issue_startdate_is_adddate: Използване на текущата дата като начална дата за нови задачи
+  description_search: Търсене
+  description_user_mail_notification: Конфигурация известията по пощата
+  description_date_range_list: Изберете диапазон от списъка
+  description_date_to: Въведете крайна дата
+  description_query_sort_criteria_attribute: Атрибут на сортиране
+  description_message_content: Съдържание на съобщението
+  description_wiki_subpages_reassign: Изберете нова родителска страница
+  description_available_columns: Налични колони
+  description_selected_columns: Избрани колони
+  description_date_range_interval: Изберете диапазон чрез задаване на начална и крайна дати
+  description_project_scope: Обхват на търсенето
+  description_issue_category_reassign: Изберете категория
+  description_query_sort_criteria_direction: Посока на сортиране
+  description_notes: Бележки
+  description_filter: Филтър
+  description_choose_project: Проекти
+  description_date_from: Въведете начална дата
+  label_deleted_custom_field: (изтрито потребителско поле)
+  button_edit_section: Edit this section
