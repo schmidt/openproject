@@ -48,4 +48,14 @@ module CalendarsHelper
   def link_to_month(link_name, year, month, options={})
     link_to_content_update(link_name, params.merge(:year => year, :month => month))
   end
+
+  def issue_background_image(issue, day = Date.today)
+    if issue.start_date == day && day == issue.due_date
+      image_tag 'bullet_diamond.png', :title => l(:text_tip_issue_begin_end_day) + ": #{day}"
+    elsif issue.start_date == day
+      image_tag 'bullet_go.png', :title => l(:text_tip_issue_begin_day) + ": #{day}"
+    elsif issue.due_date == day
+      image_tag 'bullet_end.png', :title => l(:text_tip_issue_end_day) + ": #{day}"
+    end
+  end
 end
