@@ -129,6 +129,12 @@ module Redmine::MenuManager::MenuHelper
     else
       item.url
     end
+
+    unless item.params.empty?
+      link_context = Hash[item.params.map{|identifier, instance_variable| [identifier, instance_variable_get("@#{instance_variable}")]}]
+      url.merge!(link_context)
+    end
+
     caption = item.caption(project)
     return [caption, url, (current_menu_item == item.name)]
   end

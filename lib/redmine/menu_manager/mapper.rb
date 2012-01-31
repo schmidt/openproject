@@ -23,6 +23,10 @@ class Redmine::MenuManager::Mapper
 
   # Adds an item at the end of the menu. Available options:
   # * param: the parameter name that is used for the project id (default is :id)
+  # * params: a hash to pass on additional information to offer more context when creating the link
+  #           e.g. passing the id of a wikipage or anything that is not the project_id
+  #   * {identifier => instance_variable}
+  #   * eg.: {:test => "page"}  --> {:action => 'foo', :controller => 'bar' :test => 'nameofthepage'} (when @page = 'nameofthepage')
   # * if: a Proc that is called before rendering the item, the item is displayed only if it returns true
   # * caption that can be:
   #   * a localized string Symbol
