@@ -158,6 +158,10 @@ class WikiPage < ActiveRecord::Base
     self.parent = parent_page
   end
 
+  def to_param
+    @to_param ||= self.title
+  end
+
   protected
 
   def validate
