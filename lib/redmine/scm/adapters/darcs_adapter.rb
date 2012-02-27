@@ -40,20 +40,15 @@ module Redmine
           rev ? Info.new({:root_url => @url, :lastrev => rev.last}) : nil
         end
         
-        # Returns the entry identified by path and revision identifier
-        # or nil if entry doesn't exist in the repository
-        def entry(path=nil, identifier=nil)
-          e = entries(path, identifier)
-          e ? e.first : nil
-        end
-        
         # Returns an Entries collection
         # or nil if the given path doesn't exist in the repository
         def entries(path=nil, identifier=nil)
           path_prefix = (path.blank? ? '' : "#{path}/")
           path = '.' if path.blank?
           entries = Entries.new          
-          cmd = "#{DARCS_BIN} annotate --repodir #{@url} --xml-output #{path}"
+          cmd = "#{DARCS_BIN} annotate --repodir #{@url} --xml-output"
+          cmd << " --match \"hash #{identifier}\"" if identifier
+          cmd << " #{path}"
           shellout(cmd) do |io|
             begin
               doc = REXML::Document.new(io)
@@ -102,8 +97,12 @@ module Redmine
         def diff(path, identifier_from, identifier_to=nil, type="inline")
           path = '*' if path.blank?
           cmd = "#{DARCS_BIN} diff --repodir #{@url}"
-          cmd << " --to-match \"hash #{identifier_from}\""
-          cmd << " --from-match \"hash #{identifier_to}\"" if identifier_to
+          if identifier_to.nil?
+            cmd << " --match \"hash #{identifier_from}\""
+          else
+            cmd << " --to-match \"hash #{identifier_from}\""
+            cmd << " --from-match \"hash #{identifier_to}\""
+          end
           cmd << " -u #{path}"
           diff = []
           shellout(cmd) do |io|

@@ -18,22 +18,13 @@
 <!-- page specific tags --><%= yield :header_tags %>
 </head>
 <body>
+<div id="wrapper">
 <div id="top-menu">
     <div id="account">
-        <% if User.current.logged? %>
-            <%=l(:label_logged_as)%> <%= User.current.login %> -
-            <%= link_to l(:label_my_account), { :controller => 'my', :action => 'account' }, :class => 'myaccount' %>
-            <%= link_to l(:label_logout), { :controller => 'account', :action => 'logout' }, :class => 'logout' %>
-        <% else %>
-            <%= link_to l(:label_login), { :controller => 'account', :action => 'login' }, :class => 'signin' %>
-            <%= link_to(l(:label_register), { :controller => 'account',:action => 'register' }, :class => 'register') if Setting.self_registration? %>
-        <% end %>
+        <%= render_menu :account_menu -%>
     </div>
-    <%= link_to l(:label_home), home_url, :class => 'home' %>
-    <%= link_to l(:label_my_page), { :controller => 'my', :action => 'page'}, :class => 'mypage' if User.current.logged? %>
-    <%= link_to l(:label_project_plural), { :controller => 'projects' }, :class => 'projects' %>
-    <%= link_to l(:label_administration), { :controller => 'admin' }, :class => 'admin' if User.current.admin? %>
-    <%= link_to l(:label_help), Redmine::Info.help_url, :class => 'help' %>
+    <%= content_tag('div', "#{l(:label_logged_as)} #{User.current.login}", :id => 'loggedas') if User.current.logged? %>
+    <%= render_menu :top_menu -%>
 </div>
       
 <div id="header">
@@ -45,16 +36,10 @@
         <%= render :partial => 'layouts/project_selector' if User.current.memberships.any? %>
     </div>
     
-    <h1><%= h(@project ? @project.name : Setting.app_title) %></h1>
+    <h1><%= h(@project && !@project.new_record? ? @project.name : Setting.app_title) %></h1>
     
     <div id="main-menu">
-        <ul>
-            <% Redmine::MenuManager.allowed_items(:project_menu, User.current, @project).each do |item| %>
-            <% unless item.condition && !item.condition.call(@project) %>
-                <li><%= link_to l(item.name), {item.param => @project}.merge(item.url) %></li>
-            <% end %>
-            <% end if @project && !@project.new_record? %>
-        </ul>
+        <%= render_main_menu(@project) %>
     </div>
 </div>
 
@@ -73,7 +58,8 @@
 <div id="ajax-indicator" style="display:none;"><span><%= l(:label_loading) %></span></div>
 	
 <div id="footer">
-    Powered by <%= link_to Redmine::Info.app_name, Redmine::Info.url %> <%= Redmine::VERSION %> &copy; 2006-2007 Jean-Philippe Lang
+    Powered by <%= link_to Redmine::Info.app_name, Redmine::Info.url %> &copy; 2006-2008 Jean-Philippe Lang
+</div>
 </div>
 </body>
 </html>

@@ -59,19 +59,15 @@ module Redmine
           return nil if $? && $?.exitstatus != 0
           entries.sort_by_name
         end
-  
-        def entry(path=nil, identifier=nil)
-          path ||= ''
-          search_path = path.split('/')[0..-2].join('/')
-          entry_name = path.split('/').last
-          e = entries(search_path, identifier)
-          e ? e.detect{|entry| entry.name == entry_name} : nil
-        end
           
         def revisions(path=nil, identifier_from=nil, identifier_to=nil, options={})
           revisions = Revisions.new
-          cmd = "#{HG_BIN} -v -R #{target('')} log"
-          cmd << " -r #{identifier_from.to_i}:" if identifier_from
+          cmd = "#{HG_BIN} -v --encoding utf8 -R #{target('')} log"
+          if identifier_from && identifier_to
+            cmd << " -r #{identifier_from.to_i}:#{identifier_to.to_i}"
+          elsif identifier_from
+            cmd << " -r #{identifier_from.to_i}:"
+          end
           cmd << " --limit #{options[:limit].to_i}" if options[:limit]
           shellout(cmd) do |io|
             changeset = {}
@@ -84,13 +80,7 @@ module Redmine
                 value = $2
                 if parsing_descr && line_feeds > 1
                   parsing_descr = false
-                  revisions << Revision.new({:identifier => changeset[:changeset].split(':').first.to_i,
-                                             :scmid => changeset[:changeset].split(':').last,
-                                             :author => changeset[:user],
-                                             :time => Time.parse(changeset[:date]),
-                                             :message => changeset[:description],
-                                             :paths => changeset[:files].to_s.split.collect{|path| {:action => 'X', :path => "/#{path}"}}
-                  })
+                  revisions << build_revision_from_changeset(changeset)
                   changeset = {}
                 end
                 if !parsing_descr
@@ -107,13 +97,8 @@ module Redmine
                 line_feeds += 1 if line.chomp.empty?
               end
             end
-            revisions << Revision.new({:identifier => changeset[:changeset].split(':').first.to_i,
-                                       :scmid => changeset[:changeset].split(':').last,
-                                       :author => changeset[:user],
-                                       :time => Time.parse(changeset[:date]),
-                                       :message => changeset[:description],
-                                       :paths => changeset[:files].to_s.split.collect{|path| {:action => 'X', :path => "/#{path}"}}
-            })
+            # Add the last changeset if there is one left
+            revisions << build_revision_from_changeset(changeset) if changeset[:date]
           end
           return nil if $? && $?.exitstatus != 0
           revisions
@@ -139,7 +124,9 @@ module Redmine
         end
         
         def cat(path, identifier=nil)
-          cmd = "#{HG_BIN} -R #{target('')} cat #{target(path)}"
+          cmd = "#{HG_BIN} -R #{target('')} cat"
+          cmd << " -r #{identifier.to_i}" if identifier
+          cmd << " #{target(path)}"
           cat = nil
           shellout(cmd) do |io|
             io.binmode
@@ -164,6 +151,47 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           blame
+        end
+        
+        private
+        
+        # Builds a revision objet from the changeset returned by hg command
+        def build_revision_from_changeset(changeset)
+          rev_id = changeset[:changeset].to_s.split(':').first.to_i
+          
+          # Changes
+          paths = (rev_id == 0) ?
+            # Can't get changes for revision 0 with hg status
+            changeset[:files].to_s.split.collect{|path| {:action => 'A', :path => "/#{path}"}} :
+            status(rev_id)
+          
+          Revision.new({:identifier => rev_id,
+                        :scmid => changeset[:changeset].to_s.split(':').last,
+                        :author => changeset[:user],
+                        :time => Time.parse(changeset[:date]),
+                        :message => changeset[:description],
+                        :paths => paths
+                       })
+        end
+        
+        # Returns the file changes for a given revision
+        def status(rev_id)
+          cmd = "#{HG_BIN} -R #{target('')} status --rev #{rev_id.to_i - 1}:#{rev_id.to_i}"
+          result = []
+          shellout(cmd) do |io|
+            io.each_line do |line|
+              action, file = line.chomp.split
+              next unless action && file
+              file.gsub!("\\", "/")
+              case action
+              when 'R'
+                result << { :action => 'D' , :path => "/#{file}" }
+              else
+                result << { :action => action, :path => "/#{file}" }
+              end
+            end
+          end
+          result
         end
       end
     end

@@ -29,7 +29,8 @@ class Repository::Darcs < Repository
   end
   
   def entries(path=nil, identifier=nil)
-    entries=scm.entries(path, identifier)
+    patch = identifier.nil? ? nil : changesets.find_by_revision(identifier)
+    entries = scm.entries(path, patch.nil? ? nil : patch.scmid)
     if entries
       entries.each do |entry|
         # Search the DB for the entry's last change
@@ -47,18 +48,19 @@ class Repository::Darcs < Repository
   
   def diff(path, rev, rev_to, type)
     patch_from = changesets.find_by_revision(rev)
+    return nil if patch_from.nil?
     patch_to = changesets.find_by_revision(rev_to) if rev_to
     if path.blank?
       path = patch_from.changes.collect{|change| change.path}.join(' ')
     end
-    scm.diff(path, patch_from.scmid, patch_to.scmid, type)
+    patch_from ? scm.diff(path, patch_from.scmid, patch_to ? patch_to.scmid : nil, type) : nil
   end
   
   def fetch_changesets
     scm_info = scm.info
     if scm_info
       db_last_id = latest_changeset ? latest_changeset.scmid : nil
-      next_rev = latest_changeset ? latest_changeset.revision + 1 : 1      
+      next_rev = latest_changeset ? latest_changeset.revision.to_i + 1 : 1      
       # latest revision in the repository
       scm_revision = scm_info.lastrev.scmid      
       unless changesets.find_by_scmid(scm_revision)
@@ -71,9 +73,7 @@ class Repository::Darcs < Repository
                                          :committer => revision.author, 
                                          :committed_on => revision.time,
                                          :comments => revision.message)
-            
-            next if changeset.new_record?
-            
+                                         
             revision.paths.each do |change|
               Change.create(:changeset => changeset,
                             :action => change[:action],

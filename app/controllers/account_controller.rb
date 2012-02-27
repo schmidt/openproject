@@ -43,7 +43,7 @@ class AccountController < ApplicationController
       self.logged_user = nil
     else
       # Authenticate user
-      user = User.try_to_login(params[:login], params[:password])
+      user = User.try_to_login(params[:username], params[:password])
       if user
         self.logged_user = user
         # generate a key and set cookie if autologin
@@ -56,6 +56,8 @@ class AccountController < ApplicationController
         flash.now[:error] = l(:notice_account_invalid_creditentials)
       end
     end
+  rescue User::OnTheFlyCreationFailure
+    flash.now[:error] = 'Redmine could not retrieve the required information from the LDAP to create your account. Please, contact your Redmine administrator.'
   end
 
   # Log out current user and redirect to welcome page

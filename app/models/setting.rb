@@ -53,12 +53,13 @@ class Setting < ActiveRecord::Base
     v = read_attribute(:value)
     # Unserialize serialized settings
     v = YAML::load(v) if @@available_settings[name]['serialized'] && v.is_a?(String)
+    v = v.to_sym if @@available_settings[name]['format'] == 'symbol' && !v.blank?
     v
   end
   
   def value=(v)
     v = v.to_yaml if v && @@available_settings[name]['serialized']
-    write_attribute(:value, v)
+    write_attribute(:value, v.to_s)
   end
   
   # Returns the value of the setting named name
@@ -93,6 +94,11 @@ class Setting < ActiveRecord::Base
     end
     END_SRC
     class_eval src, __FILE__, __LINE__
+  end
+  
+  # Helper that returns an array based on per_page_options setting
+  def self.per_page_options_array
+    per_page_options.split(%r{[\s,]}).collect(&:to_i).select {|n| n > 0}.sort
   end
   
   # Checks if settings have changed since the values were read

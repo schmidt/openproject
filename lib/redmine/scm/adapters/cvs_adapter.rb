@@ -55,15 +55,6 @@ module Redmine
         def get_previous_revision(revision)
           CvsRevisionHelper.new(revision).prevRev
         end
-        
-        # Returns the entry identified by path and revision identifier
-        # or nil if entry doesn't exist in the repository
-        # this method returns all revisions from one single SCM-Entry
-        def entry(path=nil, identifier="HEAD")
-          e = entries(path, identifier)
-          logger.debug("<cvs-result> #{e.first.inspect}") if e
-          e ? e.first : nil
-        end    
     
         # Returns an Entries collection
         # or nil if the given path doesn't exist in the repository
@@ -72,7 +63,9 @@ module Redmine
           logger.debug "<cvs> entries '#{path}' with identifier '#{identifier}'"
           path_with_project="#{url}#{with_leading_slash(path)}"
           entries = Entries.new
-          cmd = "#{CVS_BIN} -d #{root_url} rls -ed #{path_with_project}"
+          cmd = "#{CVS_BIN} -d #{root_url} rls -ed"
+          cmd << " -D \"#{time_to_cvstime(identifier)}\"" if identifier
+          cmd << " #{path_with_project}"
           shellout(cmd) do |io|
             io.each_line(){|line|
               fields=line.chop.split('/',-1)
@@ -140,8 +133,8 @@ module Redmine
               
               if state=="entry_start"
                 branch_map=Hash.new
-                # gsub(/^:.*@[^:]+:/, '') is here to remove :pserver:anonymous@foo.bar: string if present in the url
-                if /^RCS file: #{Regexp.escape(root_url.gsub(/^:.*@[^:]+:/, ''))}\/#{Regexp.escape(path_with_project)}(.+),v$/ =~ line
+                # gsub(/^:.*@[^:]+:\d*/, '') is here to remove :pserver:anonymous@foo.bar: string if present in the url
+                if /^RCS file: #{Regexp.escape(root_url.gsub(/^:.*@[^:]+:\d*/, ''))}\/#{Regexp.escape(path_with_project)}(.+),v$/ =~ line
                   entry_path = normalize_cvs_path($1)
                   entry_name = normalize_path(File.basename($1))
                   logger.debug("Path #{entry_path} <=> Name #{entry_name}")

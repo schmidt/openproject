@@ -51,27 +51,22 @@ module Redmine
           return nil
         end
         
-        # Returns the entry identified by path and revision identifier
-        # or nil if entry doesn't exist in the repository
-        def entry(path=nil, identifier=nil)
-          e = entries(path, identifier)
-          e ? e.first : nil
-        end
-        
         # Returns an Entries collection
         # or nil if the given path doesn't exist in the repository
         def entries(path=nil, identifier=nil)
           path ||= ''
-          identifier = 'HEAD' unless identifier and identifier > 0
+          identifier = (identifier and identifier.to_i > 0) ? identifier.to_i : "HEAD"
           entries = Entries.new
           cmd = "#{SVN_BIN} list --xml #{target(path)}@#{identifier}"
           cmd << credentials_string
-          cmd << " 2>&1"
           shellout(cmd) do |io|
             output = io.read
             begin
               doc = REXML::Document.new(output)
               doc.elements.each("lists/list/entry") do |entry|
+                # Skip directory if there is no commit date (usually that
+                # means that we don't have read access to it)
+                next if entry.attributes['kind'] == 'dir' && entry.elements['commit'].elements['date'].nil?
                 entries << Entry.new({:name => entry.elements['name'].text,
                             :path => ((path.empty? ? "" : "#{path}/") + entry.elements['name'].text),
                             :kind => entry.attributes['kind'],
@@ -95,13 +90,13 @@ module Redmine
     
         def revisions(path=nil, identifier_from=nil, identifier_to=nil, options={})
           path ||= ''
-          identifier_from = 'HEAD' unless identifier_from and identifier_from.to_i > 0
-          identifier_to = 1 unless identifier_to and identifier_to.to_i > 0
+          identifier_from = (identifier_from and identifier_from.to_i > 0) ? identifier_from.to_i : "HEAD"
+          identifier_to = (identifier_to and identifier_to.to_i > 0) ? identifier_to.to_i : 1
           revisions = Revisions.new
           cmd = "#{SVN_BIN} log --xml -r #{identifier_from}:#{identifier_to}"
           cmd << credentials_string
           cmd << " --verbose " if  options[:with_paths]
-          cmd << target(path)
+          cmd << ' ' + target(path)
           shellout(cmd) do |io|
             begin
               doc = REXML::Document.new(io)
@@ -132,15 +127,13 @@ module Redmine
         
         def diff(path, identifier_from, identifier_to=nil, type="inline")
           path ||= ''
-          if identifier_to and identifier_to.to_i > 0
-            identifier_to = identifier_to.to_i 
-          else
-            identifier_to = identifier_from.to_i - 1
-          end
+          identifier_from = (identifier_from and identifier_from.to_i > 0) ? identifier_from.to_i : ''
+          identifier_to = (identifier_to and identifier_to.to_i > 0) ? identifier_to.to_i : (identifier_from.to_i - 1)
+          
           cmd = "#{SVN_BIN} diff -r "
           cmd << "#{identifier_to}:"
           cmd << "#{identifier_from}"
-          cmd << "#{target(path)}@#{identifier_from}"
+          cmd << " #{target(path)}@#{identifier_from}"
           cmd << credentials_string
           diff = []
           shellout(cmd) do |io|

@@ -19,10 +19,10 @@
   <% end %>
 </div>
 
-<h2><%= l(:label_revision) %> <%= @changeset.revision %></h2>
+<h2><%= l(:label_revision) %> <%= format_revision(@changeset.revision) %></h2>
 
 <p><% if @changeset.scmid %>ID: <%= @changeset.scmid %><br /><% end %>
-<em><%= @changeset.committer %>, <%= format_time(@changeset.committed_on) %></em></p>
+<em><%= @changeset.committer.to_s.split('<').first %>, <%= format_time(@changeset.committed_on) %></em></p>
 
 <%= textilizable @changeset.comments %>
 
@@ -49,18 +49,17 @@
 <td><div class="square action_<%= change.action %>"></div> <%= change.path %> <%= "(#{change.revision})" unless change.revision.blank?  %></td>
 <td align="right">
 <% if change.action == "M" %>
-<%= link_to l(:label_view_diff), :action => 'diff', :id => @project, :path => change.path, :rev => @changeset.revision %>
+<%= link_to l(:label_view_diff), :action => 'diff', :id => @project, :path => without_leading_slash(change.relative_path), :rev => @changeset.revision %>
 <% end %>
 </td>
 </tr>
 <% end %>
 </tbody>
 </table>
-<p><%= pagination_links_full @changes_pages, :rev => @changeset.revision %>
-[ <%= @changes_pages.current.first_item %> - <%= @changes_pages.current.last_item %> / <%= @changes_count %> ]</p>
+<p class="pagination"><%= pagination_links_full @changes_pages %></p>
 
 <% content_for :header_tags do %>
 <%= stylesheet_link_tag "scm" %>
 <% end %>
 
-<% set_html_title("#{l(:label_revision)} #{@changeset.revision}") -%>
+<% html_title("#{l(:label_revision)} #{@changeset.revision}") -%>

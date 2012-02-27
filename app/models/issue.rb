@@ -27,7 +27,7 @@ class Issue < ActiveRecord::Base
 
   has_many :journals, :as => :journalized, :dependent => :destroy
   has_many :attachments, :as => :container, :dependent => :destroy
-  has_many :time_entries, :dependent => :nullify
+  has_many :time_entries, :dependent => :delete_all
   has_many :custom_values, :dependent => :delete_all, :as => :customized
   has_many :custom_fields, :through => :custom_values
   has_and_belongs_to_many :changesets, :order => "revision ASC"
@@ -66,8 +66,10 @@ class Issue < ActiveRecord::Base
     transaction do
       if new_project && project_id != new_project.id
         # delete issue relations
-        self.relations_from.clear
-        self.relations_to.clear
+        unless Setting.cross_project_issue_relations?
+          self.relations_from.clear
+          self.relations_to.clear
+        end
         # issue is moved to another project
         self.category = nil 
         self.fixed_version = nil
@@ -91,7 +93,11 @@ class Issue < ActiveRecord::Base
     self.priority = nil
     write_attribute(:priority_id, pid)
   end
-
+  
+  def estimated_hours=(h)
+    write_attribute :estimated_hours, (h.is_a?(String) ? h.to_hours : h)
+  end
+  
   def validate
     if self.due_date.nil? && @attributes['due_date'] && !@attributes['due_date'].empty?
       errors.add :due_date, :activerecord_error_not_a_date
@@ -142,12 +148,17 @@ class Issue < ActiveRecord::Base
   end
   
   def after_save
+    # Reload is needed in order to get the right status
+    reload
+    
     # Update start/due dates of following issues
     relations_from.each(&:set_issue_to_dates)
     
     # Close duplicates if the issue was closed
     if @issue_before_change && !@issue_before_change.closed? && self.closed?
       duplicates.each do |duplicate|
+        # Reload is need in case the duplicate was updated by a previous duplicate
+        duplicate.reload
         # Don't re-close it if it's already closed
         next if duplicate.closed?
         # Same user and notes
@@ -165,6 +176,7 @@ class Issue < ActiveRecord::Base
   def init_journal(user, notes = "")
     @current_journal ||= Journal.new(:journalized => self, :user => user, :notes => notes)
     @issue_before_change = self.clone
+    @issue_before_change.status = self.status
     @custom_values_before_change = {}
     self.custom_values.each {|c| @custom_values_before_change.store c.custom_field_id, c.value }
     @current_journal
@@ -180,12 +192,19 @@ class Issue < ActiveRecord::Base
     project.assignable_users
   end
   
+  # Returns an array of status that user is able to apply
+  def new_statuses_allowed_to(user)
+    statuses = status.find_new_statuses_allowed_to(user.role_for_project(project), tracker)
+    statuses << status unless statuses.empty?
+    statuses.uniq.sort
+  end
+  
   # Returns the mail adresses of users that should be notified for the issue
   def recipients
     recipients = project.recipients
-    # Author and assignee are always notified
-    recipients << author.mail if author
-    recipients << assigned_to.mail if assigned_to
+    # Author and assignee are always notified unless they have been locked
+    recipients << author.mail if author && author.active?
+    recipients << assigned_to.mail if assigned_to && assigned_to.active?
     recipients.compact.uniq
   end
   
@@ -217,5 +236,15 @@ class Issue < ActiveRecord::Base
   
   def soonest_start
     @soonest_start ||= relations_to.collect{|relation| relation.successor_soonest_start}.compact.min
+  end
+  
+  def self.visible_by(usr)
+    with_scope(:find => { :conditions => Project.visible_by(usr) }) do
+      yield
+    end
+  end
+  
+  def to_s
+    "#{tracker} ##{id}: #{subject}"
   end
 end

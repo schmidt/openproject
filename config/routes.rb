@@ -7,7 +7,9 @@ ActionController::Routing::Routes.draw do |map|
   # Keep in mind you can assign values other than :controller and :action
 
   map.home '', :controller => 'welcome'
-
+  map.signin 'login', :controller => 'account', :action => 'login'
+  map.signout 'logout', :controller => 'account', :action => 'logout'
+  
   map.connect 'wiki/:id/:page/:action', :controller => 'wiki', :page => nil
   map.connect 'roles/workflow/:id/:role_id/:tracker_id', :controller => 'roles', :action => 'workflow'
   map.connect 'help/:ctrl/:page', :controller => 'help'
@@ -16,7 +18,9 @@ ActionController::Routing::Routes.draw do |map|
   map.connect 'issues/:issue_id/relations/:action/:id', :controller => 'issue_relations'
   map.connect 'projects/:project_id/issues/:action', :controller => 'issues'
   map.connect 'projects/:project_id/news/:action', :controller => 'news'
+  map.connect 'projects/:project_id/documents/:action', :controller => 'documents'
   map.connect 'projects/:project_id/boards/:action/:id', :controller => 'boards'
+  map.connect 'projects/:project_id/timelog/:action/:id', :controller => 'timelog'
   map.connect 'boards/:board_id/topics/:action/:id', :controller => 'messages'
 
   map.with_options :controller => 'repositories' do |omap|

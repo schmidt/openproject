@@ -59,8 +59,17 @@ module Redmine
         # Returns the entry identified by path and revision identifier
         # or nil if entry doesn't exist in the repository
         def entry(path=nil, identifier=nil)
-          e = entries(path, identifier)
-          e ? e.first : nil
+          parts = path.to_s.split(%r{[\/\\]}).select {|n| !n.blank?}
+          search_path = parts[0..-2].join('/')
+          search_name = parts[-1]
+          if search_path.blank? && search_name.blank?
+            # Root entry
+            Entry.new(:path => '', :kind => 'dir')
+          else
+            # Search for the entry in the parent directory
+            es = entries(search_path, identifier)
+            es ? es.detect {|e| e.name == search_name} : nil
+          end
         end
         
         # Returns an Entries collection
@@ -101,15 +110,15 @@ module Redmine
         end
         
         def target(path)
-          path ||= ""
-          base = path.match(/^\//) ? root_url : url    
-          " \"" << "#{base}/#{path}".gsub(/["?<>\*]/, '') << "\""
+          path ||= ''
+          base = path.match(/^\//) ? root_url : url
+          shell_quote("#{base}/#{path}".gsub(/[?<>\*]/, ''))
         end
             
         def logger
           RAILS_DEFAULT_LOGGER
         end
-      
+        
         def shellout(cmd, &block)
           logger.debug "Shelling out: #{cmd}" if logger && logger.debug?
           begin
@@ -118,11 +127,22 @@ module Redmine
               block.call(io) if block_given?
             end
           rescue Errno::ENOENT => e
+            msg = strip_credential(e.message)
             # The command failed, log it and re-raise
-            logger.error("SCM command failed: #{cmd}\n  with: #{e.message}")
-            raise CommandFailed
+            logger.error("SCM command failed: #{strip_credential(cmd)}\n  with: #{msg}")
+            raise CommandFailed.new(msg)
           end
         end  
+        
+        # Hides username/password in a given command
+        def self.hide_credential(cmd)
+          q = (RUBY_PLATFORM =~ /mswin/ ? '"' : "'")
+          cmd.to_s.gsub(/(\-\-(password|username))\s+(#{q}[^#{q}]+#{q}|[^#{q}]\S+)/, '\\1 xxxx')
+        end
+        
+        def strip_credential(cmd)
+          self.class.hide_credential(cmd)
+        end
       end
       
       class Entries < Array
@@ -237,7 +257,8 @@ module Redmine
                 end
                 a = diff_table.add_line line
             end
-            self << diff_table
+            self << diff_table unless diff_table.empty?
+            self
         end
       end
     
@@ -269,7 +290,6 @@ module Redmine
             end
           else
             if line =~ /^[^\+\-\s@\\]/
-              self.delete(self.keys.sort.last)
               @parsing = false
               return false
             elsif line =~ /^@@ (\+|\-)(\d+)(,\d+)? (\+|\-)(\d+)(,\d+)? @@/

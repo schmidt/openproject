@@ -40,13 +40,13 @@ class RepositoryCvsTest < Test::Unit::TestCase
       
       assert_equal 5, @repository.changesets.count
       assert_equal 14, @repository.changes.count
-      assert_equal 'Two files changed', @repository.changesets.find_by_revision(3).comments
+      assert_not_nil @repository.changesets.find_by_comments('Two files changed')
     end
     
     def test_fetch_changesets_incremental
       @repository.fetch_changesets
-      # Remove changesets with revision > 2
-      @repository.changesets.find(:all, :conditions => 'revision > 2').each(&:destroy)
+      # Remove the 3 latest changesets
+      @repository.changesets.find(:all, :order => 'committed_on DESC', :limit => 3).each(&:destroy)
       @repository.reload
       assert_equal 2, @repository.changesets.count
       

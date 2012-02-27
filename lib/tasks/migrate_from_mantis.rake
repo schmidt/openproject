@@ -87,18 +87,24 @@ task :migrate_from_mantis => :environment do
       set_table_name :mantis_user_table
       
       def firstname
-        realname.blank? ? username : realname.split.first[0..29]
+        @firstname = realname.blank? ? username : realname.split.first[0..29]
+        @firstname.gsub!(/[^\w\s\'\-]/i, '')
+        @firstname
       end
       
       def lastname
-        realname.blank? ? username : realname.split[1..-1].join(' ')[0..29]
+        @lastname = realname.blank? ? '-' : realname.split[1..-1].join(' ')[0..29]
+        @lastname.gsub!(/[^\w\s\'\-]/i, '')
+        @lastname = '-' if @lastname.blank?
+        @lastname
       end
       
       def email
-        if read_attribute(:email).match(/^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i)
-          read_attribute(:email)
+        if read_attribute(:email).match(/^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i) &&
+             !User.find_by_mail(read_attribute(:email))
+          @email = read_attribute(:email)
         else
-          "#{username}@foo.bar"
+          @email = "#{username}@foo.bar"
         end
       end
       
@@ -116,10 +122,6 @@ task :migrate_from_mantis => :environment do
       
       def name
         read_attribute(:name)[0..29]
-      end
-      
-      def description
-        read_attribute(:description).blank? ? read_attribute(:name) : read_attribute(:description)[0..254]
       end
       
       def identifier
@@ -186,7 +188,7 @@ task :migrate_from_mantis => :environment do
       end
       
       def original_filename
-        filename
+        MantisMigrate.encode(filename)
       end
       
       def content_type
@@ -250,7 +252,7 @@ task :migrate_from_mantis => :environment do
     	u.password = 'mantis'
     	u.status = User::STATUS_LOCKED if user.enabled != 1
     	u.admin = true if user.access_level == 90
-    	next unless u.save
+    	next unless u.save!
     	users_migrated += 1
     	users_map[user.id] = u.id
     	print '.'
@@ -306,7 +308,8 @@ task :migrate_from_mantis => :environment do
       print "Migrating bugs"
       Issue.destroy_all
       issues_map = {}
-      MantisBug.find(:all).each do |bug|
+      keep_bug_ids = (Issue.count == 0)
+      MantisBug.find(:all, :order => 'id ASC').each do |bug|
         next unless projects_map[bug.project_id] && users_map[bug.reporter_id]
     	i = Issue.new :project_id => projects_map[bug.project_id], 
                       :subject => encode(bug.summary),
@@ -319,6 +322,7 @@ task :migrate_from_mantis => :environment do
     	i.fixed_version = Version.find_by_project_id_and_name(i.project_id, bug.fixed_in_version) unless bug.fixed_in_version.blank?
     	i.status = STATUS_MAPPING[bug.status] || DEFAULT_STATUS
     	i.tracker = (bug.severity == 10 ? TRACKER_FEATURE : TRACKER_BUG)
+    	i.id = bug.id if keep_bug_ids
     	next unless i.save
     	issues_map[bug.id] = i.id
     	print '.'
@@ -355,6 +359,9 @@ task :migrate_from_mantis => :environment do
           i.add_watcher(User.find_by_id(users_map[monitor.user_id]))
         end
       end
+      
+      # update issue id sequence if needed (postgresql)
+      Issue.connection.reset_pk_sequence!(Issue.table_name) if Issue.connection.respond_to?('reset_pk_sequence!')
       puts
       
       # Bug relationships
@@ -445,7 +452,6 @@ task :migrate_from_mantis => :environment do
       end
     end
     
-  private
     def self.encode(text)
       @ic.iconv text
     rescue
@@ -454,6 +460,14 @@ task :migrate_from_mantis => :environment do
   end
   
   puts
+  if Redmine::DefaultData::Loader.no_data?
+    puts "Redmine configuration need to be loaded before importing data."
+    puts "Please, run this first:"
+    puts
+    puts "  rake redmine:load_default_data RAILS_ENV=\"#{ENV['RAILS_ENV']}\""
+    exit
+  end
+  
   puts "WARNING: Your Redmine data will be deleted during this process."
   print "Are you sure you want to continue ? [y/N] "
   break unless STDIN.gets.match(/^y$/i)

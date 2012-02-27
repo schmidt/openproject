@@ -19,6 +19,9 @@ class ApplicationController < ActionController::Base
   before_filter :user_setup, :check_if_login_required, :set_localization
   filter_parameter_logging :password
   
+  include Redmine::MenuManager::MenuController
+  helper Redmine::MenuManager::MenuHelper
+  
   REDMINE_SUPPORTED_SCM.each do |scm|
     require_dependency "repository/#{scm.underscore}"
   end
@@ -28,18 +31,23 @@ class ApplicationController < ActionController::Base
   end
   
   def user_setup
+    # Check the settings cache for each request
     Setting.check_cache
+    # Find the current user
+    User.current = find_current_user
+  end
+  
+  # Returns the current user or nil if no user is logged in
+  def find_current_user
     if session[:user_id]
       # existing session
-      User.current = User.find(session[:user_id])
+      (User.find_active(session[:user_id]) rescue nil)
     elsif cookies[:autologin] && Setting.autologin?
       # auto-login feature
-      User.current = User.find_by_autologin_key(cookies[:autologin])
+      User.find_by_autologin_key(cookies[:autologin])
     elsif params[:key] && accept_key_auth_actions.include?(params[:action])
       # RSS key authentication
-      User.current = User.find_by_rss_key(params[:key])
-    else
-      User.current = User.anonymous
+      User.find_by_rss_key(params[:key])
     end
   end
   
@@ -51,13 +59,14 @@ class ApplicationController < ActionController::Base
   end 
   
   def set_localization
+    User.current.language = nil unless User.current.logged?
     lang = begin
-      if !User.current.language.blank? and GLoc.valid_languages.include? User.current.language.to_sym
+      if !User.current.language.blank? && GLoc.valid_language?(User.current.language)
         User.current.language
       elsif request.env['HTTP_ACCEPT_LANGUAGE']
-        accept_lang = parse_qvalues(request.env['HTTP_ACCEPT_LANGUAGE']).first.split('-').first
-        if accept_lang and !accept_lang.empty? and GLoc.valid_languages.include? accept_lang.to_sym
-          accept_lang
+        accept_lang = parse_qvalues(request.env['HTTP_ACCEPT_LANGUAGE']).first.downcase
+        if !accept_lang.blank? && (GLoc.valid_language?(accept_lang) || GLoc.valid_language?(accept_lang = accept_lang.split('-').first))
+          User.current.language = accept_lang
         end
       end
     rescue
@@ -93,13 +102,17 @@ class ApplicationController < ActionController::Base
   # make sure that the user is a member of the project (or admin) if project is private
   # used as a before_filter for actions that do not require any particular permission on the project
   def check_project_privacy
-    unless @project.active?
+    if @project && @project.active?
+      if @project.is_public? || User.current.member_of?(@project) || User.current.admin?
+        true
+      else
+        User.current.logged? ? render_403 : require_login
+      end
+    else
       @project = nil
       render_404
-      return false
+      false
     end
-    return true if @project.is_public? || User.current.member_of?(@project) || User.current.admin?
-    User.current.logged? ? render_403 : require_login
   end
 
   # store current uri in session.
@@ -129,9 +142,15 @@ class ApplicationController < ActionController::Base
     return false
   end
   
+  def render_error(msg)
+    flash.now[:error] = msg
+    render :nothing => true, :layout => !request.xhr?, :status => 500
+  end
+  
   def render_feed(items, options={})    
     @items = items || []
     @items.sort! {|x,y| y.event_datetime <=> x.event_datetime }
+    @items = @items.slice(0, Setting.feeds_limit.to_i)
     @title = options[:title] || Setting.app_title
     render :template => "common/feed.atom.rxml", :layout => false, :content_type => 'application/atom+xml'
   end
@@ -146,16 +165,35 @@ class ApplicationController < ActionController::Base
   end
   
   # TODO: move to model
-  def attach_files(obj, files)
-    attachments = []
-    if files && files.is_a?(Array)
-      files.each do |file|
-        next unless file.size > 0
-        a = Attachment.create(:container => obj, :file => file, :author => User.current)
-        attachments << a unless a.new_record?
+  def attach_files(obj, attachments)
+    attached = []
+    if attachments && attachments.is_a?(Hash)
+      attachments.each_value do |attachment|
+        file = attachment['file']
+        next unless file && file.size > 0
+        a = Attachment.create(:container => obj, 
+                              :file => file,
+                              :description => attachment['description'].to_s.strip,
+                              :author => User.current)
+        attached << a unless a.new_record?
       end
     end
-    attachments
+    attached
+  end
+
+  # Returns the number of objects that should be displayed
+  # on the paginated list
+  def per_page_option
+    per_page = nil
+    if params[:per_page] && Setting.per_page_options_array.include?(params[:per_page].to_s.to_i)
+      per_page = params[:per_page].to_s.to_i
+      session[:per_page] = per_page
+    elsif session[:per_page]
+      per_page = session[:per_page]
+    else
+      per_page = Setting.per_page_options_array.first || 25
+    end
+    per_page
   end
 
   # qvalues http header parser
@@ -175,5 +213,10 @@ class ApplicationController < ActionController::Base
       tmp.collect!{|val, q| val}
     end
     return tmp
+  end
+  
+  # Returns a string that can be used as filename value in Content-Disposition header
+  def filename_for_content_disposition(name)
+    request.env['HTTP_USER_AGENT'] =~ %r{MSIE} ? ERB::Util.url_encode(name) : name
   end
 end

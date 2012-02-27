@@ -16,31 +16,43 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Mailer < ActionMailer::Base
-  helper ApplicationHelper
-  helper IssuesHelper
-  helper CustomFieldsHelper
+  helper :application
+  helper :issues
+  helper :custom_fields
   
   include ActionController::UrlWriter
   
   def issue_add(issue)    
+    redmine_headers 'Project' => issue.project.identifier,
+                    'Issue-Id' => issue.id,
+                    'Issue-Author' => issue.author.login
+    redmine_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
     recipients issue.recipients    
-    subject "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] #{issue.status.name} - #{issue.subject}"
+    subject "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] (#{issue.status.name}) #{issue.subject}"
     body :issue => issue,
          :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
   end
 
   def issue_edit(journal)
     issue = journal.journalized
+    redmine_headers 'Project' => issue.project.identifier,
+                    'Issue-Id' => issue.id,
+                    'Issue-Author' => issue.author.login
+    redmine_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
     recipients issue.recipients
     # Watchers in cc
     cc(issue.watcher_recipients - @recipients)
-    subject "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] #{issue.status.name} - #{issue.subject}"
+    s = "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] "
+    s << "(#{issue.status.name}) " if journal.new_value_for('status_id')
+    s << issue.subject
+    subject s
     body :issue => issue,
          :journal => journal,
          :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
   end
   
   def document_added(document)
+    redmine_headers 'Project' => document.project.identifier
     recipients document.project.recipients
     subject "[#{document.project.name}] #{l(:label_document_new)}: #{document.title}"
     body :document => document,
@@ -59,6 +71,7 @@ class Mailer < ActionMailer::Base
       added_to_url = url_for(:controller => 'documents', :action => 'show', :id => container.id)
       added_to = "#{l(:label_document)}: #{container.title}"
     end
+    redmine_headers 'Project' => container.project.identifier
     recipients container.project.recipients
     subject "[#{container.project.name}] #{l(:label_attachment_new)}"
     body :attachments => attachments,
@@ -67,6 +80,7 @@ class Mailer < ActionMailer::Base
   end
 
   def news_added(news)
+    redmine_headers 'Project' => news.project.identifier
     recipients news.project.recipients
     subject "[#{news.project.name}] #{l(:label_news)}: #{news.title}"
     body :news => news,
@@ -74,6 +88,8 @@ class Mailer < ActionMailer::Base
   end
 
   def message_posted(message, recipients)
+    redmine_headers 'Project' => message.project.identifier,
+                    'Topic-Id' => (message.parent_id || message.id)
     recipients(recipients)
     subject "[#{message.board.project.name} - #{message.board.name}] #{message.subject}"
     body :message => message,
@@ -83,7 +99,7 @@ class Mailer < ActionMailer::Base
   def account_information(user, password)
     set_language_if_valid user.language
     recipients user.mail
-    subject l(:mail_subject_register)
+    subject l(:mail_subject_register, Setting.app_title)
     body :user => user,
          :password => password,
          :login_url => url_for(:controller => 'account', :action => 'login')
@@ -92,7 +108,7 @@ class Mailer < ActionMailer::Base
   def account_activation_request(user)
     # Send the email to all active administrators
     recipients User.find_active(:all, :conditions => {:admin => true}).collect { |u| u.mail }.compact
-    subject l(:mail_subject_account_activation_request)
+    subject l(:mail_subject_account_activation_request, Setting.app_title)
     body :user => user,
          :url => url_for(:controller => 'users', :action => 'index', :status => User::STATUS_REGISTERED, :sort_key => 'created_on', :sort_order => 'desc')
   end
@@ -100,7 +116,7 @@ class Mailer < ActionMailer::Base
   def lost_password(token)
     set_language_if_valid(token.user.language)
     recipients token.user.mail
-    subject l(:mail_subject_lost_password)
+    subject l(:mail_subject_lost_password, Setting.app_title)
     body :token => token,
          :url => url_for(:controller => 'account', :action => 'lost_password', :token => token.value)
   end  
@@ -108,7 +124,7 @@ class Mailer < ActionMailer::Base
   def register(token)
     set_language_if_valid(token.user.language)
     recipients token.user.mail
-    subject l(:mail_subject_register)
+    subject l(:mail_subject_register, Setting.app_title)
     body :token => token,
          :url => url_for(:controller => 'account', :action => 'activate', :token => token.value)
   end
@@ -119,7 +135,16 @@ class Mailer < ActionMailer::Base
     subject 'Redmine test'
     body :url => url_for(:controller => 'welcome')
   end
-  
+
+  # Overrides default deliver! method to prevent from sending an email
+  # with no recipient, cc or bcc
+  def deliver!(mail = @mail)
+    return false if (recipients.nil? || recipients.empty?) && 
+                    (cc.nil? || cc.empty?) &&
+                    (bcc.nil? || bcc.empty?)
+    super
+  end
+
   private
   def initialize_defaults(method_name)
     super
@@ -127,6 +152,15 @@ class Mailer < ActionMailer::Base
     from Setting.mail_from
     default_url_options[:host] = Setting.host_name
     default_url_options[:protocol] = Setting.protocol
+    # Common headers
+    headers 'X-Mailer' => 'Redmine',
+            'X-Redmine-Host' => Setting.host_name,
+            'X-Redmine-Site' => Setting.app_title
+  end
+  
+  # Appends a Redmine header field (name is prepended with 'X-Redmine-')
+  def redmine_headers(h)
+    h.each { |k,v| headers["X-Redmine-#{k}"] = v }
   end
   
   # Overrides the create_mail method

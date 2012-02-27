@@ -7,7 +7,7 @@ http://www.redmine.org/
 
 == Requirements
 
-* Ruby on Rails 1.2.6 or 2.0.2
+* Ruby on Rails 2.0.2 (not Rails 2.1)
 * A database (see compatibility below)
 
 Optional:
@@ -33,10 +33,14 @@ Supported databases:
    rake db:migrate RAILS_ENV="production"
    It will create tables and an administrator account.
 
-5. Insert default configuration data in the database:
-   rake redmine:load_default_data RAILS_ENV="production"
-   It will load default roles, trackers, statuses, workflows and enumerations.
-   This step is optional but *highly recommended*
+5. Setting up permissions
+   The user who runs Redmine must have write permission on the following
+   subdirectories: files, log, tmp (create the last one if not present).
+
+   Assuming you run Redmine with a user named redmine:
+     mkdir tmp
+     sudo chown -R redmine:redmine files log tmp
+     sudo chmod -R 755 files log tmp
 
 6. Test the installation by running WEBrick web server:
    ruby script/server -e production   
@@ -48,9 +52,8 @@ Supported databases:
    login: admin
    password: admin
    
-8. You can go to "Admin -> Settings" to modify application settings.
-
-9. Setup Apache or Lighttpd with fastcgi for best performance.
+   Go to "Administration" to load the default configuration data (roles, 
+   trackers, statuses, workflow) and adjust application settings
 
 
 == SMTP server Configuration

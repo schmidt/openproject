@@ -17,6 +17,13 @@
 
 module CustomFieldsHelper
 
+  def custom_fields_tabs
+    tabs = [{:name => 'IssueCustomField', :label => :label_issue_plural},
+            {:name => 'ProjectCustomField', :label => :label_project_plural},
+            {:name => 'UserCustomField', :label => :label_user_plural}
+            ]
+  end
+  
   # Return custom field html tag corresponding to its format
   def custom_field_tag(custom_value)	
     custom_field = custom_value.custom_field
@@ -28,7 +35,7 @@ module CustomFieldsHelper
       text_field('custom_value', 'value', :name => field_name, :id => field_id, :size => 10) + 
       calendar_for(field_id)
     when "text"
-      text_area 'custom_value', 'value', :name => field_name, :id => field_id, :cols => 60, :rows => 3
+      text_area 'custom_value', 'value', :name => field_name, :id => field_id, :rows => 3, :style => 'width:99%'
     when "bool"
       check_box 'custom_value', 'value', :name => field_name, :id => field_id
     when "list"
@@ -62,7 +69,7 @@ module CustomFieldsHelper
     return "" unless value && !value.empty?
     case field_format
     when "date"
-      begin; l_date(value.to_date); rescue; value end
+      begin; format_date(value.to_date); rescue; value end
     when "bool"
       l_YesNo(value == "1")
     else

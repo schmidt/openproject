@@ -5,7 +5,7 @@ Copyright (C) 2006-2008  Jean-Philippe Lang
 http://www.redmine.org/
 
 
-== Upgrading from 0.3.0 and above
+== Upgrading
 
 1. Uncompress the program archive in a new directory
    
@@ -19,11 +19,12 @@ http://www.redmine.org/
    rake db:migrate RAILS_ENV="production"
 
 6. Copy the RAILS_ROOT/files directory content into your new installation
+   This directory contains all the attached files
 
-Note 1: Rails 1.2.6 or higher is required
 
-Note 2: when upgrading your code with svn update, don't forget to clear
-the application cache (RAILS_ROOT/tmp/cache) before restarting.
+== Notes
 
-Note 3: settings previously defined in custom_config.rb are now stored
-in database, as of version 0.4.2. Go to "Admin -> Settings" to edit them.
+1. Rails 2.0.2 is required for version 0.7 and later.
+
+2. When upgrading your code with svn update, don't forget to clear
+   the application cache (RAILS_ROOT/tmp/cache) before restarting.

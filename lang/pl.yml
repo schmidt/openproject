@@ -68,13 +68,15 @@ notice_successful_delete: Udane usunięcie.
 notice_successful_connection: Udane nawiązanie połączenia.
 notice_file_not_found: Strona do której próbujesz się dostać nie istnieje lub została usunięta.
 notice_locking_conflict: Dane poprawione przez innego użytkownika.
-notice_scm_error: Wejście i/lub zmiana nie istnieje w repozytorium.
 notice_not_authorized: Nie jesteś autoryzowany by zobaczyć stronę.
 
-mail_subject_lost_password: Twoje hasło do redMine
+error_scm_not_found: "Obiekt lub wersja nie zostały znalezione w repozytorium."
+error_scm_command_failed: "An error occurred when trying to access the repository: %s"
+
+mail_subject_lost_password: Twoje hasło do %s
 mail_body_lost_password: 'W celu zmiany swojego hasła użyj poniższego odnośnika:'
-mail_subject_register: Aktywacja konta w redMine
-mail_body_register: 'W celu aktywacji Twojego konta w Redmine, użyj poniższego odnośnika:'
+mail_subject_register: Aktywacja konta w %s
+mail_body_register: 'W celu aktywacji Twojego konta, użyj poniższego odnośnika:'
 
 gui_validation_error: 1 błąd
 gui_validation_error_plural: %d błędów
@@ -112,12 +114,12 @@ field_subject: Temat
 field_due_date: Data oddania
 field_assigned_to: Przydzielony do
 field_priority: Priorytet
-field_fixed_version: Wersja
+field_fixed_version: Wersja docelowa
 field_user: Użytkownik
 field_role: Rola
 field_homepage: Strona www
 field_is_public: Publiczny
-field_parent: Podprojekt
+field_parent: Nadprojekt
 field_is_in_chlog: Zagadnienie pokazywane w zapisie zmian
 field_is_in_roadmap: Zagadnienie pokazywane na mapie
 field_login: Login
@@ -155,6 +157,7 @@ field_identifier: Identifikator
 field_is_filter: Atrybut filtrowania
 field_issue_to_id: Powiązania zagadnienia
 field_delay: Opóźnienie
+field_default_value: Domyślny
 
 setting_app_title: Tytuł aplikacji
 setting_app_subtitle: Podtytuł aplikacji
@@ -169,10 +172,10 @@ setting_host_name: Nazwa hosta
 setting_text_formatting: Formatowanie tekstu
 setting_wiki_compression: Kompresja historii Wiki
 setting_feeds_limit: Limit danych RSS
-setting_autofetch_changesets: Auto-odświeżanie CVS
+setting_autofetch_changesets: Automatyczne pobieranie zmian
 setting_sys_api_enabled: Włączenie WS do zarządzania repozytorium
-setting_commit_ref_keywords: Terminy odnoszące (CVS)
-setting_commit_fix_keywords: Terminy ustalające (CVS)
+setting_commit_ref_keywords: Słowa tworzące powiązania
+setting_commit_fix_keywords: Słowa zmieniające status
 setting_autologin: Auto logowanie
 setting_date_format: Format daty
 
@@ -325,14 +328,14 @@ label_repository: Repozytorium
 label_browse: Przegląd
 label_modification: %d modyfikacja
 label_modification_plural: %d modyfikacja
-label_revision: Zmiana
-label_revision_plural: Zmiany
+label_revision: Rewizja
+label_revision_plural: Rewizje
 label_added: dodane
-label_modified: zmodufikowane
+label_modified: zmodyfikowane
 label_deleted: usunięte
-label_latest_revision: Ostatnia zmiana
-label_latest_revision_plural: Ostatnie zmiany
-label_view_revisions: Pokaż zmiany
+label_latest_revision: Najnowsza rewizja
+label_latest_revision_plural: Najnowsze rewizje
+label_view_revisions: Pokaż rewizje
 label_max_size: Maksymalny rozmiar
 label_on: 'z'
 label_sort_highest: Przesuń na górę
@@ -363,8 +366,8 @@ label_f_hour_plural: %.2f godzin
 label_time_tracking: Śledzenie czasu
 label_change_plural: Zmiany
 label_statistics: Statystyki
-label_commits_per_month: Wrzutek CVS w miesiącu
-label_commits_per_author: Wrzutek CVS przez autora
+label_commits_per_month: Zatwierdzenia według miesięcy
+label_commits_per_author: Zatwierdzenia według autorów
 label_view_diff: Pokaż różnice
 label_diff_inline: w linii
 label_diff_side_by_side: obok siebie
@@ -430,7 +433,7 @@ button_back: Wstecz
 button_cancel: Anuluj
 button_activate: Aktywuj
 button_sort: Sortuj
-button_log_time: Logowanie czasu
+button_log_time: Log czasu
 button_rollback: Przywróc do tej wersji
 button_watch: Obserwuj
 button_unwatch: Nie obserwuj
@@ -460,13 +463,13 @@ text_length_between: Długość pomiędzy %d i %d znaków.
 text_tracker_no_workflow: Brak przepływu zefiniowanego dla tego typu zagadnienia
 text_unallowed_characters: Niedozwolone znaki
 text_comma_separated: Wielokrotne wartości dozwolone (rozdzielone przecinkami).
-text_issues_ref_in_commit_messages: Zagadnienia odnoszące i ustalające we wrzutkach CVS
+text_issues_ref_in_commit_messages: Odwołania do zagadnień w komentarzach zatwierdzeń
 
 default_role_manager: Kierownik
 default_role_developper: Programista
 default_role_reporter: Wprowadzajacy
 default_tracker_bug: Błąd
-default_tracker_feature: Cecha
+default_tracker_feature: Zadanie
 default_tracker_support: Wsparcie
 default_issue_status_new: Nowy
 default_issue_status_assigned: Przypisany
@@ -480,7 +483,7 @@ default_priority_low: Niski
 default_priority_normal: Normalny
 default_priority_high: Wysoki
 default_priority_urgent: Pilny
-default_priority_immediate: Natyczmiastowy
+default_priority_immediate: Natychmiastowy
 default_activity_design: Projektowanie
 default_activity_development: Rozwój
 
@@ -497,12 +500,12 @@ label_this_week: ten tydzień
 label_jump_to_a_project: Skocz do projektu...
 field_assignable: Zagadnienia mogą być przypisane do tej roli
 label_sort_by: Sortuj po %s
-text_issue_updated: Zagadnienie %s zostało zaktualizowane.
+text_issue_updated: Zagadnienie %s zostało zaktualizowane (by %s).
 notice_feeds_access_key_reseted: Twój klucz dostępu RSS został zrestetowany.
 field_redirect_existing_links: Przekierowanie istniejących odnośników
 text_issue_category_reassign_to: Przydziel zagadnienie do tej kategorii
 notice_email_sent: Email został wysłany do %s
-text_issue_added: Zagadnienie %s zostało wprowadzone.
+text_issue_added: Zagadnienie %s zostało wprowadzone (by %s).
 text_wiki_destroy_confirmation: Jesteś pewien, że chcesz usunąć to wiki i całą jego zawartość ?
 notice_email_error: Wystąpił błąd w trakcie wysyłania maila (%s)
 label_updated_time: Zaktualizowane %s temu
@@ -533,13 +536,13 @@ label_user_mail_option_none: "Tylko to co obserwuje lub w czym biorę udział"
 setting_emails_footer: Stopka e-mail
 label_float: Liczba rzeczywista
 button_copy: Kopia
-mail_body_account_information_external: Możesz użyć twojego "%s" konta do zalogowania do Redmine.
-mail_body_account_information: Twoje konto w Redmine
+mail_body_account_information_external: Możesz użyć twojego "%s" konta do zalogowania.
+mail_body_account_information: Twoje konto
 setting_protocol: Protokoł
 label_user_mail_no_self_notified: "Nie chcę powiadomień o zmianach, które sam wprowadzam."
 setting_time_format: Format czasu
 label_registration_activation_by_email: aktywacja konta przez e-mail
-mail_subject_account_activation_request: Zapytanie aktywacyjne konta Redmine
+mail_subject_account_activation_request: Zapytanie aktywacyjne konta %s
 mail_body_account_activation_request: 'Zarejestrowano nowego użytkownika: (%s). Konto oczekuje na twoje zatwierdzenie:'
 label_registration_automatic_activation: automatyczna aktywacja kont
 label_registration_manual_activation: manualna aktywacja kont
@@ -549,4 +552,69 @@ text_caracters_minimum: Musi być nie krótsze niż %d znaków.
 setting_bcc_recipients: Odbiorcy kopii tajnej (kt/bcc)
 button_annotate: Adnotuj
 label_issues_by: Zagadnienia wprowadzone przez %s
-field_searchable: Searchable
+field_searchable: Przeszukiwalne
+label_display_per_page: 'Na stronę: %s'
+setting_per_page_options: Opcje ilości obiektów na stronie
+label_age: Wiek
+notice_default_data_loaded: Domyślna konfiguracja została pomyślnie załadowana.
+text_load_default_configuration: Załaduj domyślną konfigurację
+text_no_configuration_data: "Role użytkowników, typy zagadnień, statusy zagadnień oraz przepływ pracy nie zostały jeszcze skonfigurowane.\nJest wysoce rekomendowane by załadować domyślną konfigurację. Po załadowaniu będzie możliwość edycji tych danych."
+error_can_t_load_default_data: "Domyślna konfiguracja nie może być załadowana: %s"
+button_update: Uaktualnij
+label_change_properties: Zmień właściwości
+label_general: Ogólne
+label_repository_plural: Repozytoria
+label_associated_revisions: Skojarzone rewizje
+setting_user_format: Personalny format wyświetlania
+text_status_changed_by_changeset: Zastosowane w zmianach %s.
+label_more: Więcej
+text_issues_destroy_confirmation: 'Czy jestes pewien, że chcesz usunąć wskazane zagadnienia?'
+label_scm: SCM
+text_select_project_modules: 'Wybierz moduły do aktywacji w tym projekcie:'
+label_issue_added: Dodano zagadnienie
+label_issue_updated: Uaktualniono zagadnienie
+label_document_added: Dodano dokument
+label_message_posted: Dodano wiadomość
+label_file_added: Dodano plik
+label_news_added: Dodano wiadomość
+project_module_boards: Fora
+project_module_issue_tracking: Śledzenie zagadnień
+project_module_wiki: Wiki
+project_module_files: Pliki
+project_module_documents: Dokumenty
+project_module_repository: Repozytorium
+project_module_news: Wiadomości
+project_module_time_tracking: Śledzenie czasu
+text_file_repository_writable: Zapisywalne repozytorium plików
+text_default_administrator_account_changed: Zmieniono domyślne hasło administratora
+text_rmagick_available: RMagick dostępne (opcjonalnie)
+button_configure: Konfiguruj
+label_plugins: Wtyczki
+label_ldap_authentication: Autoryzacja LDAP
+label_downloads_abbr: Pobieranie
+label_this_month: ten miesiąc
+label_last_n_days: ostatnie %d dni
+label_all_time: cały czas
+label_this_year: ten rok
+label_date_range: Zakres datowy
+label_last_week: ostatni tydzień
+label_yesterday: wczoraj
+label_last_month: ostatni miesiąc
+label_add_another_file: Dodaj kolejny plik
+label_optional_description: Opcjonalny opis
+text_destroy_time_entries_question: Zalogowano %.02f godzin przy zagadnieniu, które chcesz usunąć. Co chcesz zrobić?
+error_issue_not_found_in_project: 'Zaganienie nie zostało znalezione lub nie należy do tego projektu'
+text_assign_time_entries_to_project: Przypisz logowany czas do projektu
+text_destroy_time_entries: Usuń zalogowany czas
+text_reassign_time_entries: 'Przepnij zalogowany czas do tego zagadnienia:'
+label_chronological_order: W kolejności chronologicznej
+setting_activity_days_default: Dni wyświetlane w aktywności projektu
+setting_display_subprojects_issues: Domyślnie pokazuj zagadnienia podprojektów w głównym projekcie
+field_comments_sorting: Pokazuj komentarze
+label_reverse_chronological_order: W kolejności odwrotnej do chronologicznej
+label_preferences: Preferencje
+label_overall_activity: Ogólna aktywność
+setting_default_projects_public: Nowe projekty są domyślnie publiczne
+error_scm_annotate: "Wpis nie istnieje lub nie można do niego dodawać adnotacji."
+label_planning: Planning
+text_subprojects_destroy_warning: 'Its subproject(s): %s will be also deleted.'

@@ -18,11 +18,22 @@
 require "digest/sha1"
 
 class User < ActiveRecord::Base
+
+  class OnTheFlyCreationFailure < Exception; end
+
   # Account statuses
   STATUS_ANONYMOUS  = 0
   STATUS_ACTIVE     = 1
   STATUS_REGISTERED = 2
   STATUS_LOCKED     = 3
+  
+  USER_FORMATS = {
+    :firstname_lastname => '#{firstname} #{lastname}',
+    :firstname => '#{firstname}',
+    :lastname_firstname => '#{lastname} #{firstname}',
+    :lastname_coma_firstname => '#{lastname}, #{firstname}',
+    :username => '#{login}'
+  }
 
   has_many :memberships, :class_name => 'Member', :include => [ :project, :role ], :conditions => "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}", :order => "#{Project.table_name}.name", :dependent => :delete_all
   has_many :projects, :through => :memberships
@@ -38,11 +49,12 @@ class User < ActiveRecord::Base
   attr_protected :login, :admin, :password, :password_confirmation, :hashed_password
 	
   validates_presence_of :login, :firstname, :lastname, :mail, :if => Proc.new { |user| !user.is_a?(AnonymousUser) }
-  validates_uniqueness_of :login, :mail	
+  validates_uniqueness_of :login, :if => Proc.new { |user| !user.login.blank? }
+  validates_uniqueness_of :mail, :if => Proc.new { |user| !user.mail.blank? }
   # Login must contain lettres, numbers, underscores only
   validates_format_of :login, :with => /^[a-z0-9_\-@\.]*$/i
   validates_length_of :login, :maximum => 30
-  validates_format_of :firstname, :lastname, :with => /^[\w\s\'\-]*$/i
+  validates_format_of :firstname, :lastname, :with => /^[\w\s\'\-\.]*$/i
   validates_length_of :firstname, :lastname, :maximum => 30
   validates_format_of :mail, :with => /^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i, :allow_nil => true
   validates_length_of :mail, :maximum => 60, :allow_nil => true
@@ -96,20 +108,23 @@ class User < ActiveRecord::Base
         onthefly.language = Setting.default_language
         if onthefly.save
           user = find(:first, :conditions => ["login=?", login])
-          logger.info("User '#{user.login}' created on the fly.") if logger
+          logger.info("User '#{user.login}' created from the LDAP") if logger
+        else
+          logger.error("User '#{onthefly.login}' found in LDAP but could not be created (#{onthefly.errors.full_messages.join(', ')})") if logger
+          raise OnTheFlyCreationFailure.new
         end
       end
     end    
     user.update_attribute(:last_login_on, Time.now) if user
     user
-    
-    rescue => text
-      raise text
+  rescue => text
+    raise text
   end
 	
   # Return user's full name for display
-  def name
-    "#{firstname} #{lastname}"
+  def name(formatter = nil)
+    f = USER_FORMATS[formatter || Setting.user_format] || USER_FORMATS[:firstname_lastname]
+    eval '"' + f + '"'
   end
   
   def active?
@@ -134,6 +149,10 @@ class User < ActiveRecord::Base
   
   def time_zone
     self.pref.time_zone.nil? ? nil : TimeZone[self.pref.time_zone]
+  end
+  
+  def wants_comments_in_reverse_order?
+    self.pref[:comments_sorting] == 'desc'
   end
   
   # Return user's RSS key (a 40 chars long string), used to access feeds
@@ -165,7 +184,13 @@ class User < ActiveRecord::Base
   end
 
   def <=>(user)
-    user.nil? ? -1 : (lastname == user.lastname ? firstname <=> user.firstname : lastname <=> user.lastname)
+    if user.nil?
+      -1
+    elsif lastname.to_s.downcase == user.lastname.to_s.downcase
+      firstname.to_s.downcase <=> user.firstname.to_s.downcase
+    else
+      lastname.to_s.downcase <=> user.lastname.to_s.downcase
+    end
   end
   
   def to_s
@@ -202,17 +227,26 @@ class User < ActiveRecord::Base
   # action can be:
   # * a parameter-like Hash (eg. :controller => 'projects', :action => 'edit')
   # * a permission Symbol (eg. :edit_project)
-  def allowed_to?(action, project)
-    # No action allowed on archived projects
-    return false unless project.active?
-    # No action allowed on disabled modules
-    return false unless project.allows_to?(action)
-    # Admin users are authorized for anything else
-    return true if admin?
-    
-    role = role_for_project(project)
-    return false unless role
-    role.allowed_to?(action) && (project.is_public? || role.member?)
+  def allowed_to?(action, project, options={})
+    if project
+      # No action allowed on archived projects
+      return false unless project.active?
+      # No action allowed on disabled modules
+      return false unless project.allows_to?(action)
+      # Admin users are authorized for anything else
+      return true if admin?
+      
+      role = role_for_project(project)
+      return false unless role
+      role.allowed_to?(action) && (project.is_public? || role.member?)
+      
+    elsif options[:global]
+      # authorize if user has at least one role that has this permission
+      roles = memberships.collect {|m| m.role}.uniq
+      roles.detect {|r| r.allowed_to?(action)}
+    else
+      false
+    end
   end
   
   def self.current=(user)
@@ -224,13 +258,12 @@ class User < ActiveRecord::Base
   end
   
   def self.anonymous
-    return @anonymous_user if @anonymous_user
     anonymous_user = AnonymousUser.find(:first)
     if anonymous_user.nil?
       anonymous_user = AnonymousUser.create(:lastname => 'Anonymous', :firstname => '', :mail => '', :login => '', :status => 0)
       raise 'Unable to create the anonymous user.' if anonymous_user.new_record?
     end
-    @anonymous_user = anonymous_user
+    anonymous_user
   end
   
 private

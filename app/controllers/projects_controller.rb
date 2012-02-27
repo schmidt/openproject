@@ -17,15 +17,19 @@
 
 class ProjectsController < ApplicationController
   layout 'base'
-  before_filter :find_project, :except => [ :index, :list, :add ]
-  before_filter :authorize, :except => [ :index, :list, :add, :archive, :unarchive, :destroy ]
+  menu_item :overview
+  menu_item :activity, :only => :activity
+  menu_item :roadmap, :only => :roadmap
+  menu_item :files, :only => [:list_files, :add_file]
+  menu_item :settings, :only => :settings
+  menu_item :issues, :only => [:changelog]
+  
+  before_filter :find_project, :except => [ :index, :list, :add, :activity ]
+  before_filter :find_optional_project, :only => :activity
+  before_filter :authorize, :except => [ :index, :list, :add, :archive, :unarchive, :destroy, :activity ]
   before_filter :require_admin, :only => [ :add, :archive, :unarchive, :destroy ]
   accept_key_auth :activity, :calendar
   
-  cache_sweeper :project_sweeper, :only => [ :add, :edit, :archive, :unarchive, :destroy ]
-  cache_sweeper :issue_sweeper, :only => [ :add_issue ]
-  cache_sweeper :version_sweeper, :only => [ :add_version ]
-
   helper :sort
   include SortHelper
   helper :custom_fields
@@ -62,16 +66,17 @@ class ProjectsController < ApplicationController
                                   :conditions => "parent_id IS NULL AND status = #{Project::STATUS_ACTIVE}",
                                   :order => 'name')
     @project = Project.new(params[:project])
-    @project.enabled_module_names = Redmine::AccessControl.available_project_modules
     if request.get?
       @custom_values = ProjectCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| CustomValue.new(:custom_field => x, :customized => @project) }
       @project.trackers = Tracker.all
+      @project.is_public = Setting.default_projects_public?
+      @project.enabled_module_names = Redmine::AccessControl.available_project_modules
     else
       @project.custom_fields = CustomField.find(params[:custom_field_ids]) if params[:custom_field_ids]
       @custom_values = ProjectCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| CustomValue.new(:custom_field => x, :customized => @project, :value => (params[:custom_fields] ? params["custom_fields"][x.id.to_s] : nil)) }
       @project.custom_values = @custom_values
+      @project.enabled_module_names = params[:enabled_modules]
       if @project.save
-        @project.enabled_module_names = params[:enabled_modules]
         flash[:notice] = l(:notice_successful_create)
         redirect_to :controller => 'admin', :action => 'projects'
 	  end		
@@ -82,12 +87,24 @@ class ProjectsController < ApplicationController
   def show
     @custom_values = @project.custom_values.find(:all, :include => :custom_field, :order => "#{CustomField.table_name}.position")
     @members_by_role = @project.members.find(:all, :include => [:user, :role], :order => 'position').group_by {|m| m.role}
-    @subprojects = @project.active_children
+    @subprojects = @project.children.find(:all, :conditions => Project.visible_by(User.current))
     @news = @project.news.find(:all, :limit => 5, :include => [ :author, :project ], :order => "#{News.table_name}.created_on DESC")
-    @trackers = @project.trackers
-    @open_issues_by_tracker = Issue.count(:group => :tracker, :joins => "INNER JOIN #{IssueStatus.table_name} ON #{IssueStatus.table_name}.id = #{Issue.table_name}.status_id", :conditions => ["project_id=? and #{IssueStatus.table_name}.is_closed=?", @project.id, false])
-    @total_issues_by_tracker = Issue.count(:group => :tracker, :conditions => ["project_id=?", @project.id])
-    @total_hours = @project.time_entries.sum(:hours)
+    @trackers = @project.rolled_up_trackers
+    
+    cond = @project.project_condition(Setting.display_subprojects_issues?)
+    Issue.visible_by(User.current) do
+      @open_issues_by_tracker = Issue.count(:group => :tracker,
+                                            :include => [:project, :status, :tracker],
+                                            :conditions => ["(#{cond}) AND #{IssueStatus.table_name}.is_closed=?", false])
+      @total_issues_by_tracker = Issue.count(:group => :tracker,
+                                            :include => [:project, :status, :tracker],
+                                            :conditions => cond)
+    end
+    TimeEntry.visible_by(User.current) do
+      @total_hours = TimeEntry.sum(:hours, 
+                                   :include => :project,
+                                   :conditions => cond).to_f
+    end
     @key = User.current.rss_key
   end
 
@@ -107,7 +124,6 @@ class ProjectsController < ApplicationController
   # Edit @project
   def edit
     if request.post?
-      @project.custom_fields = IssueCustomField.find(params[:custom_field_ids]) if params[:custom_field_ids]
       if params[:custom_fields]
         @custom_values = ProjectCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| CustomValue.new(:custom_field => x, :customized => @project, :value => params["custom_fields"][x.id.to_s]) }
         @project.custom_values = @custom_values
@@ -177,165 +193,6 @@ class ProjectsController < ApplicationController
   	end
   end
 
-  # Add a new document to @project
-  def add_document
-    @document = @project.documents.build(params[:document])    
-    if request.post? and @document.save	
-      attach_files(@document, params[:attachments])
-      flash[:notice] = l(:notice_successful_create)
-      Mailer.deliver_document_added(@document) if Setting.notified_events.include?('document_added')
-      redirect_to :action => 'list_documents', :id => @project
-    end
-  end
-  
-  # Show documents list of @project
-  def list_documents
-    @sort_by = %w(category date title author).include?(params[:sort_by]) ? params[:sort_by] : 'category'
-    documents = @project.documents.find :all, :include => [:attachments, :category]
-    case @sort_by
-    when 'date'
-      @grouped = documents.group_by {|d| d.created_on.to_date }
-    when 'title'
-      @grouped = documents.group_by {|d| d.title.first.upcase}
-    when 'author'
-      @grouped = documents.select{|d| d.attachments.any?}.group_by {|d| d.attachments.last.author}
-    else
-      @grouped = documents.group_by(&:category)
-    end
-    render :layout => false if request.xhr?
-  end
-
-  # Add a new issue to @project
-  # The new issue will be created from an existing one if copy_from parameter is given
-  def add_issue
-    @issue = params[:copy_from] ? Issue.new.copy_from(params[:copy_from]) : Issue.new(params[:issue])
-    @issue.project = @project
-    @issue.author = User.current
-    @issue.tracker ||= @project.trackers.find(params[:tracker_id])
-    
-    default_status = IssueStatus.default
-    unless default_status
-      flash.now[:error] = 'No default issue status is defined. Please check your configuration (Go to "Administration -> Issue statuses").'
-      render :nothing => true, :layout => true
-      return
-    end    
-    @issue.status = default_status
-    @allowed_statuses = ([default_status] + default_status.find_new_statuses_allowed_to(User.current.role_for_project(@project), @issue.tracker))
-    
-    if request.get?
-      @issue.start_date ||= Date.today
-      @custom_values = @issue.custom_values.empty? ?
-        @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, :customized => @issue) } :
-        @issue.custom_values
-    else
-      requested_status = IssueStatus.find_by_id(params[:issue][:status_id])
-      # Check that the user is allowed to apply the requested status
-      @issue.status = (@allowed_statuses.include? requested_status) ? requested_status : default_status
-      @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, :customized => @issue, :value => params["custom_fields"][x.id.to_s]) }
-      @issue.custom_values = @custom_values
-      if @issue.save
-        attach_files(@issue, params[:attachments])
-        flash[:notice] = l(:notice_successful_create)
-        Mailer.deliver_issue_add(@issue) if Setting.notified_events.include?('issue_added')
-        redirect_to :controller => 'issues', :action => 'index', :project_id => @project
-        return
-      end		
-    end	
-    @priorities = Enumeration::get_values('IPRI')
-  end
-
-  # Bulk edit issues
-  def bulk_edit_issues
-    if request.post?
-      status = params[:status_id].blank? ? nil : IssueStatus.find_by_id(params[:status_id])
-      priority = params[:priority_id].blank? ? nil : Enumeration.find_by_id(params[:priority_id])
-      assigned_to = params[:assigned_to_id].blank? ? nil : User.find_by_id(params[:assigned_to_id])
-      category = params[:category_id].blank? ? nil : @project.issue_categories.find_by_id(params[:category_id])
-      fixed_version = params[:fixed_version_id].blank? ? nil : @project.versions.find_by_id(params[:fixed_version_id])
-      issues = @project.issues.find_all_by_id(params[:issue_ids])
-      unsaved_issue_ids = []      
-      issues.each do |issue|
-        journal = issue.init_journal(User.current, params[:notes])
-        issue.priority = priority if priority
-        issue.assigned_to = assigned_to if assigned_to || params[:assigned_to_id] == 'none'
-        issue.category = category if category
-        issue.fixed_version = fixed_version if fixed_version
-        issue.start_date = params[:start_date] unless params[:start_date].blank?
-        issue.due_date = params[:due_date] unless params[:due_date].blank?
-        issue.done_ratio = params[:done_ratio] unless params[:done_ratio].blank?
-        # Don't save any change to the issue if the user is not authorized to apply the requested status
-        if (status.nil? || (issue.status.new_status_allowed_to?(status, current_role, issue.tracker) && issue.status = status)) && issue.save
-          # Send notification for each issue (if changed)
-          Mailer.deliver_issue_edit(journal) if journal.details.any? && Setting.notified_events.include?('issue_updated')
-        else
-          # Keep unsaved issue ids to display them in flash error
-          unsaved_issue_ids << issue.id
-        end
-      end
-      if unsaved_issue_ids.empty?
-        flash[:notice] = l(:notice_successful_update) unless issues.empty?
-      else
-        flash[:error] = l(:notice_failed_to_save_issues, unsaved_issue_ids.size, issues.size, '#' + unsaved_issue_ids.join(', #'))
-      end
-      redirect_to :controller => 'issues', :action => 'index', :project_id => @project
-      return
-    end
-    if current_role && User.current.allowed_to?(:change_issue_status, @project)
-      # Find potential statuses the user could be allowed to switch issues to
-      @available_statuses = Workflow.find(:all, :include => :new_status,
-                                                :conditions => {:role_id => current_role.id}).collect(&:new_status).compact.uniq
-    end
-    render :update do |page|
-      page.hide 'query_form'
-      page.replace_html  'bulk-edit', :partial => 'issues/bulk_edit_form'
-    end
-  end
-
-  def move_issues
-    @issues = @project.issues.find(params[:issue_ids]) if params[:issue_ids]
-    redirect_to :controller => 'issues', :action => 'index', :project_id => @project and return unless @issues
-    
-    @projects = []
-    # find projects to which the user is allowed to move the issue
-    if User.current.admin?
-      # admin is allowed to move issues to any active (visible) project
-      @projects = Project.find(:all, :conditions => Project.visible_by(User.current), :order => 'name')
-    else
-      User.current.memberships.each {|m| @projects << m.project if m.role.allowed_to?(:move_issues)}
-    end
-    @target_project = @projects.detect {|p| p.id.to_s == params[:new_project_id]} if params[:new_project_id]
-    @target_project ||= @project    
-    @trackers = @target_project.trackers
-    if request.post?
-      new_tracker = params[:new_tracker_id].blank? ? nil : @target_project.trackers.find_by_id(params[:new_tracker_id])
-      unsaved_issue_ids = []
-      @issues.each do |issue|
-        unsaved_issue_ids << issue.id unless issue.move_to(@target_project, new_tracker)
-      end
-      if unsaved_issue_ids.empty?
-        flash[:notice] = l(:notice_successful_update) unless @issues.empty?
-      else
-        flash[:error] = l(:notice_failed_to_save_issues, unsaved_issue_ids.size, @issues.size, '#' + unsaved_issue_ids.join(', #'))
-      end
-      redirect_to :controller => 'issues', :action => 'index', :project_id => @project
-      return
-    end
-    render :layout => false if request.xhr?
-  end
-
-  # Add a news to @project
-  def add_news
-    @news = News.new(:project => @project, :author => User.current)
-    if request.post?
-      @news.attributes = params[:news]
-      if @news.save
-        flash[:notice] = l(:notice_successful_create)
-        Mailer.deliver_news_added(@news) if Setting.notified_events.include?('news_added')
-        redirect_to :controller => 'news', :action => 'index', :project_id => @project
-      end
-    end
-  end
-
   def add_file
     if request.post?
       @version = @project.versions.find_by_id(params[:version_id])
@@ -347,7 +204,14 @@ class ProjectsController < ApplicationController
   end
   
   def list_files
-    @versions = @project.versions.sort
+    sort_init 'filename', 'asc'
+    sort_update 'filename' => "#{Attachment.table_name}.filename",
+                'created_on' => "#{Attachment.table_name}.created_on",
+                'size' => "#{Attachment.table_name}.filesize",
+                'downloads' => "#{Attachment.table_name}.downloads"
+                
+    @versions = @project.versions.find(:all, :include => :attachments, :order => sort_clause).sort.reverse
+    render :layout => !request.xhr?
   end
   
   # Show changelog for @project
@@ -365,33 +229,24 @@ class ProjectsController < ApplicationController
   end
   
   def activity
-    if params[:year] and params[:year].to_i > 1900
-      @year = params[:year].to_i
-      if params[:month] and params[:month].to_i > 0 and params[:month].to_i < 13
-        @month = params[:month].to_i
-      end    
+    @days = Setting.activity_days_default.to_i
+    
+    if params[:from]
+      begin; @date_to = params[:from].to_date; rescue; end
     end
-    @year ||= Date.today.year
-    @month ||= Date.today.month
 
-    case params[:format]
-    when 'atom'
-      # 30 last days
-      @date_from = Date.today - 30
-      @date_to = Date.today + 1
-    else
-      # current month
-      @date_from = Date.civil(@year, @month, 1)
-      @date_to = @date_from >> 1
-    end
+    @date_to ||= Date.today + 1
+    @date_from = @date_to - @days
     
     @event_types = %w(issues news files documents changesets wiki_pages messages)
-    @event_types.delete('wiki_pages') unless @project.wiki
-    @event_types.delete('changesets') unless @project.repository
-    @event_types.delete('messages') unless @project.boards.any?
-    # only show what the user is allowed to view
-    @event_types = @event_types.select {|o| User.current.allowed_to?("view_#{o}".to_sym, @project)}
-    
+    if @project
+      @event_types.delete('wiki_pages') unless @project.wiki
+      @event_types.delete('changesets') unless @project.repository
+      @event_types.delete('messages') unless @project.boards.any?
+      # only show what the user is allowed to view
+      @event_types = @event_types.select {|o| User.current.allowed_to?("view_#{o}".to_sym, @project)}
+      @with_subprojects = params[:with_subprojects].nil? ? Setting.display_subprojects_issues? : (params[:with_subprojects] == '1')
+    end
     @scope = @event_types.select {|t| params["show_#{t}"]}
     # default events if none is specified in parameters
     @scope = (@event_types - %w(wiki_pages messages))if @scope.empty?
@@ -399,21 +254,41 @@ class ProjectsController < ApplicationController
     @events = []    
     
     if @scope.include?('issues')
-      @events += @project.issues.find(:all, :include => [:author, :tracker], :conditions => ["#{Issue.table_name}.created_on>=? and #{Issue.table_name}.created_on<=?", @date_from, @date_to] )
-      @events += @project.issues_status_changes(@date_from, @date_to)
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_issues, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Issue.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Issue.find(:all, :include => [:project, :author, :tracker], :conditions => cond.conditions)
+      
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_issues, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Journal.table_name}.journalized_type = 'Issue' AND #{JournalDetail.table_name}.prop_key = 'status_id' AND #{Journal.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Journal.find(:all, :include => [{:issue => :project}, :details, :user], :conditions => cond.conditions)
     end
     
     if @scope.include?('news')
-      @events += @project.news.find(:all, :conditions => ["#{News.table_name}.created_on>=? and #{News.table_name}.created_on<=?", @date_from, @date_to], :include => :author )
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_news, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{News.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += News.find(:all, :include => [:project, :author], :conditions => cond.conditions)
     end
     
     if @scope.include?('files')
-      @events += Attachment.find(:all, :select => "#{Attachment.table_name}.*", :joins => "LEFT JOIN #{Version.table_name} ON #{Version.table_name}.id = #{Attachment.table_name}.container_id", :conditions => ["#{Attachment.table_name}.container_type='Version' and #{Version.table_name}.project_id=? and #{Attachment.table_name}.created_on>=? and #{Attachment.table_name}.created_on<=?", @project.id, @date_from, @date_to], :include => :author )
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_files, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Attachment.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Attachment.find(:all, :select => "#{Attachment.table_name}.*", 
+                                       :joins => "LEFT JOIN #{Version.table_name} ON #{Attachment.table_name}.container_type='Version' AND #{Version.table_name}.id = #{Attachment.table_name}.container_id " +
+                                                 "LEFT JOIN #{Project.table_name} ON #{Version.table_name}.project_id = #{Project.table_name}.id",
+                                       :conditions => cond.conditions)
     end
     
     if @scope.include?('documents')
-      @events += @project.documents.find(:all, :conditions => ["#{Document.table_name}.created_on>=? and #{Document.table_name}.created_on<=?", @date_from, @date_to] )
-      @events += Attachment.find(:all, :select => "attachments.*", :joins => "LEFT JOIN #{Document.table_name} ON #{Document.table_name}.id = #{Attachment.table_name}.container_id", :conditions => ["#{Attachment.table_name}.container_type='Document' and #{Document.table_name}.project_id=? and #{Attachment.table_name}.created_on>=? and #{Attachment.table_name}.created_on<=?", @project.id, @date_from, @date_to], :include => :author )
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_documents, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Document.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Document.find(:all, :include => :project, :conditions => cond.conditions)
+      
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_documents, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Attachment.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Attachment.find(:all, :select => "#{Attachment.table_name}.*", 
+                                       :joins => "LEFT JOIN #{Document.table_name} ON #{Attachment.table_name}.container_type='Document' AND #{Document.table_name}.id = #{Attachment.table_name}.container_id " +
+                                                 "LEFT JOIN #{Project.table_name} ON #{Document.table_name}.project_id = #{Project.table_name}.id",
+                                       :conditions => cond.conditions)
     end
     
     if @scope.include?('wiki_pages')
@@ -422,33 +297,36 @@ class ProjectsController < ApplicationController
                "#{WikiContent.versioned_table_name}.page_id, #{WikiContent.versioned_table_name}.author_id, " +
                "#{WikiContent.versioned_table_name}.id"
       joins = "LEFT JOIN #{WikiPage.table_name} ON #{WikiPage.table_name}.id = #{WikiContent.versioned_table_name}.page_id " +
-              "LEFT JOIN #{Wiki.table_name} ON #{Wiki.table_name}.id = #{WikiPage.table_name}.wiki_id "
-      conditions = ["#{Wiki.table_name}.project_id = ? AND #{WikiContent.versioned_table_name}.updated_on BETWEEN ? AND ?",
-                    @project.id, @date_from, @date_to]
+              "LEFT JOIN #{Wiki.table_name} ON #{Wiki.table_name}.id = #{WikiPage.table_name}.wiki_id " +
+              "LEFT JOIN #{Project.table_name} ON #{Project.table_name}.id = #{Wiki.table_name}.project_id"
 
-      @events += WikiContent.versioned_class.find(:all, :select => select, :joins => joins, :conditions => conditions)
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_wiki_pages, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{WikiContent.versioned_table_name}.updated_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += WikiContent.versioned_class.find(:all, :select => select, :joins => joins, :conditions => cond.conditions)
     end
 
     if @scope.include?('changesets')
-      @events += Changeset.find(:all, :include => :repository, :conditions => ["#{Repository.table_name}.project_id = ? AND #{Changeset.table_name}.committed_on BETWEEN ? AND ?", @project.id, @date_from, @date_to])
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_changesets, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Changeset.table_name}.committed_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Changeset.find(:all, :include => {:repository => :project}, :conditions => cond.conditions)
     end
     
     if @scope.include?('messages')
-      @events += Message.find(:all, 
-                              :include => [:board, :author], 
-                              :conditions => ["#{Board.table_name}.project_id=? AND #{Message.table_name}.parent_id IS NULL AND #{Message.table_name}.created_on BETWEEN ? AND ?", @project.id, @date_from, @date_to])
+      cond = ARCondition.new(Project.allowed_to_condition(User.current, :view_messages, :project => @project, :with_subprojects => @with_subprojects))
+      cond.add(["#{Message.table_name}.created_on BETWEEN ? AND ?", @date_from, @date_to])
+      @events += Message.find(:all, :include => [{:board => :project}, :author], :conditions => cond.conditions)
     end
     
     @events_by_day = @events.group_by(&:event_date)
     
     respond_to do |format|
       format.html { render :layout => false if request.xhr? }
-      format.atom { render_feed(@events, :title => "#{@project.name}: #{l(:label_activity)}") }
+      format.atom { render_feed(@events, :title => "#{@project || Setting.app_title}: #{l(:label_activity)}") }
     end
   end
   
   def calendar
-    @trackers = Tracker.find(:all, :order => 'position')
+    @trackers = @project.rolled_up_trackers
     retrieve_selected_tracker_ids(@trackers)
     
     if params[:year] and params[:year].to_i > 1900
@@ -460,22 +338,23 @@ class ProjectsController < ApplicationController
     @year ||= Date.today.year
     @month ||= Date.today.month    
     @calendar = Redmine::Helpers::Calendar.new(Date.civil(@year, @month, 1), current_language, :month)
-    
+    @with_subprojects = params[:with_subprojects].nil? ? Setting.display_subprojects_issues? : (params[:with_subprojects] == '1')
     events = []
-    @project.issues_with_subprojects(params[:with_subprojects]) do
+    @project.issues_with_subprojects(@with_subprojects) do
       events += Issue.find(:all, 
                            :include => [:tracker, :status, :assigned_to, :priority, :project], 
                            :conditions => ["((start_date BETWEEN ? AND ?) OR (due_date BETWEEN ? AND ?)) AND #{Issue.table_name}.tracker_id IN (#{@selected_tracker_ids.join(',')})", @calendar.startdt, @calendar.enddt, @calendar.startdt, @calendar.enddt]
                            ) unless @selected_tracker_ids.empty?
+      events += Version.find(:all, :include => :project,
+                                   :conditions => ["effective_date BETWEEN ? AND ?", @calendar.startdt, @calendar.enddt])
     end
-    events += @project.versions.find(:all, :conditions => ["effective_date BETWEEN ? AND ?", @calendar.startdt, @calendar.enddt])
     @calendar.events = events
     
     render :layout => false if request.xhr?
   end  
 
   def gantt
-    @trackers = Tracker.find(:all, :order => 'position')
+    @trackers = @project.rolled_up_trackers
     retrieve_selected_tracker_ids(@trackers)
     
     if params[:year] and params[:year].to_i >0
@@ -503,16 +382,18 @@ class ProjectsController < ApplicationController
     
     @date_from = Date.civil(@year_from, @month_from, 1)
     @date_to = (@date_from >> @months) - 1
+    @with_subprojects = params[:with_subprojects].nil? ? Setting.display_subprojects_issues? : (params[:with_subprojects] == '1')
     
     @events = []
-    @project.issues_with_subprojects(params[:with_subprojects]) do
+    @project.issues_with_subprojects(@with_subprojects) do
       @events += Issue.find(:all, 
                            :order => "start_date, due_date",
                            :include => [:tracker, :status, :assigned_to, :priority, :project], 
                            :conditions => ["(((start_date>=? and start_date<=?) or (due_date>=? and due_date<=?) or (start_date<? and due_date>?)) and start_date is not null and due_date is not null and #{Issue.table_name}.tracker_id in (#{@selected_tracker_ids.join(',')}))", @date_from, @date_to, @date_from, @date_to, @date_from, @date_to]
                            ) unless @selected_tracker_ids.empty?
+      @events += Version.find(:all, :include => :project,
+                                    :conditions => ["effective_date BETWEEN ? AND ?", @date_from, @date_to])
     end
-    @events += @project.versions.find(:all, :conditions => ["effective_date BETWEEN ? AND ?", @date_from, @date_to])
     @events.sort! {|x,y| x.start_date <=> y.start_date }
     
     if params[:format]=='pdf'
@@ -538,6 +419,14 @@ private
     render_404
   end
   
+  def find_optional_project
+    return true unless params[:id]
+    @project = Project.find(params[:id])
+    authorize
+  rescue ActiveRecord::RecordNotFound
+    render_404
+  end
+
   def retrieve_selected_tracker_ids(selectable_trackers)
     if ids = params[:tracker_ids]
       @selected_tracker_ids = (ids.is_a? Array) ? ids.collect { |id| id.to_i.to_s } : ids.split('/').collect { |id| id.to_i.to_s }

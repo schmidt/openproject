@@ -31,15 +31,15 @@ class UsersController < ApplicationController
 
   def list
     sort_init 'login', 'asc'
-    sort_update
+    sort_update %w(login firstname lastname mail admin created_on last_login_on)
     
-    @status = params[:status] ? params[:status].to_i : 1    
-    conditions = nil
+    @status = params[:status] ? params[:status].to_i : 1
+    conditions = "status <> 0"
     conditions = ["status=?", @status] unless @status == 0
     
     @user_count = User.count(:conditions => conditions)
     @user_pages = Paginator.new self, @user_count,
-								15,
+								per_page_option,
 								params['page']								
     @users =  User.find :all,:order => sort_clause,
                         :conditions => conditions,
@@ -83,7 +83,8 @@ class UsersController < ApplicationController
       end
       if @user.update_attributes(params[:user])
         flash[:notice] = l(:notice_successful_update)
-        redirect_to :action => 'list'
+        # Give a string to redirect_to otherwise it would use status param as the response code
+        redirect_to(url_for(:action => 'list', :status => params[:status], :page => params[:page]))
       end
     end
     @auth_sources = AuthSource.find(:all)

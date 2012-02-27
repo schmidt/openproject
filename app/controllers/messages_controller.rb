@@ -17,9 +17,10 @@
 
 class MessagesController < ApplicationController
   layout 'base'
-  before_filter :find_board, :only => :new
-  before_filter :find_message, :except => :new
-  before_filter :authorize
+  menu_item :boards
+  before_filter :find_board, :only => [:new, :preview]
+  before_filter :find_message, :except => [:new, :preview]
+  before_filter :authorize, :except => :preview
 
   verify :method => :post, :only => [ :reply, :destroy ], :redirect_to => { :action => :show }
 
@@ -28,6 +29,8 @@ class MessagesController < ApplicationController
 
   # Show a topic and its replies
   def show
+    @replies = @topic.children
+    @replies.reverse! if User.current.wants_comments_in_reverse_order?
     @reply = Message.new(:subject => "RE: #{@message.subject}")
     render :action => "show", :layout => false if request.xhr?
   end
@@ -78,6 +81,13 @@ class MessagesController < ApplicationController
     redirect_to @message.parent.nil? ?
       { :controller => 'boards', :action => 'show', :project_id => @project, :id => @board } :
       { :action => 'show', :id => @message.parent }
+  end
+  
+  def preview
+    message = @board.messages.find_by_id(params[:id])
+    @attachements = message.attachments if message
+    @text = (params[:message] || params[:reply])[:content]
+    render :partial => 'common/preview'
   end
   
 private
