@@ -16,21 +16,50 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 module CustomFieldsHelper
-	def custom_field_tag(custom_value)
-	
-		custom_field = custom_value.custom_field
-		
-		field_name = "custom_fields[#{custom_field.id}]"
-		
-		case custom_field.typ
-		when 0 .. 2
-			text_field_tag field_name, custom_value.value
-		when 3
-			check_box field_name
-		when 4
-			select_tag field_name, 
-					options_for_select(custom_field.possible_values.split('|'),
-					custom_value.value)
-		end
-	end
+
+  # Return custom field html tag corresponding to its format
+  def custom_field_tag(custom_value)	
+    custom_field = custom_value.custom_field
+    field_name = "custom_fields[#{custom_field.id}]"
+    field_id = "custom_fields_#{custom_field.id}"
+    
+    case custom_field.field_format
+    when "string", "int", "date"
+      text_field 'custom_value', 'value', :name => field_name, :id => field_id
+    when "text"
+      text_area 'custom_value', 'value', :name => field_name, :id => field_id, :cols => 60, :rows => 3
+    when "bool"
+      check_box 'custom_value', 'value', :name => field_name, :id => field_id
+    when "list"
+      select 'custom_value', 'value', custom_field.possible_values.split('|'), { :include_blank => true }, :name => field_name, :id => field_id
+    end
+  end
+  
+  # Return custom field label tag
+  def custom_field_label_tag(custom_value)
+    content_tag "label", custom_value.custom_field.name +
+	(custom_value.custom_field.is_required? ? " <span class=\"required\">*</span>" : ""),
+	:for => "custom_fields_#{custom_value.custom_field.id}",
+	:class => (custom_value.errors.empty? ? nil : "error" )
+  end
+  
+  # Return custom field tag with its label tag
+  def custom_field_tag_with_label(custom_value)
+    custom_field_label_tag(custom_value) + custom_field_tag(custom_value)
+  end
+
+  # Return a string used to display a custom value
+  def show_value(custom_value)
+    case custom_value.custom_field.field_format
+    when "bool"
+      l_YesNo(custom_value.value == "1")
+    else
+      custom_value.value
+    end	
+  end
+
+  # Return an array of custom field formats which can be used in select_tag
+  def custom_field_formats_for_select
+    CustomField::FIELD_FORMATS.keys.collect { |k| [ l(CustomField::FIELD_FORMATS[k]), k ] }
+  end
 end

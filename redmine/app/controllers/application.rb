@@ -18,43 +18,56 @@
 class ApplicationController < ActionController::Base
   before_filter :check_if_login_required, :set_localization
   
+  def logged_in_user=(user)
+    @logged_in_user = user
+    session[:user_id] = (user ? user.id : nil)
+  end
+  
+  def logged_in_user
+    if session[:user_id]
+      @logged_in_user ||= User.find(session[:user_id], :include => :memberships)
+    else
+      nil
+    end
+  end
+  
   # check if login is globally required to access the application
   def check_if_login_required
-    require_login if RDM_LOGIN_REQUIRED
+    require_login if $RDM_LOGIN_REQUIRED
   end 
   
   def set_localization
-    Localization.lang = begin
-      if session[:user]
-        session[:user].language
+    lang = begin
+      if self.logged_in_user and self.logged_in_user.language and !self.logged_in_user.language.empty? and GLoc.valid_languages.include? self.logged_in_user.language.to_sym
+        self.logged_in_user.language
       elsif request.env['HTTP_ACCEPT_LANGUAGE']
         accept_lang = HTTPUtils.parse_qvalues(request.env['HTTP_ACCEPT_LANGUAGE']).first.split('-').first
-        if Localization.langs.collect{ |l| l[1] }.include? accept_lang
+        if accept_lang and !accept_lang.empty? and GLoc.valid_languages.include? accept_lang.to_sym
           accept_lang
         end
       end
     rescue
       nil
-    end || RDM_DEFAULT_LANG
+    end || $RDM_DEFAULT_LANG
+    set_language_if_valid(lang)    
   end
   
   def require_login
-    unless session[:user]
+    unless self.logged_in_user
       store_location
-      redirect_to(:controller => "account", :action => "login")
+      redirect_to :controller => "account", :action => "login"
+      return false
     end
+    true
   end
 
   def require_admin
-    if session[:user].nil?
-      store_location
-      redirect_to(:controller => "account", :action => "login")
-    else
-      unless session[:user].admin?
-        flash[:notice] = "Acces not allowed"
-        redirect_to(:controller => "projects", :action => "list")
-      end
+    return unless require_login
+    unless self.logged_in_user.admin?
+      render :nothing => true, :status => 403
+      return false
     end
+    true
   end
 
   # authorizes the user for the requested action.
@@ -62,19 +75,17 @@ class ApplicationController < ActionController::Base
     # check if action is allowed on public projects
     if @project.is_public? and Permission.allowed_to_public "%s/%s" % [ @params[:controller], @params[:action] ]
       return true
-    end  
-    # if user not logged in, redirect to login form
-    unless session[:user]
-      store_location
-      redirect_to(:controller => "account", :action => "login")
-      return false
-    end
-    # if logged in, check if authorized    
-    if session[:user].admin? or Permission.allowed_to_role( "%s/%s" % [ @params[:controller], @params[:action] ], session[:user].role_for_project(@project.id)  )    
+    end    
+    # if action is not public, force login
+    return unless require_login    
+    # admin is always authorized
+    return true if self.logged_in_user.admin?
+    # if not admin, check membership permission    
+    @user_membership ||= Member.find(:first, :conditions => ["user_id=? and project_id=?", self.logged_in_user.id, @project.id])    
+    if @user_membership and Permission.allowed_to_role( "%s/%s" % [ @params[:controller], @params[:action] ], @user_membership.role_id )    
       return true		
     end		
-    flash[:notice] = "Acces denied"
-    redirect_to(:controller => "")
+    render :nothing => true, :status => 403
     false
   end
 	
