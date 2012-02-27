@@ -46,6 +46,8 @@ general_text_no: 'non'
 general_text_yes: 'oui'
 general_lang_fr: 'Français'
 general_csv_separator: ';'
+general_csv_encoding: ISO-8859-1
+general_pdf_encoding: ISO-8859-1
 general_day_names: Lundi,Mardi,Mercredi,Jeudi,Vendredi,Samedi,Dimanche
 
 notice_account_updated: Le compte a été mis à jour avec succès.
@@ -112,10 +114,10 @@ field_homepage: Site web
 field_is_public: Public
 field_parent: Sous-projet de
 field_is_in_chlog: Demandes affichées dans l'historique
+field_is_in_roadmap: Demandes affichées dans la roadmap
 field_login: Identifiant
 field_mail_notification: Notifications par mail
 field_admin: Administrateur
-field_locked: Verrouillé
 field_last_login_on: Dernière connexion
 field_language: Langue
 field_effective_date: Date
@@ -139,6 +141,28 @@ field_auth_source: Mode d'authentification
 field_hide_mail: Cacher mon adresse mail
 field_comment: Commentaire
 field_url: URL
+field_start_page: Page de démarrage
+field_subproject: Sous-projet
+field_hours: Heures
+field_activity: Activité
+field_spent_on: Date
+field_identifier: Identifiant
+
+setting_app_title: Titre de l'application
+setting_app_subtitle: Sous-titre de l'application
+setting_welcome_text: Texte d'accueil
+setting_default_language: Langue par défaut
+setting_login_required: Authentif. obligatoire
+setting_self_registration: Enregistrement autorisé
+setting_attachment_max_size: Taille max des fichiers
+setting_issues_export_limit: Limite export demandes
+setting_mail_from: Adresse d'émission
+setting_host_name: Nom d'hôte
+setting_text_formatting: Formatage du texte
+setting_wiki_compression: Compression historique wiki
+setting_feeds_limit: Limite du contenu des flux RSS
+setting_autofetch_changesets: Récupération auto. des commits SVN
+setting_sys_api_enabled: Activer les WS pour la gestion des dépôts
 
 label_user: Utilisateur
 label_user_plural: Utilisateurs
@@ -203,7 +227,6 @@ label_authentication: Authentification
 label_auth_source: Mode d'authentification
 label_auth_source_new: Nouveau mode d'authentification
 label_auth_source_plural: Modes d'authentification
-label_subproject: Sous-projet
 label_subproject_plural: Sous-projets
 label_min_max_length: Longueurs mini - maxi
 label_list: Liste
@@ -295,8 +318,44 @@ label_added: ajouté
 label_modified: modifié
 label_deleted: supprimé
 label_latest_revision: Dernière révision
+label_latest_revision_plural: Dernières révisions
 label_view_revisions: Voir les révisions
 label_max_size: Taille maximale
+label_on: sur
+label_sort_highest: Remonter en premier
+label_sort_higher: Remonter
+label_sort_lower: Descendre
+label_sort_lowest: Descendre en dernier
+label_roadmap: Roadmap
+label_roadmap_due_in: Echéance dans
+label_roadmap_no_issues: Aucune demande pour cette version
+label_search: Recherche
+label_result: %d résultat
+label_result_plural: %d résultats
+label_all_words: Tous les mots
+label_wiki: Wiki
+label_wiki_edit: Révision wiki
+label_wiki_edit_plural: Révisions wiki
+label_page_index: Index
+label_current_version: Version actuelle
+label_preview: Prévisualisation
+label_feed_plural: Flux RSS
+label_changes_details: Détails de tous les changements
+label_issue_tracking: Suivi des demandes
+label_spent_time: Temps passé
+label_f_hour: %.2f heure
+label_f_hour_plural: %.2f heures
+label_time_tracking: Suivi du temps
+label_change_plural: Changements
+label_statistics: Statistiques
+label_commits_per_month: Commits par mois
+label_commits_per_author: Commits par auteur
+label_view_diff: Voir les différences
+label_diff_inline: en ligne
+label_diff_side_by_side: côte à côte
+label_options: Options
+label_copy_workflow_from: Copier le workflow de
+label_permissions_report: Synthèse des permissions
 
 button_login: Connexion
 button_submit: Soumettre
@@ -319,11 +378,18 @@ button_view: Voir
 button_move: Déplacer
 button_back: Retour
 button_cancel: Annuler
+button_activate: Activer
+button_sort: Trier
+button_log_time: Saisir temps
+button_rollback: Revenir à cette version
+
+status_active: actif
+status_registered: enregistré
+status_locked: vérouillé
 
 text_select_mail_notifications: Sélectionner les actions pour lesquelles la notification par mail doit être activée.
 text_regexp_info: ex. ^[A-Z0-9]+$
 text_min_max_length_info: 0 pour aucune restriction
-text_possible_values_info: valeurs séparées par |
 text_project_destroy_confirmation: Etes-vous sûr de vouloir supprimer ce projet et tout ce qui lui est rattaché ?
 text_workflow_edit: Sélectionner un tracker et un rôle pour éditer le workflow
 text_are_you_sure: Etes-vous sûr ?
@@ -333,6 +399,10 @@ text_journal_deleted: supprimé
 text_tip_task_begin_day: tâche commençant ce jour
 text_tip_task_end_day: tâche finissant ce jour
 text_tip_task_begin_end_day: tâche commençant et finissant ce jour
+text_project_identifier_info: 'Lettres minuscules (a-z), chiffres et tirets autorisés.<br />Un fois sauvegardé, l''identifiant ne pourra plus être modifié.'
+text_caracters_maximum: %d caractères maximum.
+text_length_between: Longueur comprise entre %d et %d caractères.
+text_tracker_no_workflow: Aucun worflow n'est défini pour ce tracker
 
 default_role_manager: Manager
 default_role_developper: Développeur
@@ -353,6 +423,9 @@ default_priority_normal: Normal
 default_priority_high: Haut
 default_priority_urgent: Urgent
 default_priority_immediate: Immédiat
+default_activity_design: Conception
+default_activity_development: Développement
 
 enumeration_issue_priorities: Priorités des demandes
 enumeration_doc_categories: Catégories des documents
+enumeration_activities: Activités (suivi du temps)

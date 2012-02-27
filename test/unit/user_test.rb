@@ -18,11 +18,12 @@
 require File.dirname(__FILE__) + '/../test_helper'
 
 class UserTest < Test::Unit::TestCase
-  fixtures :users
+  fixtures :users, :members, :projects
 
   def setup
     @admin = User.find(1)
     @jsmith = User.find(2)
+    @dlopper = User.find(3)
   end
   
   def test_truth
@@ -84,5 +85,28 @@ class UserTest < Test::Unit::TestCase
     
     user = User.try_to_login("jsmith", "jsmith")
     assert_equal nil, user  
+  end
+  
+  def test_rss_key
+    assert_nil @jsmith.rss_key
+    key = @jsmith.get_or_create_rss_key
+    assert_kind_of Token, key
+    assert_equal 40, key.value.length
+    
+    @jsmith.reload
+    assert_equal key.value, @jsmith.get_or_create_rss_key.value
+    
+    @jsmith.reload
+    assert_equal key.value, @jsmith.rss_key.value
+  end
+  
+  def test_role_for_project
+    # user with a role
+    role = @jsmith.role_for_project(Project.find(1))
+    assert_kind_of Role, role
+    assert_equal "Manager", role.name
+    
+    # user with no role
+    assert_nil @dlopper.role_for_project(Project.find(2))
   end
 end

@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -32,11 +32,17 @@ class UsersController < ApplicationController
   def list
     sort_init 'login', 'asc'
     sort_update
-    @user_count = User.count		
+    
+    @status = params[:status] ? params[:status].to_i : 1    
+    conditions = nil
+    conditions = ["status=?", @status] unless @status == 0
+    
+    @user_count = User.count(:conditions => conditions)
     @user_pages = Paginator.new self, @user_count,
 								15,
 								params['page']								
     @users =  User.find :all,:order => sort_clause,
+                        :conditions => conditions,
 						:limit  =>  @user_pages.items_per_page,
 						:offset =>  @user_pages.current.offset
 
@@ -45,7 +51,7 @@ class UsersController < ApplicationController
 
   def add
     if request.get?
-      @user = User.new(:language => $RDM_DEFAULT_LANG)
+      @user = User.new(:language => Setting.default_language)
       @custom_values = UserCustomField.find(:all).collect { |x| CustomValue.new(:custom_field => x, :customized => @user) }
     else
       @user = User.new(params[:user])
@@ -80,7 +86,7 @@ class UsersController < ApplicationController
       end
     end
     @auth_sources = AuthSource.find(:all)
-    @roles = Role.find :all
+    @roles = Role.find(:all, :order => 'position')
     @projects = Project.find(:all) - @user.projects
     @membership ||= Member.new
   end

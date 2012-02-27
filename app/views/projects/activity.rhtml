@@ -2,23 +2,28 @@
 
 <div>
 <div class="rightbox">
-  <%= start_form_tag %>
+<% form_tag do %>
 <p><%= select_month(@month, :prefix => "month", :discard_type => true) %>
 <%= select_year(@year, :prefix => "year", :discard_type => true) %></p>
-    <%= check_box_tag 'show_issues', 1, @show_issues %><%= hidden_field_tag 'show_issues', 0 %> <%=l(:label_issue_plural)%><br />
-    <%= check_box_tag 'show_news', 1, @show_news %><%= hidden_field_tag 'show_news', 0 %> <%=l(:label_news_plural)%><br />
-    <%= check_box_tag 'show_files', 1, @show_files %><%= hidden_field_tag 'show_files', 0 %> <%=l(:label_attachment_plural)%><br />
-    <%= check_box_tag 'show_documents', 1, @show_documents %><%= hidden_field_tag 'show_documents', 0 %> <%=l(:label_document_plural)%><br />
-    <p><center><%= submit_tag l(:button_apply), :class => 'button-small' %></center></p>
-  <%= end_form_tag %>
-  </div>
+<p>
+    <%= check_box_tag 'show_issues', 1, @show_issues %><%= hidden_field_tag 'show_issues', 0, :id => nil %> <%=l(:label_issue_plural)%><br />
+    <% if @project.repository %><%= check_box_tag 'show_changesets', 1, @show_changesets %><%= hidden_field_tag 'show_changesets', 0, :id => nil %> <%=l(:label_revision_plural)%><br /><% end %>
+    <%= check_box_tag 'show_news', 1, @show_news %><%= hidden_field_tag 'show_news', 0, :id => nil %> <%=l(:label_news_plural)%><br />
+    <%= check_box_tag 'show_files', 1, @show_files %><%= hidden_field_tag 'show_files', 0, :id => nil %> <%=l(:label_attachment_plural)%><br />
+    <%= check_box_tag 'show_documents', 1, @show_documents %><%= hidden_field_tag 'show_documents', 0, :id => nil %> <%=l(:label_document_plural)%><br />
+    <%= check_box_tag 'show_wiki_edits', 1, @show_wiki_edits %><%= hidden_field_tag 'show_wiki_edits', 0, :id => nil %> <%=l(:label_wiki_edit_plural)%>
+</p>
+<p class="textcenter"><%= submit_tag l(:button_apply), :class => 'button-small' %></p>
+<% end %>
+</div>
+
 <% @events_by_day.keys.sort {|x,y| y <=> x }.each do |day| %>
   <h3><%= day_name(day.cwday) %> <%= day.day %></h3>
   <ul>
   <% @events_by_day[day].sort {|x,y| y.created_on <=> x.created_on }.each do |e| %>
     <li><p>
     <% if e.is_a? Issue %>
-      <%= e.created_on.strftime("%H:%M") %> <%= link_to "#{e.tracker.name} ##{e.id}", :controller => 'issues', :action => 'show', :id => e %> (<%= e.status.name %>): <%=h e.subject %><br />
+      <%= e.created_on.strftime("%H:%M") %> <%= link_to_issue e %>: <%=h e.subject %><br />
           <i><%= e.author.name %></i>
     <% elsif e.is_a? News %>
       <%= e.created_on.strftime("%H:%M") %> <%=l(:label_news)%>: <%= link_to h(e.title), :controller => 'news', :action => 'show', :id => e %><br />
@@ -32,6 +37,12 @@
         <i><%= e.author.name %></i>
     <% elsif e.is_a? Document %>
       <%= e.created_on.strftime("%H:%M") %> <%=l(:label_document)%>: <%= link_to h(e.title), :controller => 'documents', :action => 'show', :id => e %><br />
+    <% elsif e.is_a? WikiContent.versioned_class %>
+      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_wiki_edit)%>: <%= link_to h(WikiPage.pretty_title(e.title)), :controller => 'wiki', :page => e.title %> (<%= link_to '#' + e.version.to_s, :controller => 'wiki', :page => e.title, :version => e.version %>)<br />
+      <% unless e.comment.blank? %><em><%=h e.comment %></em><% end %>
+    <% elsif e.is_a? Changeset %>
+      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_revision)%> <%= link_to h(e.revision), :controller => 'repositories', :action => 'revision', :id => @project, :rev => e.revision %><br />
+      <em><%=h e.committer.blank? ? "anonymous" : e.committer %><%= h(": #{truncate(e.comment, 500)}") unless e.comment.blank? %></em>
     <% end %>
     </p></li>
   

@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,6 +17,7 @@
 
 class ApplicationController < ActionController::Base
   before_filter :check_if_login_required, :set_localization
+  filter_parameter_logging :password
   
   def logged_in_user=(user)
     @logged_in_user = user
@@ -31,9 +32,15 @@ class ApplicationController < ActionController::Base
     end
   end
   
+  # Returns the role that the logged in user has on the current project
+  # or nil if current user is not a member of the project
+  def logged_in_user_membership
+    @user_membership ||= logged_in_user.role_for_project(@project)
+  end
+  
   # check if login is globally required to access the application
   def check_if_login_required
-    require_login if $RDM_LOGIN_REQUIRED
+    require_login if Setting.login_required?
   end 
   
   def set_localization
@@ -48,7 +55,7 @@ class ApplicationController < ActionController::Base
       end
     rescue
       nil
-    end || $RDM_DEFAULT_LANG
+    end || Setting.default_language
     set_language_if_valid(lang)    
   end
   
@@ -81,10 +88,19 @@ class ApplicationController < ActionController::Base
     # admin is always authorized
     return true if self.logged_in_user.admin?
     # if not admin, check membership permission    
-    @user_membership ||= Member.find(:first, :conditions => ["user_id=? and project_id=?", self.logged_in_user.id, @project.id])    
-    if @user_membership and Permission.allowed_to_role( "%s/%s" % [ ctrl, action ], @user_membership.role_id )    
+    if logged_in_user_membership and Permission.allowed_to_role( "%s/%s" % [ ctrl, action ], logged_in_user_membership )    
       return true		
     end		
+    render :nothing => true, :status => 403
+    false
+  end
+  
+  # make sure that the user is a member of the project (or admin) if project is private
+  # used as a before_filter for actions that do not require any particular permission on the project
+  def check_project_privacy
+    return true if @project.is_public?
+    return false unless logged_in_user
+    return true if logged_in_user.admin? || logged_in_user_membership
     render :nothing => true, :status => 403
     false
   end
@@ -92,16 +108,16 @@ class ApplicationController < ActionController::Base
   # store current uri in session.
   # return to this location by calling redirect_back_or_default
   def store_location
-    session[:return_to] = request.request_uri
+    session[:return_to_params] = params
   end
 
   # move to the last store_location call or to the passed default one
   def redirect_back_or_default(default)
-    if session[:return_to].nil?
+    if session[:return_to_params].nil?
       redirect_to default
     else
-      redirect_to_url session[:return_to]
-      session[:return_to] = nil
+      redirect_to session[:return_to_params]
+      session[:return_to_params] = nil
     end
   end
   

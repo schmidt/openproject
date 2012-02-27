@@ -25,19 +25,26 @@ class TrackersController < ApplicationController
   end
 
   # GETs should be safe (see http://www.w3.org/2001/tag/doc/whenToUseGet.html)
-  verify :method => :post, :only => [ :destroy ], :redirect_to => { :action => :list }
+  verify :method => :post, :only => [ :destroy, :move ], :redirect_to => { :action => :list }
 
   def list
-    @tracker_pages, @trackers = paginate :trackers, :per_page => 10
+    @tracker_pages, @trackers = paginate :trackers, :per_page => 10, :order => 'position'
     render :action => "list", :layout => false if request.xhr?
   end
 
   def new
     @tracker = Tracker.new(params[:tracker])
     if request.post? and @tracker.save
+      # workflow copy
+      if params[:copy_workflow_from] && (copy_from = Tracker.find_by_id(params[:copy_workflow_from]))
+        copy_from.workflows.each do |w|
+          @tracker.workflows << w.clone
+        end
+      end
       flash[:notice] = l(:notice_successful_create)
       redirect_to :action => 'list'
     end
+    @trackers = Tracker.find :all
   end
 
   def edit
@@ -48,6 +55,21 @@ class TrackersController < ApplicationController
     end
   end
 
+  def move
+    @tracker = Tracker.find(params[:id])
+    case params[:position]
+    when 'highest'
+      @tracker.move_to_top
+    when 'higher'
+      @tracker.move_higher
+    when 'lower'
+      @tracker.move_lower
+    when 'lowest'
+      @tracker.move_to_bottom
+    end if params[:position]
+    redirect_to :action => 'list'
+  end
+  
   def destroy
     @tracker = Tracker.find(params[:id])
     unless @tracker.issues.empty?
@@ -56,6 +78,5 @@ class TrackersController < ApplicationController
       @tracker.destroy
     end
     redirect_to :action => 'list'
-  end
-  
+  end  
 end

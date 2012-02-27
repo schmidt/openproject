@@ -18,6 +18,7 @@
 class IssueStatus < ActiveRecord::Base
   before_destroy :check_integrity  
   has_many :workflows, :foreign_key => "old_status_id"
+  acts_as_list
 
   validates_presence_of :name
   validates_uniqueness_of :name
@@ -26,7 +27,7 @@ class IssueStatus < ActiveRecord::Base
   validates_format_of :html_color, :with => /^[a-f0-9]*$/i
 
   def before_save
-    IssueStatus.update_all "is_default=false" if self.is_default?
+    IssueStatus.update_all "is_default=#{connection.quoted_false}" if self.is_default?
   end  
   
   # Returns the default status for new issues
@@ -35,16 +36,25 @@ class IssueStatus < ActiveRecord::Base
   end
 
   # Returns an array of all statuses the given role can switch to
+  # Uses association cache when called more than one time
   def new_statuses_allowed_to(role, tracker)
-    statuses = []
-    for workflow in self.workflows
-      statuses << workflow.new_status if workflow.role_id == role.id and workflow.tracker_id == tracker.id
-    end unless role.nil? or tracker.nil?
-    statuses
+    new_statuses = [self]
+    new_statuses += workflows.select {|w| w.role_id == role.id && w.tracker_id == tracker.id}.collect{|w| w.new_status} if role && tracker
+    new_statuses.sort{|x, y| x.position <=> y.position }
+  end
+  
+  # Same thing as above but uses a database query
+  # More efficient than the previous method if called just once
+  def find_new_statuses_allowed_to(role, tracker)  
+    new_statuses = [self]
+    new_statuses += workflows.find(:all, 
+                                   :include => :new_status,
+                                   :conditions => ["role_id=? and tracker_id=?", role.id, tracker.id]).collect{ |w| w.new_status }  if role && tracker
+    new_statuses.sort{|x, y| x.position <=> y.position }
   end
   
 private
   def check_integrity
-    raise "Can't delete status" if Issue.find(:first, :conditions => ["status_id=?", self.id]) or IssueHistory.find(:first, :conditions => ["status_id=?", self.id])
+    raise "Can't delete status" if Issue.find(:first, :conditions => ["status_id=?", self.id])
   end
 end

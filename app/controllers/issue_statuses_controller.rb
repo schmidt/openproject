@@ -16,16 +16,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class IssueStatusesController < ApplicationController
-	layout 'base'	
-	before_filter :require_admin
-	
+  layout 'base'	
+  before_filter :require_admin
+
+  verify :method => :post, :only => [ :destroy, :create, :update, :move ],
+         :redirect_to => { :action => :list }
+         
   def index
     list
     render :action => 'list' unless request.xhr?
   end
 
   def list
-    @issue_status_pages, @issue_statuses = paginate :issue_statuses, :per_page => 10
+    @issue_status_pages, @issue_statuses = paginate :issue_statuses, :per_page => 25, :order => "position"
     render :action => "list", :layout => false if request.xhr?
   end
 
@@ -56,6 +59,21 @@ class IssueStatusesController < ApplicationController
       render :action => 'edit'
     end
   end
+  
+  def move
+    @issue_status = IssueStatus.find(params[:id])
+    case params[:position]
+    when 'highest'
+      @issue_status.move_to_top
+    when 'higher'
+      @issue_status.move_higher
+    when 'lower'
+      @issue_status.move_lower
+    when 'lowest'
+      @issue_status.move_to_bottom
+    end if params[:position]
+    redirect_to :action => 'list'
+  end
 
   def destroy
     IssueStatus.find(params[:id]).destroy
@@ -63,7 +81,5 @@ class IssueStatusesController < ApplicationController
   rescue
     flash[:notice] = "Unable to delete issue status"
     redirect_to :action => 'list'
-  end
-  
-  	
+  end  	
 end

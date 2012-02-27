@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,14 +25,14 @@ class IssuesController < ApplicationController
   include IfpdfHelper
 
   def show
-    @status_options = @issue.status.workflows.find(:all, :include => :new_status, :conditions => ["role_id=? and tracker_id=?", self.logged_in_user.role_for_project(@project.id), @issue.tracker.id]).collect{ |w| w.new_status } if self.logged_in_user
+    @status_options = @issue.status.find_new_statuses_allowed_to(logged_in_user.role_for_project(@project), @issue.tracker) if logged_in_user
     @custom_values = @issue.custom_values.find(:all, :include => :custom_field)
     @journals_count = @issue.journals.count
-    @journals = @issue.journals.find(:all, :include => [:user, :details], :limit => 15, :order => "journals.created_on desc")
+    @journals = @issue.journals.find(:all, :include => [:user, :details], :limit => 15, :order => "#{Journal.table_name}.created_on desc")
   end
   
   def history
-    @journals = @issue.journals.find(:all, :include => [:user, :details], :order => "journals.created_on desc")
+    @journals = @issue.journals.find(:all, :include => [:user, :details], :order => "#{Journal.table_name}.created_on desc")
     @journals_count = @journals.length  
   end
   
@@ -67,9 +67,6 @@ class IssuesController < ApplicationController
   def add_note
     unless params[:notes].empty?
       journal = @issue.init_journal(self.logged_in_user, params[:notes])
-      #@history = @issue.histories.build(params[:history])
-      #@history.author_id = self.logged_in_user.id if self.logged_in_user
-      #@history.status = @issue.status
       if @issue.save
         flash[:notice] = l(:notice_successful_update)
         Mailer.deliver_issue_edit(journal) if Permission.find_by_controller_and_action(params[:controller], params[:action]).mail_enabled?
@@ -82,20 +79,22 @@ class IssuesController < ApplicationController
   end
 
   def change_status
-    #@history = @issue.histories.build(params[:history])	
-    @status_options = @issue.status.workflows.find(:all, :conditions => ["role_id=? and tracker_id=?", self.logged_in_user.role_for_project(@project.id), @issue.tracker.id]).collect{ |w| w.new_status } if self.logged_in_user
+    @status_options = @issue.status.find_new_statuses_allowed_to(logged_in_user.role_for_project(@project), @issue.tracker) if logged_in_user
     @new_status = IssueStatus.find(params[:new_status_id])
     if params[:confirm]
       begin
-        #@history.author_id = self.logged_in_user.id if self.logged_in_user
-        #@issue.status = @history.status
-        #@issue.fixed_version_id = (params[:issue][:fixed_version_id])
-        #@issue.assigned_to_id = (params[:issue][:assigned_to_id])
-        #@issue.done_ratio = (params[:issue][:done_ratio])
-        #@issue.lock_version = (params[:issue][:lock_version])
         journal = @issue.init_journal(self.logged_in_user, params[:notes])
         @issue.status = @new_status
         if @issue.update_attributes(params[:issue])
+          # Save attachments
+          params[:attachments].each { |file|
+            next unless file.size > 0
+            a = Attachment.create(:container => @issue, :file => file, :author => logged_in_user)            
+            journal.details << JournalDetail.new(:property => 'attachment',
+                                                 :prop_key => a.id,
+                                                 :value => a.filename) unless a.new_record?
+          } if params[:attachments] and params[:attachments].is_a? Array
+        
           flash[:notice] = l(:notice_successful_update)
           Mailer.deliver_issue_edit(journal) if Permission.find_by_controller_and_action(params[:controller], params[:action]).mail_enabled?
           redirect_to :action => 'show', :id => @issue
@@ -115,15 +114,29 @@ class IssuesController < ApplicationController
 
   def add_attachment
     # Save the attachments
-    params[:attachments].each { |a|
-      @attachment = @issue.attachments.build(:file => a, :author => self.logged_in_user) unless a.size == 0
-      @attachment.save
+    @attachments = []
+    journal = @issue.init_journal(self.logged_in_user)
+    params[:attachments].each { |file|
+      next unless file.size > 0
+      a = Attachment.create(:container => @issue, :file => file, :author => logged_in_user)
+      @attachments << a unless a.new_record?
+      journal.details << JournalDetail.new(:property => 'attachment',
+                                           :prop_key => a.id,
+                                           :value => a.filename) unless a.new_record?
     } if params[:attachments] and params[:attachments].is_a? Array
+    journal.save if journal.details.any?
+    Mailer.deliver_attachments_add(@attachments) if !@attachments.empty? and Permission.find_by_controller_and_action(params[:controller], params[:action]).mail_enabled?
     redirect_to :action => 'show', :id => @issue
   end
 
   def destroy_attachment
-    @issue.attachments.find(params[:attachment_id]).destroy
+    a = @issue.attachments.find(params[:attachment_id])
+    a.destroy
+    journal = @issue.init_journal(self.logged_in_user)
+    journal.details << JournalDetail.new(:property => 'attachment',
+                                         :prop_key => a.id,
+                                         :old_value => a.filename)
+    journal.save
     redirect_to :action => 'show', :id => @issue
   end
 

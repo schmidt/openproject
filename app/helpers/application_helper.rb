@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,7 +34,7 @@ module ApplicationHelper
       return true
     end
     # check if user is authorized    
-    if @logged_in_user and (@logged_in_user.admin? or Permission.allowed_to_role( "%s/%s" % [ controller, action ], @logged_in_user.role_for_project(@project.id)  )  )
+    if @logged_in_user and (@logged_in_user.admin? or Permission.allowed_to_role( "%s/%s" % [ controller, action ], @logged_in_user.role_for_project(@project)  )  )
       return true
     end
     return false
@@ -50,12 +50,31 @@ module ApplicationHelper
     link_to user.display_name, :controller => 'account', :action => 'show', :id => user
   end
   
+  def link_to_issue(issue)
+    link_to "#{issue.tracker.name} ##{issue.id}", :controller => "issues", :action => "show", :id => issue
+  end
+  
+  def toggle_link(name, id, options={})
+    onclick = "Element.toggle('#{id}'); "
+    onclick << (options[:focus] ? "Form.Element.focus('#{options[:focus]}'); " : "this.blur(); ")
+    onclick << "return false;"
+    link_to(name, "#", :onclick => onclick)
+  end
+  
+  def image_to_function(name, function, html_options = {})
+    html_options.symbolize_keys!
+    tag(:input, html_options.merge({ 
+        :type => "image", :src => image_path(name), 
+        :onclick => (html_options[:onclick] ? "#{html_options[:onclick]}; " : "") + "#{function};" 
+        }))
+  end
+  
   def format_date(date)
     l_date(date) if date
   end
   
   def format_time(time)
-    l_datetime(time) if time
+    l_datetime((time.is_a? String) ? time.to_time : time) if time
   end
   
   def day_name(day)
@@ -69,23 +88,58 @@ module ApplicationHelper
   def pagination_links_full(paginator, options={}, html_options={})
     html = ''    
     html << link_to_remote(('&#171; ' + l(:label_previous)), 
-                            {:update => "content", :url => { :page => paginator.current.previous }},
-                            {:href => url_for(:action => 'list', :params => params.merge({:page => paginator.current.previous}))}) + ' ' if paginator.current.previous
+                            {:update => "content", :url => options.merge(:page => paginator.current.previous)},
+                            {:href => url_for(:params => options.merge(:page => paginator.current.previous))}) + ' ' if paginator.current.previous
                             
     html << (pagination_links_each(paginator, options) do |n|
       link_to_remote(n.to_s, 
-                      {:url => {:action => 'list', :params => params.merge({:page => n})}, :update => 'content'},
-                      {:href => url_for(:action => 'list', :params => params.merge({:page => n}))})
+                      {:url => {:params => options.merge(:page => n)}, :update => 'content'},
+                      {:href => url_for(:params => options.merge(:page => n))})
     end || '')
     
     html << ' ' + link_to_remote((l(:label_next) + ' &#187;'), 
-                                 {:update => "content", :url => { :page => paginator.current.next }},
-                                 {:href => url_for(:action => 'list', :params => params.merge({:page => paginator.current.next}))}) if paginator.current.next
+                                 {:update => "content", :url => options.merge(:page => paginator.current.next)},
+                                 {:href => url_for(:params => options.merge(:page => paginator.current.next))}) if paginator.current.next
     html  
   end
   
-  def textilizable(text)
-    $RDM_TEXTILE_DISABLED ? simple_format(auto_link(h(text))) : RedCloth.new(h(text)).to_html
+  # textilize text according to system settings and RedCloth availability
+  def textilizable(text, options = {})
+    # different methods for formatting wiki links
+    case options[:wiki_links]
+    when :local
+      # used for local links to html files
+      format_wiki_link = Proc.new {|title| "#{title}.html" }
+    when :anchor
+      # used for single-file wiki export
+      format_wiki_link = Proc.new {|title| "##{title}" }
+    else
+      if @project
+        format_wiki_link = Proc.new {|title| url_for :controller => 'wiki', :action => 'index', :id => @project, :page => title }
+      else
+        format_wiki_link = Proc.new {|title| title }
+      end
+    end
+    
+    # turn wiki links into textile links: 
+    # example:
+    #   [[link]] -> "link":link
+    #   [[link|title]] -> "title":link
+    text = text.gsub(/\[\[([^\]\|]+)(\|([^\]\|]+))?\]\]/) {|m| "\"#{$3 || $1}\":" + format_wiki_link.call(Wiki.titleize($1)) }
+
+    # turn issue ids to textile links
+    # example:
+    #   #52 -> "#52":/issues/show/52
+    text = text.gsub(/#(\d+)(?=\b)/) {|m| "\"##{$1}\":" + url_for(:controller => 'issues', :action => 'show', :id => $1) }
+       
+    # turn revision ids to textile links (@project needed)
+    # example:
+    #   r52 -> "r52":/repositories/revision/6?rev=52 (@project.id is 6)
+    text = text.gsub(/(?=\b)r(\d+)(?=\b)/) {|m| "\"r#{$1}\":" + url_for(:controller => 'repositories', :action => 'revision', :id => @project.id, :rev => $1) } if @project
+   
+    # finally textilize text
+    @do_textilize ||= (Setting.text_formatting == 'textile') && (ActionView::Helpers::TextHelper.method_defined? "textilize")
+    text = @do_textilize ? auto_link(RedCloth.new(text).to_html) : simple_format(auto_link(h(text)))
   end
   
   def error_messages_for(object_name, options = {})
@@ -96,6 +150,7 @@ module ApplicationHelper
       full_messages = []
       object.errors.each do |attr, msg|
         next if msg.nil?
+        msg = msg.first if msg.is_a? Array
         if attr == "base"
           full_messages << l(msg)
         else
@@ -107,6 +162,7 @@ module ApplicationHelper
         object.custom_values.each do |v| 
           v.errors.each do |attr, msg|
             next if msg.nil?
+            msg = msg.first if msg.is_a? Array
             full_messages << "&#171; " + v.custom_field.name + " &#187; " + l(msg)
           end
         end
@@ -123,8 +179,9 @@ module ApplicationHelper
     end
   end
   
-  def lang_options_for_select
-    (GLoc.valid_languages.sort {|x,y| x.to_s <=> y.to_s }).collect {|lang| [ l_lang_name(lang.to_s, lang), lang.to_s]}
+  def lang_options_for_select(blank=true)
+    (blank ? [["(auto)", ""]] : []) + 
+      (GLoc.valid_languages.sort {|x,y| x.to_s <=> y.to_s }).collect {|lang| [ l_lang_name(lang.to_s, lang), lang.to_s]}
   end
   
   def label_tag_for(name, option_tags = nil, options = {})
@@ -145,7 +202,7 @@ module ApplicationHelper
   end
   
   def calendar_for(field_id)
-    image_tag("calendar", {:id => "#{field_id}_trigger",:class => "calendar-trigger"}) +
+    image_tag("calendar.png", {:id => "#{field_id}_trigger",:class => "calendar-trigger"}) +
     javascript_tag("Calendar.setup({inputField : '#{field_id}', ifFormat : '%Y-%m-%d', button : '#{field_id}_trigger' });")
   end
 end

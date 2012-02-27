@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,7 +22,7 @@ class AccountController < ApplicationController
   
   # prevents login action to be filtered by check_if_login_required application scope filter
   skip_before_filter :check_if_login_required, :only => [:login, :lost_password, :register]
-  before_filter :require_login, :except => [:show, :login, :lost_password, :register]
+  before_filter :require_login, :only => :logout
 
   # Show user's account
   def show
@@ -52,14 +52,15 @@ class AccountController < ApplicationController
   # Log out current user and redirect to welcome page
   def logout
     self.logged_in_user = nil
-    redirect_to :controller => ''
+    redirect_to :controller => 'welcome'
   end
   
   # Enable user to choose a new password
   def lost_password
+    redirect_to :controller => 'welcome' and return unless Setting.lost_password?
     if params[:token]
       @token = Token.find_by_action_and_value("recovery", params[:token])
-      redirect_to :controller => '' and return unless @token and !@token.expired?
+      redirect_to :controller => 'welcome' and return unless @token and !@token.expired?
       @user = @token.user
       if request.post?
         @user.password, @user.password_confirmation = params[:new_password], params[:new_password_confirmation]
@@ -82,8 +83,6 @@ class AccountController < ApplicationController
         # create a new token for password recovery
         token = Token.new(:user => user, :action => "recovery")
         if token.save
-          # send token to user via email
-          Mailer.set_language_if_valid(user.language)
           Mailer.deliver_lost_password(token)
           flash[:notice] = l(:notice_account_lost_email_sent)
           redirect_to :action => 'login'
@@ -95,12 +94,12 @@ class AccountController < ApplicationController
   
   # User self-registration
   def register
-    redirect_to :controller => '' and return if $RDM_SELF_REGISTRATION == false
+    redirect_to :controller => 'welcome' and return unless Setting.self_registration?
     if params[:token]
       token = Token.find_by_action_and_value("register", params[:token])
-      redirect_to :controller => '' and return unless token and !token.expired?
+      redirect_to :controller => 'welcome' and return unless token and !token.expired?
       user = token.user
-      redirect_to :controller => '' and return unless user.status == User::STATUS_REGISTERED
+      redirect_to :controller => 'welcome' and return unless user.status == User::STATUS_REGISTERED
       user.status = User::STATUS_ACTIVE
       if user.save
         token.destroy
@@ -110,7 +109,7 @@ class AccountController < ApplicationController
       end      
     else
       if request.get?
-        @user = User.new(:language => $RDM_DEFAULT_LANG)
+        @user = User.new(:language => Setting.default_language)
         @custom_values = UserCustomField.find(:all).collect { |x| CustomValue.new(:custom_field => x, :customized => @user) }
       else
         @user = User.new(params[:user])
@@ -122,10 +121,9 @@ class AccountController < ApplicationController
         @user.custom_values = @custom_values
         token = Token.new(:user => @user, :action => "register")
         if @user.save and token.save
-          Mailer.set_language_if_valid(@user.language)
           Mailer.deliver_register(token)
           flash[:notice] = l(:notice_account_register_done)
-          redirect_to :controller => ''
+          redirect_to :controller => 'welcome' and return
         end
       end
     end

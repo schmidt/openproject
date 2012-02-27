@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@ class User < ActiveRecord::Base
   has_many :projects, :through => :memberships
   has_many :custom_values, :dependent => :delete_all, :as => :customized
   has_one :preference, :dependent => :destroy, :class_name => 'UserPreference'
+  has_one :rss_key, :dependent => :destroy, :class_name => 'Token', :conditions => "action='feeds'"
   belongs_to :auth_source
   
   attr_accessor :password, :password_confirmation
@@ -32,9 +33,12 @@ class User < ActiveRecord::Base
   validates_presence_of :login, :firstname, :lastname, :mail
   validates_uniqueness_of :login, :mail	
   # Login must contain lettres, numbers, underscores only
-  validates_format_of :firstname, :lastname, :with => /^[\w\s\'\-]*$/i
   validates_format_of :login, :with => /^[a-z0-9_\-@\.]+$/i
+  validates_length_of :login, :maximum => 30
+  validates_format_of :firstname, :lastname, :with => /^[\w\s\'\-]*$/i
+  validates_length_of :firstname, :lastname, :maximum => 30
   validates_format_of :mail, :with => /^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i
+  validates_length_of :mail, :maximum => 60
   # Password length between 4 and 12
   validates_length_of :password, :in => 4..12, :allow_nil => true
   validates_confirmation_of :password, :allow_nil => true
@@ -49,7 +53,19 @@ class User < ActiveRecord::Base
     # update hashed_password if password was set
     self.hashed_password = User.hash_password(self.password) if self.password
   end
-	
+
+  def self.active
+    with_scope :find => { :conditions => [ "status = ?", STATUS_ACTIVE ] } do 
+      yield 
+    end 
+  end
+  
+  def self.find_active(*args)
+    active do
+      find(*args)
+    end
+  end
+  
   # Returns the user that matches provided login and password, or nil
   def self.try_to_login(login, password)
     user = find(:first, :conditions => ["login=?", login])
@@ -69,7 +85,7 @@ class User < ActiveRecord::Base
       if attrs
         onthefly = new(*attrs)
         onthefly.login = login
-        onthefly.language = $RDM_DEFAULT_LANG
+        onthefly.language = Setting.default_language
         if onthefly.save
           user = find(:first, :conditions => ["login=?", login])
           logger.info("User '#{user.login}' created on the fly.") if logger
@@ -108,20 +124,28 @@ class User < ActiveRecord::Base
     User.hash_password(clear_password) == self.hashed_password
   end
   
-  def role_for_project(project_id)
-    @role_for_projects ||=
-      begin
-        roles = {}
-        self.memberships.each { |m| roles.store m.project_id, m.role_id }
-        roles
-      end
-    @role_for_projects[project_id]
+  def role_for_project(project)
+    member = memberships.detect {|m| m.project_id == project.id}
+    member ? member.role : nil 
   end
   
   def pref
     self.preference ||= UserPreference.new(:user => self)
   end
-	
+  
+  def get_or_create_rss_key
+    self.rss_key || Token.create(:user => self, :action => 'feeds')
+  end
+  
+  def self.find_by_rss_key(key)
+    token = Token.find_by_value(key)
+    token && token.user.active? ? token.user : nil
+  end
+
+  def <=>(user)
+    lastname <=> user.lastname
+  end
+  
 private
   # Return password digest
   def self.hash_password(clear_password)

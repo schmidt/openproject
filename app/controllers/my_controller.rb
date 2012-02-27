@@ -19,12 +19,16 @@ class MyController < ApplicationController
   layout 'base'
   before_filter :require_login
 
-  BLOCKS = { 'issues_assigned_to_me' => :label_assigned_to_me_issues,
-             'issues_reported_by_me' => :label_reported_issues,
-             'latest_news' => :label_news_latest,
+  BLOCKS = { 'issuesassignedtome' => :label_assigned_to_me_issues,
+             'issuesreportedbyme' => :label_reported_issues,
+             'news' => :label_news_latest,
              'calendar' => :label_calendar,
              'documents' => :label_document_plural
            }.freeze
+
+  DEFAULT_LAYOUT = {  'left' => ['issuesassignedtome'], 
+                      'right' => ['issuesreportedbyme'] 
+                   }.freeze
 
   verify :xhr => true,
          :session => :page_layout,
@@ -38,7 +42,7 @@ class MyController < ApplicationController
   # Show user's page
   def page
     @user = self.logged_in_user
-    @blocks = @user.pref[:my_page_layout] || { 'left' => ['issues_assigned_to_me'], 'right' => ['issues_reported_by_me'] }
+    @blocks = @user.pref[:my_page_layout] || DEFAULT_LAYOUT
   end
 
   # Edit user's account
@@ -47,7 +51,7 @@ class MyController < ApplicationController
     @pref = @user.pref
     @user.attributes = params[:user]
     @user.pref.attributes = params[:pref]
-    if request.post? and @user.save
+    if request.post? and @user.save and @user.pref.save
       set_localization
       flash.now[:notice] = l(:notice_account_updated)
       self.logged_in_user.reload
@@ -75,7 +79,7 @@ class MyController < ApplicationController
   # User's page layout configuration
   def page_layout
     @user = self.logged_in_user
-    @blocks = @user.pref[:my_page_layout] || { 'left' => ['issues_assigned_to_me'], 'right' => ['issues_reported_by_me'] }
+    @blocks = @user.pref[:my_page_layout] || DEFAULT_LAYOUT.dup
     session[:page_layout] = @blocks
     %w(top left right).each {|f| session[:page_layout][f] ||= [] }
     @block_options = []
@@ -86,8 +90,9 @@ class MyController < ApplicationController
   # The block is added on top of the page
   # params[:block] : id of the block to add
   def add_block
-    @user = self.logged_in_user
     block = params[:block]
+    render(:nothing => true) and return unless block && (BLOCKS.keys.include? block)
+    @user = self.logged_in_user
     # remove if already present in a group
     %w(top left right).each {|f| (session[:page_layout][f] ||= []).delete block }
     # add it on top

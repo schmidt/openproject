@@ -45,6 +45,7 @@ class Query < ActiveRecord::Base
   @@operators_by_filter_type = { :list => [ "=", "!" ],
                                  :list_status => [ "o", "=", "!", "c", "*" ],
                                  :list_optional => [ "=", "!", "!*", "*" ],
+                                 :list_one_or_more => [ "*", "=" ],
                                  :date => [ "<t+", ">t+", "t+", "t", ">t-", "<t-", "t-" ],
                                  :date_past => [ ">t-", "<t-", "t-", "t" ],
                                  :text => [  "~", "!~" ] }
@@ -69,19 +70,23 @@ class Query < ActiveRecord::Base
   
   def available_filters
     return @available_filters if @available_filters
-    @available_filters = { "status_id" => { :type => :list_status, :order => 1, :values => IssueStatus.find(:all).collect{|s| [s.name, s.id.to_s] } },       
-                           "tracker_id" => { :type => :list, :order => 2, :values => Tracker.find(:all).collect{|s| [s.name, s.id.to_s] } },                                                                                                                
+    @available_filters = { "status_id" => { :type => :list_status, :order => 1, :values => IssueStatus.find(:all, :order => 'position').collect{|s| [s.name, s.id.to_s] } },       
+                           "tracker_id" => { :type => :list, :order => 2, :values => Tracker.find(:all, :order => 'position').collect{|s| [s.name, s.id.to_s] } },                                                                                                                
                            "priority_id" => { :type => :list, :order => 3, :values => Enumeration.find(:all, :conditions => ['opt=?','IPRI']).collect{|s| [s.name, s.id.to_s] } },
-                           "subject" => { :type => :text, :order => 7 },  
-                           "created_on" => { :type => :date_past, :order => 8 },                        
-                           "updated_on" => { :type => :date_past, :order => 9 },
-                           "start_date" => { :type => :date, :order => 10 },
-                           "due_date" => { :type => :date, :order => 11 } }                          
+                           "subject" => { :type => :text, :order => 8 },  
+                           "created_on" => { :type => :date_past, :order => 9 },                        
+                           "updated_on" => { :type => :date_past, :order => 10 },
+                           "start_date" => { :type => :date, :order => 11 },
+                           "due_date" => { :type => :date, :order => 12 } }                          
     unless project.nil?
       # project specific filters
       @available_filters["assigned_to_id"] = { :type => :list_optional, :order => 4, :values => @project.users.collect{|s| [s.name, s.id.to_s] } }  
       @available_filters["author_id"] = { :type => :list, :order => 5, :values => @project.users.collect{|s| [s.name, s.id.to_s] } }  
       @available_filters["category_id"] = { :type => :list_optional, :order => 6, :values => @project.issue_categories.collect{|s| [s.name, s.id.to_s] } }
+      @available_filters["fixed_version_id"] = { :type => :list_optional, :order => 7, :values => @project.versions.collect{|s| [s.name, s.id.to_s] } }
+      unless @project.children.empty?
+        @available_filters["subproject_id"] = { :type => :list_one_or_more, :order => 13, :values => @project.children.collect{|s| [s.name, s.id.to_s] } }
+      end
       # remove category filter if no category defined
       @available_filters.delete "category_id" if @available_filters["category_id"][:values].empty?
     end
@@ -122,43 +127,54 @@ class Query < ActiveRecord::Base
   end
   
   def statement
-    sql = "1=1" 
-    sql << " AND issues.project_id=%d" % project.id if project
+    sql = "1=1"
+    if has_filter?("subproject_id")
+      subproject_ids = []
+      if operator_for("subproject_id") == "="
+        subproject_ids = values_for("subproject_id").each(&:to_i)
+      else
+        subproject_ids = project.children.collect{|p| p.id}
+      end
+      sql << " AND #{Issue.table_name}.project_id IN (%d,%s)" % [project.id, subproject_ids.join(",")] if project
+    else
+      sql << " AND #{Issue.table_name}.project_id=%d" % project.id if project
+    end
     filters.each_key do |field|
+      next if field == "subproject_id"
       v = values_for field
       next unless v and !v.empty?  
       sql = sql + " AND " unless sql.empty?      
       case operator_for field
       when "="
-        sql = sql + "issues.#{field} IN (" + v.each(&:to_i).join(",") + ")"
+        sql = sql + "#{Issue.table_name}.#{field} IN (" + v.each(&:to_i).join(",") + ")"
       when "!"
-        sql = sql + "issues.#{field} NOT IN (" + v.each(&:to_i).join(",") + ")"
+        sql = sql + "#{Issue.table_name}.#{field} NOT IN (" + v.each(&:to_i).join(",") + ")"
       when "!*"
-        sql = sql + "issues.#{field} IS NULL"
+        sql = sql + "#{Issue.table_name}.#{field} IS NULL"
       when "*"
-        sql = sql + "issues.#{field} IS NOT NULL"
+        sql = sql + "#{Issue.table_name}.#{field} IS NOT NULL"
       when "o"
-        sql = sql + "issue_statuses.is_closed=#{connection.quoted_false}" if field == "status_id"
+        sql = sql + "#{IssueStatus.table_name}.is_closed=#{connection.quoted_false}" if field == "status_id"
       when "c"
-        sql = sql + "issue_statuses.is_closed=#{connection.quoted_true}" if field == "status_id"
+        sql = sql + "#{IssueStatus.table_name}.is_closed=#{connection.quoted_true}" if field == "status_id"
       when ">t-"
-        sql = sql + "issues.#{field} >= '%s'" % connection.quoted_date(Date.today - v.first.to_i)
+        sql = sql + "#{Issue.table_name}.#{field} >= '%s'" % connection.quoted_date(Date.today - v.first.to_i)
       when "<t-"
-        sql = sql + "issues.#{field} <= '" + (Date.today - v.first.to_i).strftime("%Y-%m-%d") + "'"
+        sql = sql + "#{Issue.table_name}.#{field} <= '" + (Date.today - v.first.to_i).strftime("%Y-%m-%d") + "'"
       when "t-"
-        sql = sql + "issues.#{field} = '" + (Date.today - v.first.to_i).strftime("%Y-%m-%d") + "'"
+        sql = sql + "#{Issue.table_name}.#{field} = '" + (Date.today - v.first.to_i).strftime("%Y-%m-%d") + "'"
       when ">t+"
-        sql = sql + "issues.#{field} >= '" + (Date.today + v.first.to_i).strftime("%Y-%m-%d") + "'"
+        sql = sql + "#{Issue.table_name}.#{field} >= '" + (Date.today + v.first.to_i).strftime("%Y-%m-%d") + "'"
       when "<t+"
-        sql = sql + "issues.#{field} <= '" + (Date.today + v.first.to_i).strftime("%Y-%m-%d") + "'"
+        sql = sql + "#{Issue.table_name}.#{field} <= '" + (Date.today + v.first.to_i).strftime("%Y-%m-%d") + "'"
       when "t+"
-        sql = sql + "issues.#{field} = '" + (Date.today + v.first.to_i).strftime("%Y-%m-%d") + "'"
+        sql = sql + "#{Issue.table_name}.#{field} = '" + (Date.today + v.first.to_i).strftime("%Y-%m-%d") + "'"
       when "t"
-        sql = sql + "issues.#{field} = '%s'" % connection.quoted_date(Date.today)
+        sql = sql + "#{Issue.table_name}.#{field} = '%s'" % connection.quoted_date(Date.today)
       when "~"
-        sql = sql + "issues.#{field} LIKE '%#{connection.quote_string(v.first)}%'"
+        sql = sql + "#{Issue.table_name}.#{field} LIKE '%#{connection.quote_string(v.first)}%'"
       when "!~"
-        sql = sql + "issues.#{field} NOT LIKE '%#{connection.quote_string(v.first)}%'"
+        sql = sql + "#{Issue.table_name}.#{field} NOT LIKE '%#{connection.quote_string(v.first)}%'"
       end
     end if filters and valid?
     sql
