@@ -22,6 +22,7 @@ module Redmine
   module WikiFormatting
     module Textile
       class Formatter < RedCloth3
+        include ActionView::Helpers::TagHelper
         
         # auto_link rule after textile rules so that it doesn't break !image_url! tags
         RULES = [:textile, :block_markdown_rule, :inline_auto_link, :inline_auto_mailto, :inline_toc, :inline_macros]
@@ -44,7 +45,7 @@ module Redmine
         # Patch for RedCloth.  Fixed in RedCloth r128 but _why hasn't released it yet.
         # <a href="http://code.whytheluckystiff.net/redcloth/changeset/128">http://code.whytheluckystiff.net/redcloth/changeset/128</a>
         def hard_break( text ) 
-          text.gsub!( /(.)\n(?!\n|\Z|>| *(>? *[#*=]+(\s|$)|[{|]))/, "\\1<br />\n" ) if hard_breaks 
+          text.gsub!( /(.)\n(?!\n|\Z|>| *([#*=]+(\s|$)|[{|]))/, "\\1<br />" ) if hard_breaks
         end
         
         # Patch to add code highlighting support to RedCloth
@@ -65,7 +66,12 @@ module Redmine
         # Patch to add 'table of content' support to RedCloth
         def textile_p_withtoc(tag, atts, cite, content)
           # removes wiki links from the item
-          toc_item = content.gsub(/(\[\[|\]\])/, '')
+          toc_item = content.gsub(/(\[\[([^\]\|]*)(\|([^\]]*))?\]\])/) { $4 || $2 }
+          # sanitizes titles from links
+          # see redcloth3.rb, same as "#{pre}#{text}#{post}"
+          toc_item.gsub!(LINK_RE) { [$2, $4, $9].join }
+          # sanitizes image links from titles
+          toc_item.gsub!(IMAGE_RE) { [$5].join }
           # removes styles
           # eg. %{color:red}Triggers% => Triggers
           toc_item.gsub! %r[%\{[^\}]*\}([^%]+)%], '\\1'
@@ -162,7 +168,8 @@ module Redmine
                 url=url[0..-2] # discard closing parenth from url
                 post = ")"+post # add closing parenth to post
               end
-              %(#{leading}<a class="external" href="#{proto=="www."?"http://www.":proto}#{url}">#{proto + url}</a>#{post})
+              tag = content_tag('a', proto + url, :href => "#{proto=="www."?"http://www.":proto}#{url}", :class => 'external')
+              %(#{leading}#{tag}#{post})
             end
           end
         end
@@ -174,7 +181,7 @@ module Redmine
             if text.match(/<a\b[^>]*>(.*)(#{Regexp.escape(mail)})(.*)<\/a>/)
               mail
             else
-              %{<a href="mailto:#{mail}" class="email">#{mail}</a>}
+              content_tag('a', mail, :href => "mailto:#{mail}", :class => "email")
             end
           end
         end
