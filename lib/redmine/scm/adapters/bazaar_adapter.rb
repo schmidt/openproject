@@ -30,7 +30,7 @@ module Redmine
           cmd = "#{BZR_BIN} revno #{target('')}"
           info = nil
           shellout(cmd) do |io|
-            if io.read =~ %r{^(\d+)$}
+            if io.read =~ %r{^(\d+)\r?$}
               info = Info.new({:root_url => url,
                                :lastrev => Revision.new({
                                  :identifier => $1
@@ -56,7 +56,7 @@ module Redmine
           shellout(cmd) do |io|
             prefix = "#{url}/#{path}".gsub('\\', '/')
             logger.debug "PREFIX: #{prefix}"
-            re = %r{^V\s+(#{Regexp.escape(prefix)})?(\/?)([^\/]+)(\/?)\s+(\S+)$}
+            re = %r{^V\s+(#{Regexp.escape(prefix)})?(\/?)([^\/]+)(\/?)\s+(\S+)\r?$}
             io.each_line do |line|
               next unless line =~ re
               entries << Entry.new({:name => $3.strip,
@@ -74,10 +74,10 @@ module Redmine
     
         def revisions(path=nil, identifier_from=nil, identifier_to=nil, options={})
           path ||= ''
-          identifier_from = 'last:1' unless identifier_from and identifier_from.to_i > 0
-          identifier_to = 1 unless identifier_to and identifier_to.to_i > 0
+          identifier_from = (identifier_from and identifier_from.to_i > 0) ? identifier_from.to_i : 'last:1'
+          identifier_to = (identifier_to and identifier_to.to_i > 0) ? identifier_to.to_i : 1
           revisions = Revisions.new
-          cmd = "#{BZR_BIN} log -v --show-ids -r#{identifier_to.to_i}..#{identifier_from} #{target(path)}"
+          cmd = "#{BZR_BIN} log -v --show-ids -r#{identifier_to}..#{identifier_from} #{target(path)}"
           shellout(cmd) do |io|
             revision = nil
             parsing = nil
@@ -139,6 +139,9 @@ module Redmine
             identifier_to = identifier_to.to_i 
           else
             identifier_to = identifier_from.to_i - 1
+          end
+          if identifier_from
+            identifier_from = identifier_from.to_i
           end
           cmd = "#{BZR_BIN} diff -r#{identifier_to}..#{identifier_from} #{target(path)}"
           diff = []

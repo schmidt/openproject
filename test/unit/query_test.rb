@@ -33,6 +33,15 @@ class QueryTest < ActiveSupport::TestCase
     assert query.available_filters['fixed_version_id'][:values].detect {|v| v.last == '2'}
   end
   
+  def test_project_filter_in_global_queries
+    query = Query.new(:project => nil, :name => '_')
+    project_filter = query.available_filters["project_id"]
+    assert_not_nil project_filter
+    project_ids = project_filter[:values].map{|p| p[1]}
+    assert project_ids.include?("1")  #public project
+    assert !project_ids.include?("2") #private project user cannot see
+  end
+  
   def find_issues_with_query(query)
     Issue.find :all,
       :include => [ :assigned_to, :status, :tracker, :project, :priority ], 
@@ -216,6 +225,22 @@ class QueryTest < ActiveSupport::TestCase
     q = Query.new
     assert q.groupable_columns.detect {|c| c.is_a? QueryCustomFieldColumn}
   end
+
+  def test_grouped_with_valid_column
+    q = Query.new(:group_by => 'status')
+    assert q.grouped?
+    assert_not_nil q.group_by_column
+    assert_equal :status, q.group_by_column.name
+    assert_not_nil q.group_by_statement
+    assert_equal 'status', q.group_by_statement
+  end
+  
+  def test_grouped_with_invalid_column
+    q = Query.new(:group_by => 'foo')
+    assert !q.grouped?
+    assert_nil q.group_by_column
+    assert_nil q.group_by_statement
+  end
   
   def test_default_sort
     q = Query.new
@@ -350,5 +375,14 @@ class QueryTest < ActiveSupport::TestCase
     assert q.editable_by?(admin)
     assert !q.editable_by?(manager)
     assert !q.editable_by?(developer)
+  end
+
+  context "#available_filters" do
+    should "include users of visible projects in cross-project view" do
+      query = Query.new(:name => "_")
+      users = query.available_filters["assigned_to_id"]
+      assert_not_nil users
+      assert users[:values].map{|u|u[1]}.include?("3")
+    end
   end
 end
