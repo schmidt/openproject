@@ -33,13 +33,14 @@
 <%= text_field_tag 'settings[activity_days_default]', Setting.activity_days_default, :size => 6 %> <%= l(:label_day_plural) %></p>
 
 <p><label><%= l(:setting_host_name) %></label>
-<%= text_field_tag 'settings[host_name]', Setting.host_name, :size => 60 %></p>
+<%= text_field_tag 'settings[host_name]', Setting.host_name, :size => 60 %><br />
+<em><%= l(:label_example) %>: <%= @guessed_host_and_path %></em></p>
 
 <p><label><%= l(:setting_protocol) %></label>
 <%= select_tag 'settings[protocol]', options_for_select(['http', 'https'], Setting.protocol) %></p>
 
 <p><label><%= l(:setting_text_formatting) %></label>
-<%= select_tag 'settings[text_formatting]', options_for_select([[l(:label_none), "0"], ["textile", "textile"]], Setting.text_formatting) %></p>
+<%= select_tag 'settings[text_formatting]', options_for_select([[l(:label_none), "0"], *Redmine::WikiFormatting.format_names.collect{|name| [name, name]} ], Setting.text_formatting.to_sym) %></p>
 
 <p><label><%= l(:setting_wiki_compression) %></label>
 <%= select_tag 'settings[wiki_compression]', options_for_select( [[l(:label_none), 0], ["gzip", "gzip"]], Setting.wiki_compression) %></p>
@@ -47,8 +48,11 @@
 <p><label><%= l(:setting_feeds_limit) %></label>
 <%= text_field_tag 'settings[feeds_limit]', Setting.feeds_limit, :size => 6 %></p>
 
-<p><label><%= l(:setting_default_projects_public) %></label>
-<%= check_box_tag 'settings[default_projects_public]', 1, Setting.default_projects_public? %><%= hidden_field_tag 'settings[default_projects_public]', 0 %></p>
+<p><label><%= l(:setting_diff_max_lines_displayed) %></label>
+<%= text_field_tag 'settings[diff_max_lines_displayed]', Setting.diff_max_lines_displayed, :size => 6 %></p>
+
+<p><label><%= l(:setting_gravatar_enabled) %></label>
+<%= check_box_tag 'settings[gravatar_enabled]', 1, Setting.gravatar_enabled? %><%= hidden_field_tag 'settings[gravatar_enabled]', 0 %></p>
 </div>
 
 <%= submit_tag l(:button_save) %>

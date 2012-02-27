@@ -17,6 +17,7 @@
 
 require 'redmine/scm/adapters/abstract_adapter'
 require 'rexml/document'
+require 'uri'
 
 module Redmine
   module Scm
@@ -25,6 +26,25 @@ module Redmine
       
         # SVN executable name
         SVN_BIN = "svn"
+        
+        class << self
+          def client_version
+            @@client_version ||= (svn_binary_version || [])
+          end
+          
+          def svn_binary_version
+            cmd = "#{SVN_BIN} --version"
+            version = nil
+            shellout(cmd) do |io|
+              # Read svn version in first returned line
+              if m = io.gets.to_s.match(%r{((\d+\.)+\d+)})
+                version = m[0].scan(%r{\d+}).collect(&:to_i)
+              end
+            end
+            return nil if $? && $?.exitstatus != 0
+            version
+          end
+        end
         
         # Get info about the svn repository
         def info
@@ -57,24 +77,27 @@ module Redmine
           path ||= ''
           identifier = (identifier and identifier.to_i > 0) ? identifier.to_i : "HEAD"
           entries = Entries.new
-          cmd = "#{SVN_BIN} list --xml #{target(path)}@#{identifier}"
+          cmd = "#{SVN_BIN} list --xml #{target(URI.escape(path))}@#{identifier}"
           cmd << credentials_string
           shellout(cmd) do |io|
             output = io.read
             begin
               doc = REXML::Document.new(output)
               doc.elements.each("lists/list/entry") do |entry|
+                commit = entry.elements['commit']
+                commit_date = commit.elements['date']
                 # Skip directory if there is no commit date (usually that
                 # means that we don't have read access to it)
-                next if entry.attributes['kind'] == 'dir' && entry.elements['commit'].elements['date'].nil?
-                entries << Entry.new({:name => entry.elements['name'].text,
-                            :path => ((path.empty? ? "" : "#{path}/") + entry.elements['name'].text),
+                next if entry.attributes['kind'] == 'dir' && commit_date.nil?
+                name = entry.elements['name'].text
+                entries << Entry.new({:name => URI.unescape(name),
+                            :path => ((path.empty? ? "" : "#{path}/") + name),
                             :kind => entry.attributes['kind'],
-                            :size => (entry.elements['size'] and entry.elements['size'].text).to_i,
+                            :size => ((s = entry.elements['size']) ? s.text.to_i : nil),
                             :lastrev => Revision.new({
-                              :identifier => entry.elements['commit'].attributes['revision'],
-                              :time => Time.parse(entry.elements['commit'].elements['date'].text).localtime,
-                              :author => (entry.elements['commit'].elements['author'] ? entry.elements['commit'].elements['author'].text : "")
+                              :identifier => commit.attributes['revision'],
+                              :time => Time.parse(commit_date.text).localtime,
+                              :author => ((a = commit.elements['author']) ? a.text : nil)
                               })
                             })
               end
@@ -87,7 +110,29 @@ module Redmine
           logger.debug("Found #{entries.size} entries in the repository for #{target(path)}") if logger && logger.debug?
           entries.sort_by_name
         end
-    
+        
+        def properties(path, identifier=nil)
+          # proplist xml output supported in svn 1.5.0 and higher
+          return nil unless self.class.client_version_above?([1, 5, 0])
+          
+          identifier = (identifier and identifier.to_i > 0) ? identifier.to_i : "HEAD"
+          cmd = "#{SVN_BIN} proplist --verbose --xml #{target(URI.escape(path))}@#{identifier}"
+          cmd << credentials_string
+          properties = {}
+          shellout(cmd) do |io|
+            output = io.read
+            begin
+              doc = REXML::Document.new(output)
+              doc.elements.each("properties/target/property") do |property|
+                properties[ property.attributes['name'] ] = property.text
+              end
+            rescue
+            end
+          end
+          return nil if $? && $?.exitstatus != 0
+          properties
+        end
+        
         def revisions(path=nil, identifier_from=nil, identifier_to=nil, options={})
           path ||= ''
           identifier_from = (identifier_from and identifier_from.to_i > 0) ? identifier_from.to_i : "HEAD"
@@ -96,7 +141,7 @@ module Redmine
           cmd = "#{SVN_BIN} log --xml -r #{identifier_from}:#{identifier_to}"
           cmd << credentials_string
           cmd << " --verbose " if  options[:with_paths]
-          cmd << ' ' + target(path)
+          cmd << ' ' + target(URI.escape(path))
           shellout(cmd) do |io|
             begin
               doc = REXML::Document.new(io)
@@ -133,7 +178,7 @@ module Redmine
           cmd = "#{SVN_BIN} diff -r "
           cmd << "#{identifier_to}:"
           cmd << "#{identifier_from}"
-          cmd << " #{target(path)}@#{identifier_from}"
+          cmd << " #{target(URI.escape(path))}@#{identifier_from}"
           cmd << credentials_string
           diff = []
           shellout(cmd) do |io|
@@ -142,12 +187,12 @@ module Redmine
             end
           end
           return nil if $? && $?.exitstatus != 0
-          DiffTableList.new diff, type    
+          diff
         end
         
         def cat(path, identifier=nil)
           identifier = (identifier and identifier.to_i > 0) ? identifier.to_i : "HEAD"
-          cmd = "#{SVN_BIN} cat #{target(path)}@#{identifier}"
+          cmd = "#{SVN_BIN} cat #{target(URI.escape(path))}@#{identifier}"
           cmd << credentials_string
           cat = nil
           shellout(cmd) do |io|
@@ -160,7 +205,7 @@ module Redmine
         
         def annotate(path, identifier=nil)
           identifier = (identifier and identifier.to_i > 0) ? identifier.to_i : "HEAD"
-          cmd = "#{SVN_BIN} blame #{target(path)}@#{identifier}"
+          cmd = "#{SVN_BIN} blame #{target(URI.escape(path))}@#{identifier}"
           cmd << credentials_string
           blame = Annotate.new
           shellout(cmd) do |io|
@@ -179,6 +224,7 @@ module Redmine
           str = ''
           str << " --username #{shell_quote(@login)}" unless @login.blank?
           str << " --password #{shell_quote(@password)}" unless @login.blank? || @password.blank?
+          str << " --no-auth-cache --non-interactive"
           str
         end
       end

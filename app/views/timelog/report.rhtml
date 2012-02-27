@@ -2,13 +2,15 @@
 <%= link_to_if_authorized l(:button_log_time), {:controller => 'timelog', :action => 'edit', :project_id => @project, :issue_id => @issue}, :class => 'icon icon-time' %>
 </div>
 
+<%= render_timelog_breadcrumb %>
+
 <h2><%= l(:label_spent_time) %></h2>
 
 <% form_remote_tag(:url => {}, :update => 'content') do %>
   <% @criterias.each do |criteria| %>
     <%= hidden_field_tag 'criterias[]', criteria, :id => nil %>
   <% end %>
-  <%= hidden_field_tag 'project_id', params[:project_id] %>
+  <%= hidden_field_tag('project_id', params[:project_id]) if @project %>
   <%= render :partial => 'date_range' %>
 
   <p><%= l(:label_details) %>: <%= select_tag 'columns', options_for_select([[l(:label_year), 'year'],

@@ -118,6 +118,7 @@ class ProjectTest < Test::Unit::TestCase
   
   def test_rolled_up_trackers
     parent = Project.find(1)
+    parent.trackers = Tracker.find([1,2])
     child = parent.children.find(3)
   
     assert_equal [1, 2], parent.tracker_ids
@@ -128,5 +129,16 @@ class ProjectTest < Test::Unit::TestCase
     
     assert_equal [1, 2, 3], parent.rolled_up_trackers.collect(&:id)
     assert_equal [2, 3], child.rolled_up_trackers.collect(&:id)
+  end
+  
+  def test_next_identifier
+    ProjectCustomField.delete_all
+    Project.create!(:name => 'last', :identifier => 'p2008040')
+    assert_equal 'p2008041', Project.next_identifier
+  end
+  
+  def test_next_identifier_first_project
+    Project.delete_all
+    assert_nil Project.next_identifier
   end
 end

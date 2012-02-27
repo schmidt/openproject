@@ -48,6 +48,19 @@ class RepositoryDarcsTest < Test::Unit::TestCase
       @repository.fetch_changesets
       assert_equal 6, @repository.changesets.count
     end
+    
+    def test_deleted_files_should_not_be_listed
+      entries = @repository.entries('sources')
+      assert entries.detect {|e| e.name == 'watchers_controller.rb'}
+      assert_nil entries.detect {|e| e.name == 'welcome_controller.rb'}
+    end
+    
+    def test_cat
+      @repository.fetch_changesets
+      cat = @repository.cat("sources/welcome_controller.rb", 2)
+      assert_not_nil cat
+      assert cat.include?('class WelcomeController < ApplicationController')
+    end
   else
     puts "Darcs test repository NOT FOUND. Skipping unit tests !!!"
     def test_fake; assert true end

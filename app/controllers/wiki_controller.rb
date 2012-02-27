@@ -18,10 +18,10 @@
 require 'diff'
 
 class WikiController < ApplicationController
-  layout 'base'
   before_filter :find_wiki, :authorize
+  before_filter :find_existing_page, :only => [:rename, :protect, :history, :diff, :annotate, :add_attachment, :destroy]
   
-  verify :method => :post, :only => [:destroy, :destroy_attachment], :redirect_to => { :action => :index }
+  verify :method => :post, :only => [:destroy, :protect], :redirect_to => { :action => :index }
 
   helper :attachments
   include AttachmentsHelper   
@@ -39,6 +39,11 @@ class WikiController < ApplicationController
       end
       return
     end
+    if params[:version] && !User.current.allowed_to?(:view_wiki_edits, @project)
+      # Redirects user to the current version if he's not allowed to view previous versions
+      redirect_to :version => nil
+      return
+    end
     @content = @page.content_for_version(params[:version])
     if params[:export] == 'html'
       export = render_to_string :action => 'export', :layout => false
@@ -48,19 +53,24 @@ class WikiController < ApplicationController
       send_data(@content.text, :type => 'text/plain', :filename => "#{@page.title}.txt")
       return
     end
+	@editable = editable?
     render :action => 'show'
   end
   
   # edit an existing page or a new one
   def edit
     @page = @wiki.find_or_new_page(params[:page])    
+    return render_403 unless editable?
     @page.content = WikiContent.new(:page => @page) if @page.new_record?
     
     @content = @page.content_for_version(params[:version])
-    @content.text = "h1. #{@page.pretty_title}" if @content.text.blank?
+    @content.text = initial_page_content(@page) if @content.text.blank?
     # don't keep previous comment
     @content.comments = nil
-    if request.post?      
+    if request.get?
+      # To prevent StaleObjectError exception when reverting to a previous version
+      @content.version = @page.content.version
+    else
       if !@page.new_record? && @content.text == params[:content][:text]
         # don't save if text wasn't changed
         redirect_to :action => 'index', :id => @project, :page => @page.title
@@ -72,6 +82,7 @@ class WikiController < ApplicationController
       @content.author = User.current
       # if page is new @page.save will also save content, but not if page isn't a new record
       if (@page.new_record? ? @page.save : @content.save)
+        call_hook(:controller_wiki_edit_after_save, { :params => params, :page => @page})
         redirect_to :action => 'index', :id => @project, :page => @page.title
       end
     end
@@ -82,7 +93,7 @@ class WikiController < ApplicationController
   
   # rename a page
   def rename
-    @page = @wiki.find_page(params[:page])    
+    return render_403 unless editable?
     @page.redirect_existing_links = true
     # used to display the *original* title if some AR validation errors occur
     @original_title = @page.pretty_title
@@ -92,10 +103,13 @@ class WikiController < ApplicationController
     end
   end
   
+  def protect
+    @page.update_attribute :protected, params[:protected]
+    redirect_to :action => 'index', :id => @project, :page => @page.title
+  end
+
   # show page history
   def history
-    @page = @wiki.find_page(params[:page])
-    
     @version_count = @page.content.versions.count
     @version_pages = Paginator.new self, @version_count, per_page_option, params['p']
     # don't load text    
@@ -109,20 +123,19 @@ class WikiController < ApplicationController
   end
   
   def diff
-    @page = @wiki.find_page(params[:page])
     @diff = @page.diff(params[:version], params[:version_from])
     render_404 unless @diff
   end
   
   def annotate
-    @page = @wiki.find_page(params[:page])
     @annotate = @page.annotate(params[:version])
+    render_404 unless @annotate
   end
   
   # remove a wiki page and its history
   def destroy
-    @page = @wiki.find_page(params[:page])
-    @page.destroy if @page
+    return render_403 unless editable?
+    @page.destroy
     redirect_to :action => 'special', :id => @project, :page => 'Page_index'
   end
 
@@ -137,6 +150,7 @@ class WikiController < ApplicationController
                                       :joins => "LEFT JOIN #{WikiContent.table_name} ON #{WikiContent.table_name}.page_id = #{WikiPage.table_name}.id",
                                       :order => 'title'
       @pages_by_date = @pages.group_by {|p| p.updated_on.to_date}
+      @pages_by_parent_id = @pages.group_by(&:parent_id)
     # export wiki to a single html file
     when 'export'
       @pages = @wiki.pages.find :all, :order => 'title'
@@ -152,20 +166,19 @@ class WikiController < ApplicationController
   
   def preview
     page = @wiki.find_page(params[:page])
-    @attachements = page.attachments if page
+    # page is nil when previewing a new page
+    return render_403 unless page.nil? || editable?(page)
+    if page
+      @attachements = page.attachments
+      @previewed = page.content
+    end
     @text = params[:content][:text]
     render :partial => 'common/preview'
   end
 
   def add_attachment
-    @page = @wiki.find_page(params[:page])
+    return render_403 unless editable?
     attach_files(@page, params[:attachments])
-    redirect_to :action => 'index', :page => @page.title
-  end
-
-  def destroy_attachment
-    @page = @wiki.find_page(params[:page])
-    @page.attachments.find(params[:attachment_id]).destroy
     redirect_to :action => 'index', :page => @page.title
   end
 
@@ -177,5 +190,23 @@ private
     render_404 unless @wiki
   rescue ActiveRecord::RecordNotFound
     render_404
+  end
+  
+  # Finds the requested page and returns a 404 error if it doesn't exist
+  def find_existing_page
+    @page = @wiki.find_page(params[:page])
+    render_404 if @page.nil?
+  end
+  
+  # Returns true if the current user is allowed to edit the page, otherwise false
+  def editable?(page = @page)
+    page.editable_by?(User.current)
+  end
+
+  # Returns the default content of a new wiki page
+  def initial_page_content(page)
+    helper = Redmine::WikiFormatting.helper_for(Setting.text_formatting)
+    extend helper unless self.instance_of?(helper)
+    helper.instance_method(:initial_page_content).bind(self).call(page)
   end
 end

@@ -1,5 +1,6 @@
 <div class="contextual">
 <%= link_to_if_authorized l(:button_edit), {:controller => 'versions', :action => 'edit', :id => @version}, :class => 'icon icon-edit' %>
+<%= call_hook(:view_versions_show_contextual, { :version => @version, :project => @project }) %>
 </div>
 
 <h2><%= h(@version.name) %></h2>
@@ -38,11 +39,13 @@
 <fieldset class="related-issues"><legend><%= l(:label_related_issues) %></legend>
 <ul>
 <% issues.each do |issue| -%>
-    <li class="issue <%= 'closed' if issue.closed? %>"><%= link_to_issue(issue) %>: <%=h issue.subject %></li>
+    <li><%= link_to_issue(issue) %>: <%=h issue.subject %></li>
 <% end -%>
 </ul>
 </fieldset>
 <% end %>
 </div>
+
+<%= call_hook :view_versions_show_bottom, :version => @version %>
 
 <% html_title @version.name %>

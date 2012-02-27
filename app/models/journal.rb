@@ -25,18 +25,20 @@ class Journal < ActiveRecord::Base
   has_many :details, :class_name => "JournalDetail", :dependent => :delete_all
   attr_accessor :indice
   
-  acts_as_searchable :columns => 'notes',
-                     :include => :issue,
-                     :project_key => "#{Issue.table_name}.project_id",
-                     :date_column => "#{Issue.table_name}.created_on"
-  
   acts_as_event :title => Proc.new {|o| status = ((s = o.new_status) ? " (#{s})" : nil); "#{o.issue.tracker} ##{o.issue.id}#{status}: #{o.issue.subject}" },
                 :description => :notes,
                 :author => :user,
-                :type => Proc.new {|o| (s = o.new_status) && s.is_closed? ? 'issue-closed' : 'issue-edit' },
+                :type => Proc.new {|o| (s = o.new_status) ? (s.is_closed? ? 'issue-closed' : 'issue-edit') : 'issue-note' },
                 :url => Proc.new {|o| {:controller => 'issues', :action => 'show', :id => o.issue.id, :anchor => "change-#{o.id}"}}
 
-  def save
+  acts_as_activity_provider :type => 'issues',
+                            :permission => :view_issues,
+                            :author_key => :user_id,
+                            :find_options => {:include => [{:issue => :project}, :details, :user],
+                                              :conditions => "#{Journal.table_name}.journalized_type = 'Issue' AND" +
+                                                             " (#{JournalDetail.table_name}.prop_key = 'status_id' OR #{Journal.table_name}.notes <> '')"}
+  
+  def save(*args)
     # Do not save an empty journal
     (details.empty? && notes.blank?) ? false : super
   end

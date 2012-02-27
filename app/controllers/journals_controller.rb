@@ -16,13 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class JournalsController < ApplicationController
-  layout 'base'
   before_filter :find_journal
   
   def edit
     if request.post?
       @journal.update_attributes(:notes => params[:notes]) if params[:notes]
       @journal.destroy if @journal.details.empty? && @journal.notes.blank?
+      call_hook(:controller_journals_edit_post, { :journal => @journal, :params => params})
       respond_to do |format|
         format.html { redirect_to :controller => 'issues', :action => 'show', :id => @journal.journalized_id }
         format.js { render :action => 'update' }

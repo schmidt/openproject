@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class CustomFieldsController < ApplicationController
-  layout 'base'		
   before_filter :require_admin
 
   def index
@@ -39,12 +38,15 @@ class CustomFieldsController < ApplicationController
         @custom_field = UserCustomField.new(params[:custom_field])
       when "ProjectCustomField" 
         @custom_field = ProjectCustomField.new(params[:custom_field])
+      when "TimeEntryCustomField" 
+        @custom_field = TimeEntryCustomField.new(params[:custom_field])
       else
         redirect_to :action => 'list'
         return
     end  
     if request.post? and @custom_field.save
       flash[:notice] = l(:notice_successful_create)
+      call_hook(:controller_custom_fields_new_after_save, :params => params, :custom_field => @custom_field)
       redirect_to :action => 'list', :tab => @custom_field.class.name
     end
     @trackers = Tracker.find(:all, :order => 'position')
@@ -57,6 +59,7 @@ class CustomFieldsController < ApplicationController
         @custom_field.trackers = params[:tracker_ids] ? Tracker.find(params[:tracker_ids]) : []
       end
       flash[:notice] = l(:notice_successful_update)
+      call_hook(:controller_custom_fields_edit_after_save, :params => params, :custom_field => @custom_field)
       redirect_to :action => 'list', :tab => @custom_field.class.name
     end
     @trackers = Tracker.find(:all, :order => 'position')

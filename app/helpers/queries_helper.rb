@@ -40,10 +40,18 @@ module QueriesHelper
       else
         case column.name
         when :subject
-        h((@project.nil? || @project != issue.project) ? "#{issue.project.name} - " : '') +
+        h((!@project.nil? && @project != issue.project) ? "#{issue.project.name} - " : '') +
           link_to(h(value), :controller => 'issues', :action => 'show', :id => issue)
+        when :project
+          link_to(h(value), :controller => 'projects', :action => 'show', :id => value)
+        when :assigned_to
+          link_to(h(value), :controller => 'account', :action => 'show', :id => value)
+        when :author
+          link_to(h(value), :controller => 'account', :action => 'show', :id => value)
         when :done_ratio
           progress_bar(value, :width => '80px')
+        when :fixed_version
+          link_to(h(value), { :controller => 'versions', :action => 'show', :id => issue.fixed_version_id })
         else
           h(value)
         end

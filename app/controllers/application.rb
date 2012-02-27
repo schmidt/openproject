@@ -15,9 +15,21 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'uri'
+require 'cgi'
+
 class ApplicationController < ActionController::Base
+  class MissingSessionSecret < Exception ; end
+  layout 'base'
+  
   before_filter :user_setup, :check_if_login_required, :set_localization
   filter_parameter_logging :password
+
+  if session.first[:secret].blank?
+    raise MissingSessionSecret, "Missing session secret. Please run 'rake config/initializers/session_store.rb' to generate one"
+  else
+    protect_from_forgery :secret => session.first[:secret]
+  end
   
   include Redmine::MenuManager::MenuController
   helper Redmine::MenuManager::MenuHelper
@@ -41,7 +53,7 @@ class ApplicationController < ActionController::Base
   def find_current_user
     if session[:user_id]
       # existing session
-      (User.find_active(session[:user_id]) rescue nil)
+      (User.active.find(session[:user_id]) rescue nil)
     elsif cookies[:autologin] && Setting.autologin?
       # auto-login feature
       User.find_by_autologin_key(cookies[:autologin])
@@ -77,8 +89,13 @@ class ApplicationController < ActionController::Base
   
   def require_login
     if !User.current.logged?
-      store_location
-      redirect_to :controller => "account", :action => "login"
+      # Extract only the basic url parameters on non-GET requests
+      if request.get?
+        url = url_for(params)
+      else
+        url = url_for(:controller => params[:controller], :action => params[:action], :id => params[:id], :project_id => params[:project_id])
+      end
+      redirect_to :controller => "account", :action => "login", :back_url => url
       return false
     end
     true
@@ -92,11 +109,15 @@ class ApplicationController < ActionController::Base
     end
     true
   end
+  
+  def deny_access
+    User.current.logged? ? render_403 : require_login
+  end
 
   # Authorize the user for the requested action
   def authorize(ctrl = params[:controller], action = params[:action])
     allowed = User.current.allowed_to?({:controller => ctrl, :action => action}, @project)
-    allowed ? true : (User.current.logged? ? render_403 : require_login)
+    allowed ? true : deny_access
   end
   
   # make sure that the user is a member of the project (or admin) if project is private
@@ -115,20 +136,20 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  # store current uri in session.
-  # return to this location by calling redirect_back_or_default
-  def store_location
-    session[:return_to_params] = params
-  end
-
-  # move to the last store_location call or to the passed default one
   def redirect_back_or_default(default)
-    if session[:return_to_params].nil?
-      redirect_to default
-    else
-      redirect_to session[:return_to_params]
-      session[:return_to_params] = nil
+    back_url = CGI.unescape(params[:back_url].to_s)
+    if !back_url.blank?
+      begin
+        uri = URI.parse(back_url)
+        # do not redirect user to another host or to the login or register page
+        if (uri.relative? || (uri.host == request.host)) && !uri.path.match(%r{/(login|account/register)})
+          redirect_to(back_url) and return
+        end
+      rescue URI::InvalidURIError
+        # redirect to default
+      end
     end
+    redirect_to default
   end
   
   def render_403
@@ -167,6 +188,7 @@ class ApplicationController < ActionController::Base
   # TODO: move to model
   def attach_files(obj, attachments)
     attached = []
+    unsaved = []
     if attachments && attachments.is_a?(Hash)
       attachments.each_value do |attachment|
         file = attachment['file']
@@ -175,7 +197,10 @@ class ApplicationController < ActionController::Base
                               :file => file,
                               :description => attachment['description'].to_s.strip,
                               :author => User.current)
-        attached << a unless a.new_record?
+        a.new_record? ? (unsaved << a) : (attached << a)
+      end
+      if unsaved.any?
+        flash[:warning] = l(:warning_attachments_not_saved, unsaved.size)
       end
     end
     attached

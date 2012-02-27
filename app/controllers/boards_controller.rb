@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class BoardsController < ApplicationController
-  layout 'base'
   before_filter :find_project, :authorize
 
   helper :messages
@@ -38,6 +37,7 @@ class BoardsController < ApplicationController
   def show
     sort_init 'updated_on', 'desc'
     sort_update	'created_on' => "#{Message.table_name}.created_on",
+                'replies' => "#{Message.table_name}.replies_count",
                 'updated_on' => "#{Message.table_name}.updated_on"
       
     @topic_count = @board.topics.count

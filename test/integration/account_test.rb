@@ -17,6 +17,12 @@
 
 require "#{File.dirname(__FILE__)}/../test_helper"
 
+begin
+  require 'mocha'
+rescue
+  # Won't run some tests
+end
+
 class AccountTest < ActionController::IntegrationTest
   fixtures :users
 
@@ -38,7 +44,7 @@ class AccountTest < ActionController::IntegrationTest
     assert_response :success
     assert_template "account/lost_password"
     
-    post "account/lost_password", :mail => 'jsmith@somenet.foo'
+    post "account/lost_password", :mail => 'jSmith@somenet.foo'
     assert_redirected_to "account/login"
     
     token = Token.find(:first)
@@ -67,8 +73,12 @@ class AccountTest < ActionController::IntegrationTest
     
     post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar"}, 
                              :password => "newpass", :password_confirmation => "newpass"
-    assert_redirected_to 'account/login'
-    log_user('newuser', 'newpass')
+    assert_redirected_to 'my/account'
+    follow_redirect!
+    assert_response :success
+    assert_template 'my/account'
+    
+    assert User.find_by_login('newuser').active?
   end
   
   def test_register_with_manual_activation
@@ -97,5 +107,65 @@ class AccountTest < ActionController::IntegrationTest
     get 'account/activate', :token => token.value
     assert_redirected_to 'account/login'
     log_user('newuser', 'newpass')
+  end
+  
+  if Object.const_defined?(:Mocha)
+  
+  def test_onthefly_registration
+    # disable registration
+    Setting.self_registration = '0'
+    AuthSource.expects(:authenticate).returns([:login => 'foo', :firstname => 'Foo', :lastname => 'Smith', :mail => 'foo@bar.com', :auth_source_id => 66])
+  
+    post 'account/login', :username => 'foo', :password => 'bar'
+    assert_redirected_to 'my/page'
+    
+    user = User.find_by_login('foo')
+    assert user.is_a?(User)
+    assert_equal 66, user.auth_source_id
+    assert user.hashed_password.blank?
+  end
+  
+  def test_onthefly_registration_with_invalid_attributes
+    # disable registration
+    Setting.self_registration = '0'
+    AuthSource.expects(:authenticate).returns([:login => 'foo', :lastname => 'Smith', :auth_source_id => 66])
+    
+    post 'account/login', :username => 'foo', :password => 'bar'
+    assert_response :success
+    assert_template 'account/register'
+    assert_tag :input, :attributes => { :name => 'user[firstname]', :value => '' }
+    assert_tag :input, :attributes => { :name => 'user[lastname]', :value => 'Smith' }
+    assert_no_tag :input, :attributes => { :name => 'user[login]' }
+    assert_no_tag :input, :attributes => { :name => 'user[password]' }
+    
+    post 'account/register', :user => {:firstname => 'Foo', :lastname => 'Smith', :mail => 'foo@bar.com'}
+    assert_redirected_to 'my/account'
+    
+    user = User.find_by_login('foo')
+    assert user.is_a?(User)
+    assert_equal 66, user.auth_source_id
+    assert user.hashed_password.blank?
+  end
+  
+  def test_login_and_logout_should_clear_session
+    get '/login'
+    sid = session.session_id
+    
+    post '/login', :username => 'admin', :password => 'admin'
+    assert_redirected_to 'my/page'
+    assert_not_equal sid, session.session_id, "login should reset session"
+    assert_equal 1, session[:user_id]
+    sid = session.session_id
+    
+    get '/'
+    assert_equal sid, session.session_id
+      
+    get '/logout'
+    assert_not_equal sid, session.session_id, "logout should reset session"
+    assert_nil session[:user_id]
+  end
+  
+  else
+    puts 'Mocha is missing. Skipping tests.'
   end
 end

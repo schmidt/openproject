@@ -48,6 +48,7 @@ general_text_no: 'nem'
 general_text_yes: 'igen'
 general_lang_name: 'Magyar'
 general_csv_separator: ','
+general_csv_decimal_separator: '.'
 general_csv_encoding: ISO-8859-2
 general_pdf_encoding: ISO-8859-2
 general_day_names: Hétfő,Kedd,Szerda,Csütörtök,Péntek,Szombat,Vasárnap
@@ -355,7 +356,7 @@ label_last_changes: utolsó %d változás
 label_change_view_all: Minden változás megtekintése
 label_personalize_page: Az oldal testreszabása
 label_comment: Megjegyzés
-label_comment_plural: Megjegyzések
+label_comment_plural: Megjegyzés
 label_comment_add: Megjegyzés hozzáadása
 label_comment_added: Megjegyzés hozzáadva
 label_comment_delete: Megjegyzések törlése
@@ -406,7 +407,7 @@ label_sort_higher: Eggyel feljebb
 label_sort_lower: Eggyel lejjebb
 label_sort_lowest: Az aljára
 label_roadmap: Életút
-label_roadmap_due_in: Elkészültéig várhatóan még 
+label_roadmap_due_in: Elkészültéig várhatóan még %s
 label_roadmap_overdue: %s késésben
 label_roadmap_no_issues: Nincsenek feladatok ehhez a verzióhoz
 label_search: Keresés
@@ -624,3 +625,78 @@ mail_body_reminder: "%d neked kiosztott feladat határidős az elkövetkező %d 
 mail_subject_reminder: "%d feladat határidős az elkövetkező napokban"
 text_user_wrote: '%s írta:'
 label_duplicated_by: duplikálta
+setting_enabled_scm: Forráskódkezelő (SCM) engedélyezése
+text_enumeration_category_reassign_to: 'Újra hozzárendelés ehhez:'
+text_enumeration_destroy_question: '%d objektum van hozzárendelve ehhez az értékhez.'
+label_incoming_emails: Beérkezett levelek
+label_generate_key: Kulcs generálása
+setting_mail_handler_api_enabled: Web Service engedélyezése a beérkezett levelekhez
+setting_mail_handler_api_key: API kulcs
+text_email_delivery_not_configured: "Az E-mail küldés nincs konfigurálva, és az értesítések ki vannak kapcsolva.\nÁllítsd be az SMTP szervert a config/email.yml fájlban és indítsd újra az alkalmazást, hogy érvénybe lépjen."
+field_parent_title: Szülő oldal
+label_issue_watchers: Megfigyelők
+setting_commit_logs_encoding: Commit üzenetek kódlapja
+button_quote: Idézet
+setting_sequential_project_identifiers: Szekvenciális projekt azonosítók generálása
+notice_unable_delete_version: A verziót nem lehet törölni
+label_renamed: átnevezve
+label_copied: lemásolva
+setting_plain_text_mail: csak szöveg (nem HTML)
+permission_view_files: Fájlok megtekintése
+permission_edit_issues: Feladatok szerkesztése
+permission_edit_own_time_entries: Saját időnapló szerkesztése
+permission_manage_public_queries: Nyilvános kérések kezelése
+permission_add_issues: Feladat felvétele
+permission_log_time: Idő rögzítése
+permission_view_changesets: Változáskötegek megtekintése
+permission_view_time_entries: Időrögzítések megtekintése
+permission_manage_versions: Verziók kezelése
+permission_manage_wiki: Wiki kezelése
+permission_manage_categories: Feladat kategóriák kezelése
+permission_protect_wiki_pages: Wiki oldalak védelme
+permission_comment_news: Hírek kommentelése
+permission_delete_messages: Üzenetek törlése
+permission_select_project_modules: Projekt modulok kezelése
+permission_manage_documents: Dokumentumok kezelése
+permission_edit_wiki_pages: Wiki oldalak szerkesztése
+permission_add_issue_watchers: Megfigyelők felvétele
+permission_view_gantt: Gannt diagramm megtekintése
+permission_move_issues: Feladatok mozgatása
+permission_manage_issue_relations: Feladat kapcsolatok kezelése
+permission_delete_wiki_pages: Wiki oldalak törlése
+permission_manage_boards: Fórumok kezelése
+permission_delete_wiki_pages_attachments: Csatolmányok törlése
+permission_view_wiki_edits: Wiki történet megtekintése
+permission_add_messages: Üzenet beküldése
+permission_view_messages: Üzenetek megtekintése
+permission_manage_files: Fájlok kezelése
+permission_edit_issue_notes: Jegyzetek szerkesztése
+permission_manage_news: Hírek kezelése
+permission_view_calendar: Naptár megtekintése
+permission_manage_members: Tagok kezelése
+permission_edit_messages: Üzenetek szerkesztése
+permission_delete_issues: Feladatok törlése
+permission_view_issue_watchers: Megfigyelők listázása
+permission_manage_repository: Tárolók kezelése
+permission_commit_access: Commit hozzáférés
+permission_browse_repository: Tároló böngészése
+permission_view_documents: Dokumetumok megtekintése
+permission_edit_project: Projekt szerkesztése
+permission_add_issue_notes: Jegyzet rögzítése
+permission_save_queries: Kérések mentése
+permission_view_wiki_pages: Wiki megtekintése
+permission_rename_wiki_pages: Wiki oldalak átnevezése
+permission_edit_time_entries: Időnaplók szerkesztése
+permission_edit_own_issue_notes: Saját jegyzetek szerkesztése
+setting_gravatar_enabled: Felhasználói fényképek engedélyezése
+label_example: Példa
+text_repository_usernames_mapping: "Állítsd be a felhasználó összerendeléseket a Redmine, és a tároló logban található felhasználók között.\nAz azonos felhasználó nevek összerendelése automatikusan megtörténik."
+permission_edit_own_messages: Saját üzenetek szerkesztése
+permission_delete_own_messages: Saját üzenetek törlése
+label_user_activity: "%s tevékenységei"
+label_updated_time_by: "Módosította %s ennyivel ezelőtt: %s"
+text_diff_truncated: '... A diff fájl vége nem jelenik meg, mert hosszab, mint a megjeleníthető sorok száma.'
+setting_diff_max_lines_displayed: A megjelenítendő sorok száma (maximum) a diff fájloknál
+text_plugin_assets_writable: Plugin assets directory writable
+warning_attachments_not_saved: "%d file(s) could not be saved."
+button_create_and_continue: Create and continue

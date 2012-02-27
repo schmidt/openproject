@@ -18,8 +18,22 @@
 require File.dirname(__FILE__) + '/../test_helper'
 
 class AttachmentTest < Test::Unit::TestCase
-
+  fixtures :issues, :users
+  
   def setup
+  end
+
+  def test_create
+    a = Attachment.new(:container => Issue.find(1),
+                       :file => test_uploaded_file("testfile.txt", "text/plain"),
+                       :author => User.find(1))
+    assert a.save
+    assert_equal 'testfile.txt', a.filename
+    assert_equal 59, a.filesize
+    assert_equal 'text/plain', a.content_type
+    assert_equal 0, a.downloads
+    assert_equal Digest::MD5.hexdigest(test_uploaded_file("testfile.txt", "text/plain").read), a.digest
+    assert File.exist?(a.diskfile)
   end
   
   def test_diskfilename

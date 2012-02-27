@@ -26,7 +26,21 @@ class Attachment < ActiveRecord::Base
   validates_length_of :disk_filename, :maximum => 255
 
   acts_as_event :title => :filename,
-                :url => Proc.new {|o| {:controller => 'attachments', :action => 'download', :id => o.id}}
+                :url => Proc.new {|o| {:controller => 'attachments', :action => 'download', :id => o.id, :filename => o.filename}}
+
+  acts_as_activity_provider :type => 'files',
+                            :permission => :view_files,
+                            :author_key => :author_id,
+                            :find_options => {:select => "#{Attachment.table_name}.*", 
+                                              :joins => "LEFT JOIN #{Version.table_name} ON #{Attachment.table_name}.container_type='Version' AND #{Version.table_name}.id = #{Attachment.table_name}.container_id " +
+                                                        "LEFT JOIN #{Project.table_name} ON #{Version.table_name}.project_id = #{Project.table_name}.id OR ( #{Attachment.table_name}.container_type='Project' AND #{Attachment.table_name}.container_id = #{Project.table_name}.id )"}
+  
+  acts_as_activity_provider :type => 'documents',
+                            :permission => :view_documents,
+                            :author_key => :author_id,
+                            :find_options => {:select => "#{Attachment.table_name}.*", 
+                                              :joins => "LEFT JOIN #{Document.table_name} ON #{Attachment.table_name}.container_type='Document' AND #{Document.table_name}.id = #{Attachment.table_name}.container_id " +
+                                                        "LEFT JOIN #{Project.table_name} ON #{Document.table_name}.project_id = #{Project.table_name}.id"}
 
   cattr_accessor :storage_path
   @@storage_path = "#{RAILS_ROOT}/files"
@@ -51,14 +65,20 @@ class Attachment < ActiveRecord::Base
     nil
   end
 
-  # Copy temp file to its final location
+  # Copies the temporary file to its final location
+  # and computes its MD5 hash
   def before_save
     if @temp_file && (@temp_file.size > 0)
       logger.debug("saving '#{self.diskfile}'")
+      md5 = Digest::MD5.new
       File.open(diskfile, "wb") do |f| 
-        f.write(@temp_file.read)
+        buffer = ""
+        while (buffer = @temp_file.read(8192))
+          f.write(buffer)
+          md5.update(buffer)
+        end
       end
-      self.digest = Digest::MD5.hexdigest(File.read(diskfile))
+      self.digest = md5.hexdigest
     end
     # Don't save the content type if it's longer than the authorized length
     if self.content_type && self.content_type.length > 255
@@ -68,9 +88,7 @@ class Attachment < ActiveRecord::Base
 
   # Deletes file on the disk
   def after_destroy
-    if self.filename?
-      File.delete(diskfile) if File.exist?(diskfile)
-    end
+    File.delete(diskfile) if !filename.blank? && File.exist?(diskfile)
   end
 
   # Returns file's location on disk
@@ -86,8 +104,24 @@ class Attachment < ActiveRecord::Base
     container.project
   end
   
+  def visible?(user=User.current)
+    container.attachments_visible?(user)
+  end
+  
+  def deletable?(user=User.current)
+    container.attachments_deletable?(user)
+  end
+  
   def image?
     self.filename =~ /\.(jpe?g|gif|png)$/i
+  end
+  
+  def is_text?
+    Redmine::MimeType.is_type?('text', filename)
+  end
+  
+  def is_diff?
+    self.filename =~ /\.(patch|diff)$/i
   end
   
 private

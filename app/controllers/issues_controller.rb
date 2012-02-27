@@ -1,5 +1,5 @@
-# redMine - project management software
-# Copyright (C) 2006-2007  Jean-Philippe Lang
+# Redmine - project management software
+# Copyright (C) 2006-2008  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,23 +16,20 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class IssuesController < ApplicationController
-  layout 'base'
   menu_item :new_issue, :only => :new
   
-  before_filter :find_issue, :only => [:show, :edit, :destroy_attachment]
+  before_filter :find_issue, :only => [:show, :edit, :reply]
   before_filter :find_issues, :only => [:bulk_edit, :move, :destroy]
   before_filter :find_project, :only => [:new, :update_form, :preview]
-  before_filter :authorize, :except => [:index, :changes, :preview, :update_form, :context_menu]
-  before_filter :find_optional_project, :only => [:index, :changes]
-  accept_key_auth :index, :changes
+  before_filter :authorize, :except => [:index, :changes, :gantt, :calendar, :preview, :update_form, :context_menu]
+  before_filter :find_optional_project, :only => [:index, :changes, :gantt, :calendar]
+  accept_key_auth :index, :show, :changes
 
   helper :journals
   helper :projects
   include ProjectsHelper   
   helper :custom_fields
   include CustomFieldsHelper
-  helper :ifpdf
-  include IfpdfHelper
   helper :issue_relations
   include IssueRelationsHelper
   helper :watchers
@@ -43,7 +40,13 @@ class IssuesController < ApplicationController
   helper :sort
   include SortHelper
   include IssuesHelper
+  helper :timelog
+  include Redmine::Export::PDF
 
+  verify :method => :post,
+         :only => :destroy,
+         :render => { :nothing => true, :status => :method_not_allowed }
+           
   def index
     retrieve_query
     sort_init 'id', 'desc'
@@ -66,9 +69,9 @@ class IssuesController < ApplicationController
                            :offset =>  @issue_pages.current.offset
       respond_to do |format|
         format.html { render :template => 'issues/index.rhtml', :layout => !request.xhr? }
-        format.atom { render_feed(@issues, :title => l(:label_issue_plural)) }
+        format.atom { render_feed(@issues, :title => "#{@project || Setting.app_title}: #{l(:label_issue_plural)}") }
         format.csv  { send_data(issues_to_csv(@issues, @project).read, :type => 'text/csv; header=present', :filename => 'export.csv') }
-        format.pdf  { send_data(render(:template => 'issues/index.rfpdf', :layout => false), :type => 'application/pdf', :filename => 'export.pdf') }
+        format.pdf  { send_data(issues_to_pdf(@issues, @project), :type => 'application/pdf', :filename => 'export.pdf') }
       end
     else
       # Send html if the query is not valid
@@ -96,34 +99,38 @@ class IssuesController < ApplicationController
   end
   
   def show
-    @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| @issue.custom_values.find_by_custom_field_id(x.id) || CustomValue.new(:custom_field => x, :customized => @issue) }
     @journals = @issue.journals.find(:all, :include => [:user, :details], :order => "#{Journal.table_name}.created_on ASC")
     @journals.each_with_index {|j,i| j.indice = i+1}
     @journals.reverse! if User.current.wants_comments_in_reverse_order?
     @allowed_statuses = @issue.new_statuses_allowed_to(User.current)
     @edit_allowed = User.current.allowed_to?(:edit_issues, @project)
-    @activities = Enumeration::get_values('ACTI')
     @priorities = Enumeration::get_values('IPRI')
     @time_entry = TimeEntry.new
     respond_to do |format|
       format.html { render :template => 'issues/show.rhtml' }
       format.atom { render :action => 'changes', :layout => false, :content_type => 'application/atom+xml' }
-      format.pdf  { send_data(render(:template => 'issues/show.rfpdf', :layout => false), :type => 'application/pdf', :filename => "#{@project.identifier}-#{@issue.id}.pdf") }
+      format.pdf  { send_data(issue_to_pdf(@issue), :type => 'application/pdf', :filename => "#{@project.identifier}-#{@issue.id}.pdf") }
     end
   end
 
   # Add a new issue
   # The new issue will be created from an existing one if copy_from parameter is given
   def new
-    @issue = params[:copy_from] ? Issue.new.copy_from(params[:copy_from]) : Issue.new(params[:issue])
+    @issue = Issue.new
+    @issue.copy_from(params[:copy_from]) if params[:copy_from]
     @issue.project = @project
-    @issue.author = User.current
-    @issue.tracker ||= @project.trackers.find(params[:tracker_id] ? params[:tracker_id] : :first)
+    # Tracker must be set before custom field values
+    @issue.tracker ||= @project.trackers.find((params[:issue] && params[:issue][:tracker_id]) || params[:tracker_id] || :first)
     if @issue.tracker.nil?
       flash.now[:error] = 'No tracker is associated to this project. Please check the Project settings.'
       render :nothing => true, :layout => true
       return
     end
+    if params[:issue].is_a?(Hash)
+      @issue.attributes = params[:issue]
+      @issue.watcher_user_ids = params[:issue]['watcher_user_ids'] if User.current.allowed_to?(:add_issue_watchers, @project)
+    end
+    @issue.author = User.current
     
     default_status = IssueStatus.default
     unless default_status
@@ -136,22 +143,17 @@ class IssuesController < ApplicationController
     
     if request.get? || request.xhr?
       @issue.start_date ||= Date.today
-      @custom_values = @issue.custom_values.empty? ?
-        @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, :customized => @issue) } :
-        @issue.custom_values
     else
-      requested_status = (params[:issue] && params[:issue][:status_id] ? IssueStatus.find_by_id(params[:issue][:status_id]) : default_status)
+      requested_status = IssueStatus.find_by_id(params[:issue][:status_id])
       # Check that the user is allowed to apply the requested status
       @issue.status = (@allowed_statuses.include? requested_status) ? requested_status : default_status
-      @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, 
-                                                                                                       :customized => @issue,
-                                                                                                       :value => (params[:custom_fields] ? params[:custom_fields][x.id.to_s] : nil)) }
-      @issue.custom_values = @custom_values
       if @issue.save
         attach_files(@issue, params[:attachments])
         flash[:notice] = l(:notice_successful_create)
         Mailer.deliver_issue_add(@issue) if Setting.notified_events.include?('issue_added')
-        redirect_to :controller => 'issues', :action => 'show', :id => @issue
+        call_hook(:controller_issues_new_after_save, { :params => params, :issue => @issue})
+        redirect_to(params[:continue] ? { :action => 'new', :tracker_id => @issue.tracker } :
+                                        { :action => 'show', :id => @issue })
         return
       end		
     end	
@@ -165,10 +167,9 @@ class IssuesController < ApplicationController
   
   def edit
     @allowed_statuses = @issue.new_statuses_allowed_to(User.current)
-    @activities = Enumeration::get_values('ACTI')
     @priorities = Enumeration::get_values('IPRI')
-    @custom_values = []
     @edit_allowed = User.current.allowed_to?(:edit_issues, @project)
+    @time_entry = TimeEntry.new
     
     @notes = params[:notes]
     journal = @issue.init_journal(User.current, @notes)
@@ -180,21 +181,17 @@ class IssuesController < ApplicationController
       @issue.attributes = attrs
     end
 
-    if request.get?
-      @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| @issue.custom_values.find_by_custom_field_id(x.id) || CustomValue.new(:custom_field => x, :customized => @issue) }
-    else
-      # Update custom fields if user has :edit permission
-      if @edit_allowed && params[:custom_fields]
-        @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, :customized => @issue, :value => params["custom_fields"][x.id.to_s]) }
-        @issue.custom_values = @custom_values
-      end
+    if request.post?
       @time_entry = TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => Date.today)
       @time_entry.attributes = params[:time_entry]
       attachments = attach_files(@issue, params[:attachments])
       attachments.each {|a| journal.details << JournalDetail.new(:property => 'attachment', :prop_key => a.id, :value => a.filename)}
-      if @issue.save
+      
+      call_hook(:controller_issues_edit_before_save, { :params => params, :issue => @issue, :time_entry => @time_entry, :journal => journal})
+
+      if (@time_entry.hours.nil? || @time_entry.valid?) && @issue.save
         # Log spend time
-        if current_role.allowed_to?(:log_time)
+        if User.current.allowed_to?(:log_time, @project)
           @time_entry.save
         end
         if !journal.new_record?
@@ -202,6 +199,7 @@ class IssuesController < ApplicationController
           flash[:notice] = l(:notice_successful_update)
           Mailer.deliver_issue_edit(journal) if Setting.notified_events.include?('issue_updated')
         end
+        call_hook(:controller_issues_edit_after_save, { :params => params, :issue => @issue, :time_entry => @time_entry, :journal => journal})
         redirect_to(params[:back_to] || {:action => 'show', :id => @issue})
       end
     end
@@ -210,6 +208,26 @@ class IssuesController < ApplicationController
     flash.now[:error] = l(:notice_locking_conflict)
   end
 
+  def reply
+    journal = Journal.find(params[:journal_id]) if params[:journal_id]
+    if journal
+      user = journal.user
+      text = journal.notes
+    else
+      user = @issue.author
+      text = @issue.description
+    end
+    content = "#{ll(Setting.default_language, :text_user_wrote, user)}\\n> "
+    content << text.to_s.strip.gsub(%r{<pre>((.|\s)*?)</pre>}m, '[...]').gsub('"', '\"').gsub(/(\r?\n|\r\n?)/, "\\n> ") + "\\n\\n"
+    render(:update) { |page|
+      page.<< "$('notes').value = \"#{content}\";"
+      page.show 'update'
+      page << "Form.Element.focus('notes');"
+      page << "Element.scrollTo('update');"
+      page << "$('notes').scrollTop = $('notes').scrollHeight - $('notes').clientHeight;"
+    }
+  end
+  
   # Bulk edit a set of issues
   def bulk_edit
     if request.post?
@@ -229,6 +247,7 @@ class IssuesController < ApplicationController
         issue.start_date = params[:start_date] unless params[:start_date].blank?
         issue.due_date = params[:due_date] unless params[:due_date].blank?
         issue.done_ratio = params[:done_ratio] unless params[:done_ratio].blank?
+        call_hook(:controller_issues_bulk_edit_before_save, { :params => params, :issue => issue })
         # Don't save any change to the issue if the user is not authorized to apply the requested status
         if (status.nil? || (issue.status.new_status_allowed_to?(status, current_role, issue.tracker) && issue.status = status)) && issue.save
           # Send notification for each issue (if changed)
@@ -243,12 +262,12 @@ class IssuesController < ApplicationController
       else
         flash[:error] = l(:notice_failed_to_save_issues, unsaved_issue_ids.size, @issues.size, '#' + unsaved_issue_ids.join(', #'))
       end
-      redirect_to :controller => 'issues', :action => 'index', :project_id => @project
+      redirect_to(params[:back_to] || {:controller => 'issues', :action => 'index', :project_id => @project})
       return
     end
     # Find potential statuses the user could be allowed to switch issues to
     @available_statuses = Workflow.find(:all, :include => :new_status,
-                                              :conditions => {:role_id => current_role.id}).collect(&:new_status).compact.uniq
+                                              :conditions => {:role_id => current_role.id}).collect(&:new_status).compact.uniq.sort
   end
 
   def move
@@ -267,6 +286,7 @@ class IssuesController < ApplicationController
       new_tracker = params[:new_tracker_id].blank? ? nil : @target_project.trackers.find_by_id(params[:new_tracker_id])
       unsaved_issue_ids = []
       @issues.each do |issue|
+        issue.init_journal(User.current)
         unsaved_issue_ids << issue.id unless issue.move_to(@target_project, new_tracker)
       end
       if unsaved_issue_ids.empty?
@@ -304,16 +324,65 @@ class IssuesController < ApplicationController
     @issues.each(&:destroy)
     redirect_to :action => 'index', :project_id => @project
   end
-
-  def destroy_attachment
-    a = @issue.attachments.find(params[:attachment_id])
-    a.destroy
-    journal = @issue.init_journal(User.current)
-    journal.details << JournalDetail.new(:property => 'attachment',
-                                         :prop_key => a.id,
-                                         :old_value => a.filename)
-    journal.save
-    redirect_to :action => 'show', :id => @issue
+  
+  def gantt
+    @gantt = Redmine::Helpers::Gantt.new(params)
+    retrieve_query
+    if @query.valid?
+      events = []
+      # Issues that have start and due dates
+      events += Issue.find(:all, 
+                           :order => "start_date, due_date",
+                           :include => [:tracker, :status, :assigned_to, :priority, :project], 
+                           :conditions => ["(#{@query.statement}) AND (((start_date>=? and start_date<=?) or (due_date>=? and due_date<=?) or (start_date<? and due_date>?)) and start_date is not null and due_date is not null)", @gantt.date_from, @gantt.date_to, @gantt.date_from, @gantt.date_to, @gantt.date_from, @gantt.date_to]
+                           )
+      # Issues that don't have a due date but that are assigned to a version with a date
+      events += Issue.find(:all, 
+                           :order => "start_date, effective_date",
+                           :include => [:tracker, :status, :assigned_to, :priority, :project, :fixed_version], 
+                           :conditions => ["(#{@query.statement}) AND (((start_date>=? and start_date<=?) or (effective_date>=? and effective_date<=?) or (start_date<? and effective_date>?)) and start_date is not null and due_date is null and effective_date is not null)", @gantt.date_from, @gantt.date_to, @gantt.date_from, @gantt.date_to, @gantt.date_from, @gantt.date_to]
+                           )
+      # Versions
+      events += Version.find(:all, :include => :project,
+                                   :conditions => ["(#{@query.project_statement}) AND effective_date BETWEEN ? AND ?", @gantt.date_from, @gantt.date_to])
+                                   
+      @gantt.events = events
+    end
+    
+    basename = (@project ? "#{@project.identifier}-" : '') + 'gantt'
+    
+    respond_to do |format|
+      format.html { render :template => "issues/gantt.rhtml", :layout => !request.xhr? }
+      format.png  { send_data(@gantt.to_image, :disposition => 'inline', :type => 'image/png', :filename => "#{basename}.png") } if @gantt.respond_to?('to_image')
+      format.pdf  { send_data(gantt_to_pdf(@gantt, @project), :type => 'application/pdf', :filename => "#{basename}.pdf") }
+    end
+  end
+  
+  def calendar
+    if params[:year] and params[:year].to_i > 1900
+      @year = params[:year].to_i
+      if params[:month] and params[:month].to_i > 0 and params[:month].to_i < 13
+        @month = params[:month].to_i
+      end    
+    end
+    @year ||= Date.today.year
+    @month ||= Date.today.month
+    
+    @calendar = Redmine::Helpers::Calendar.new(Date.civil(@year, @month, 1), current_language, :month)
+    retrieve_query
+    if @query.valid?
+      events = []
+      events += Issue.find(:all, 
+                           :include => [:tracker, :status, :assigned_to, :priority, :project], 
+                           :conditions => ["(#{@query.statement}) AND ((start_date BETWEEN ? AND ?) OR (due_date BETWEEN ? AND ?))", @calendar.startdt, @calendar.enddt, @calendar.startdt, @calendar.enddt]
+                           )
+      events += Version.find(:all, :include => :project,
+                                   :conditions => ["(#{@query.project_statement}) AND effective_date BETWEEN ? AND ?", @calendar.startdt, @calendar.enddt])
+                                     
+      @calendar.events = events
+    end
+    
+    render :layout => false if request.xhr?
   end
   
   def context_menu
@@ -321,19 +390,22 @@ class IssuesController < ApplicationController
     if (@issues.size == 1)
       @issue = @issues.first
       @allowed_statuses = @issue.new_statuses_allowed_to(User.current)
-      @assignables = @issue.assignable_users
-      @assignables << @issue.assigned_to if @issue.assigned_to && !@assignables.include?(@issue.assigned_to)
     end
     projects = @issues.collect(&:project).compact.uniq
     @project = projects.first if projects.size == 1
 
     @can = {:edit => (@project && User.current.allowed_to?(:edit_issues, @project)),
-            :update => (@issue && (User.current.allowed_to?(:edit_issues, @project) || (User.current.allowed_to?(:change_status, @project) && !@allowed_statuses.empty?))),
+            :log_time => (@project && User.current.allowed_to?(:log_time, @project)),
+            :update => (@project && (User.current.allowed_to?(:edit_issues, @project) || (User.current.allowed_to?(:change_status, @project) && @allowed_statuses && !@allowed_statuses.empty?))),
             :move => (@project && User.current.allowed_to?(:move_issues, @project)),
             :copy => (@issue && @project.trackers.include?(@issue.tracker) && User.current.allowed_to?(:add_issues, @project)),
             :delete => (@project && User.current.allowed_to?(:delete_issues, @project))
             }
-
+    if @project
+      @assignables = @project.assignable_users
+      @assignables << @issue.assigned_to if @issue && @issue.assigned_to && !@assignables.include?(@issue.assigned_to)
+    end
+    
     @priorities = Enumeration.get_values('IPRI').reverse
     @statuses = IssueStatus.find(:all, :order => 'position')
     @back = request.env['HTTP_REFERER']
@@ -383,9 +455,9 @@ private
   end
   
   def find_optional_project
-    return true unless params[:project_id]
-    @project = Project.find(params[:project_id])
-    authorize
+    @project = Project.find(params[:project_id]) unless params[:project_id].blank?
+    allowed = User.current.allowed_to?({:controller => params[:controller], :action => params[:action]}, @project, :global => true)
+    allowed ? true : deny_access
   rescue ActiveRecord::RecordNotFound
     render_404
   end

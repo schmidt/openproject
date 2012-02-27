@@ -57,6 +57,12 @@ class UserTest < Test::Unit::TestCase
     assert_equal "john", @admin.login
   end
   
+  def test_destroy
+    User.find(2).destroy
+    assert_nil User.find_by_id(2)
+    assert Member.find_all_by_user_id(2).empty?
+  end
+  
   def test_validate
     @admin.login = ""
     assert !@admin.save
@@ -79,9 +85,9 @@ class UserTest < Test::Unit::TestCase
   def test_name_format
     assert_equal 'Smith, John', @jsmith.name(:lastname_coma_firstname)
     Setting.user_format = :firstname_lastname
-    assert_equal 'John Smith', @jsmith.name
+    assert_equal 'John Smith', @jsmith.reload.name
     Setting.user_format = :username
-    assert_equal 'jsmith', @jsmith.name
+    assert_equal 'jsmith', @jsmith.reload.name
   end
   
   def test_lock
@@ -151,5 +157,11 @@ class UserTest < Test::Unit::TestCase
     assert !@jsmith.wants_comments_in_reverse_order?
     @jsmith.pref.comments_sorting = 'desc'
     assert @jsmith.wants_comments_in_reverse_order?
+  end
+  
+  def test_find_by_mail_should_be_case_insensitive
+    u = User.find_by_mail('JSmith@somenet.foo')
+    assert_not_nil u
+    assert_equal 'jsmith@somenet.foo', u.mail
   end
 end

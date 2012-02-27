@@ -37,13 +37,41 @@ class AccountControllerTest < Test::Unit::TestCase
     assert_template 'show'
     assert_not_nil assigns(:user)
   end
+
+  def test_show_should_not_fail_when_custom_values_are_nil
+    user = User.find(2)
+
+    # Create a custom field to illustrate the issue
+    custom_field = CustomField.create!(:name => 'Testing', :field_format => 'text')
+    custom_value = user.custom_values.build(:custom_field => custom_field).save!
+
+    get :show, :id => 2
+    assert_response :success
+  end
   
+
   def test_show_inactive
     get :show, :id => 5
     assert_response 404
     assert_nil assigns(:user)
   end
   
+  def test_show_should_not_reveal_users_with_no_visible_activity_or_project
+    get :show, :id => 9
+    assert_response 404
+  end
+  
+  def test_login_should_redirect_to_back_url_param
+    # request.uri is "test.host" in test environment
+    post :login, :username => 'jsmith', :password => 'jsmith', :back_url => 'http%3A%2F%2Ftest.host%2Fissues%2Fshow%2F1'
+    assert_redirected_to '/issues/show/1'
+  end
+  
+  def test_login_should_not_redirect_to_another_host
+    post :login, :username => 'jsmith', :password => 'jsmith', :back_url => 'http%3A%2F%2Ftest.foo%2Ffake'
+    assert_redirected_to '/my/page'
+  end
+
   def test_login_with_wrong_password
     post :login, :username => 'admin', :password => 'bad'
     assert_response :success
