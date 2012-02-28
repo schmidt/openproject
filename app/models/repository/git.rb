@@ -29,6 +29,16 @@ class Repository::Git < Repository
     'Git'
   end
 
+  # Returns the identifier for the given git changeset
+  def self.changeset_identifier(changeset)
+    changeset.scmid
+  end
+
+  # Returns the readable identifier for the given git changeset
+  def self.format_changeset_identifier(changeset)
+    changeset.revision[0, 8]
+  end
+
   def branches
     scm.branches
   end
@@ -37,12 +47,31 @@ class Repository::Git < Repository
     scm.tags
   end
 
+  # In Git and Mercurial, revisions are not in date order.
+  # Mercurial fixed issues.
+  #    * Redmine Takes Too Long On Large Mercurial Repository
+  #      http://www.redmine.org/issues/3449
+  #    * Sorting for changesets might go wrong on Mercurial repos 
+  #      http://www.redmine.org/issues/3567
+  # Database revision column is text, so Redmine can not sort by revision.
+  # Mercurial has revision number, and revision number guarantees revision order.
+  # Mercurial adapter uses "hg log -r 0:tip --limit 10"
+  # to get limited revisions from old to new.
+  # And Mercurial model stored revisions ordered by database id in database.
+  # So, Mercurial can use correct order revisions.
+  #
+  # But, Git 1.7.3.4 does not support --reverse with -n or --skip.
+  #
   # With SCM's that have a sequential commit numbering, redmine is able to be
   # clever and only fetch changesets going forward from the most recent one
-  # it knows about.  However, with git, you never know if people have merged
+  # it knows about.
+  # However, with git, you never know if people have merged
   # commits into the middle of the repository history, so we should parse
-  # the entire log. Since it's way too slow for large repositories, we only
-  # parse 1 week before the last known commit.
+  # the entire log.
+  #
+  # Since it's way too slow for large repositories,
+  # we only parse 1 week before the last known commit.
+  #
   # The repository can still be fully reloaded by calling #clear_changesets
   # before fetching changesets (eg. for offline resync)
   def fetch_changesets

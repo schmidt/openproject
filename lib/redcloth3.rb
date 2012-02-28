@@ -456,7 +456,7 @@ class RedCloth3 < String
         #    next if tog and method( tog ).call
         #    text.gsub! re, resub
         #end
-        text.gsub!(/\b([A-Z][A-Z0-9]{2,})\b(?:[(]([^)]*)[)])/) do |m|
+        text.gsub!(/\b([A-Z][A-Z0-9]{1,})\b(?:[(]([^)]*)[)])/) do |m|
           "<acronym title=\"#{htmlesc $2}\">#{$1}</acronym>"
         end
     end
@@ -707,11 +707,13 @@ class RedCloth3 < String
             atts = pba( atts )
 
             # pass to prefix handler
+            replacement = nil
             if respond_to? "textile_#{ tag }", true
-                text.gsub!( $&, method( "textile_#{ tag }" ).call( tag, atts, cite, content ) )
+              replacement = method( "textile_#{ tag }" ).call( tag, atts, cite, content )
             elsif respond_to? "textile_#{ tagpre }_", true
-                text.gsub!( $&, method( "textile_#{ tagpre }_" ).call( tagpre, num, atts, cite, content ) )
+              replacement = method( "textile_#{ tagpre }_" ).call( tagpre, num, atts, cite, content )  
             end
+            text.gsub!( $& ) { replacement } if replacement
         end
     end
     

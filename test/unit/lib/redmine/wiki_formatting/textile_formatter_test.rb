@@ -15,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require File.dirname(__FILE__) + '/../../../../test_helper'
+require File.expand_path('../../../../../test_helper', __FILE__)
 
 class Redmine::WikiFormatting::TextileFormatterTest < HelperTestCase
 
@@ -64,11 +64,17 @@ class Redmine::WikiFormatting::TextileFormatterTest < HelperTestCase
       '@<Location /redmine>@'    => '<code>&lt;Location /redmine&gt;</code>'
     )
   end
-  
+
   def test_escaping
     assert_html_output(
       'this is a <script>'      => 'this is a &lt;script&gt;'
     )
+  end
+
+  def test_use_of_backslashes_followed_by_numbers_in_headers
+    assert_html_output({
+      'h1. 2009\02\09'      => '<h1>2009\02\09</h1>'
+    }, false)
   end
   
   def test_double_dashes_should_not_strikethrough
@@ -78,11 +84,19 @@ class Redmine::WikiFormatting::TextileFormatterTest < HelperTestCase
     )
   end
   
+  def test_acronyms
+    assert_html_output(
+      'this is an acronym: GPL(General Public License)' => 'this is an acronym: <acronym title="General Public License">GPL</acronym>',
+      '2 letters JP(Jean-Philippe) acronym' => '2 letters <acronym title="Jean-Philippe">JP</acronym> acronym',
+      'GPL(This is a double-quoted "title")' => '<acronym title="This is a double-quoted &quot;title&quot;">GPL</acronym>'
+    )
+  end
+  
   private
   
-  def assert_html_output(to_test)
+  def assert_html_output(to_test, expect_paragraph = true)
     to_test.each do |text, expected|
-      assert_equal "<p>#{expected}</p>", @formatter.new(text).to_html, "Formatting the following text failed:\n===\n#{text}\n===\n"
+      assert_equal(( expect_paragraph ? "<p>#{expected}</p>" : expected ), @formatter.new(text).to_html, "Formatting the following text failed:\n===\n#{text}\n===\n")
     end
   end
 end

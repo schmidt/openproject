@@ -15,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require File.dirname(__FILE__) + '/../test_helper'
+require File.expand_path('../../test_helper', __FILE__)
 
 class MailerTest < ActiveSupport::TestCase
   include Redmine::I18n
@@ -26,6 +26,7 @@ class MailerTest < ActiveSupport::TestCase
     ActionMailer::Base.deliveries.clear
     Setting.host_name = 'mydomain.foo'
     Setting.protocol = 'http'
+    Setting.plain_text_mail = '0'
   end
   
   def test_generated_links_in_emails
@@ -278,6 +279,9 @@ class MailerTest < ActiveSupport::TestCase
     assert Mailer.deliver_attachments_added(attachements)
     assert_not_nil last_email.bcc
     assert last_email.bcc.any?
+    assert_select_email do
+      assert_select "a[href=?]", "http://mydomain.foo/projects/ecookbook/files"
+    end
   end
   
   def test_project_file_added
@@ -285,6 +289,9 @@ class MailerTest < ActiveSupport::TestCase
     assert Mailer.deliver_attachments_added(attachements)
     assert_not_nil last_email.bcc
     assert last_email.bcc.any?
+    assert_select_email do
+      assert_select "a[href=?]", "http://mydomain.foo/projects/ecookbook/files"
+    end
   end
   
   def test_news_added
@@ -314,7 +321,7 @@ class MailerTest < ActiveSupport::TestCase
       end
     end
   end
-
+  
   def test_wiki_content_updated
     content = WikiContent.find(:first)
     valid_languages.each do |lang|
@@ -413,4 +420,21 @@ class MailerTest < ActiveSupport::TestCase
     # should restore perform_deliveries
     assert ActionMailer::Base.perform_deliveries
   end
+
+  context "layout" do
+    should "include the emails_header" do
+      with_settings(:emails_header => "*Header content*") do
+        assert Mailer.deliver_test(User.find(1))
+
+        assert_select_email do
+          assert_select ".header" do
+            assert_select "strong", :text => "Header content"
+          end
+        end
+      end
+      
+    end
+    
+  end
+  
 end

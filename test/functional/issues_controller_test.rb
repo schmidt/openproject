@@ -15,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require File.dirname(__FILE__) + '/../test_helper'
+require File.expand_path('../../test_helper', __FILE__)
 require 'issues_controller'
 
 # Re-raise errors caught by the controller.
@@ -125,11 +125,42 @@ class IssuesControllerTest < ActionController::TestCase
     assert_tag :tag => 'a', :content => /Issue of a private subproject/
   end
   
-  def test_index_with_project_and_filter
+  def test_index_with_project_and_default_filter
     get :index, :project_id => 1, :set_filter => 1
     assert_response :success
     assert_template 'index.rhtml'
     assert_not_nil assigns(:issues)
+    
+    query = assigns(:query)
+    assert_not_nil query
+    # default filter
+    assert_equal({'status_id' => {:operator => 'o', :values => ['']}}, query.filters)
+  end
+  
+  def test_index_with_project_and_filter
+    get :index, :project_id => 1, :set_filter => 1, 
+      :fields => ['tracker_id'],
+      :operators => {'tracker_id' => '='},
+      :values => {'tracker_id' => ['1']} 
+    assert_response :success
+    assert_template 'index.rhtml'
+    assert_not_nil assigns(:issues)
+    
+    query = assigns(:query)
+    assert_not_nil query
+    assert_equal({'tracker_id' => {:operator => '=', :values => ['1']}}, query.filters)
+  end
+  
+  def test_index_with_project_and_empty_filters
+    get :index, :project_id => 1, :set_filter => 1, :fields => ['']
+    assert_response :success
+    assert_template 'index.rhtml'
+    assert_not_nil assigns(:issues)
+    
+    query = assigns(:query)
+    assert_not_nil query
+    # no filter
+    assert_equal({}, query.filters)
   end
   
   def test_index_with_query
@@ -343,9 +374,7 @@ class IssuesControllerTest < ActionController::TestCase
     
     get :new, :project_id => 1
     assert_response 500
-    assert_not_nil flash[:error]
-    assert_tag :tag => 'div', :attributes => { :class => /error/ },
-                              :content => /No default issue/
+    assert_error_tag :content => /No default issue/
   end
   
   def test_get_new_with_no_tracker_should_display_an_error
@@ -354,9 +383,7 @@ class IssuesControllerTest < ActionController::TestCase
     
     get :new, :project_id => 1
     assert_response 500
-    assert_not_nil flash[:error]
-    assert_tag :tag => 'div', :attributes => { :class => /error/ },
-                              :content => /No tracker/
+    assert_error_tag :content => /No tracker/
   end
   
   def test_update_new_form
@@ -570,7 +597,7 @@ class IssuesControllerTest < ActionController::TestCase
   context "without workflow privilege" do
     setup do
       Workflow.delete_all(["role_id = ?", Role.anonymous.id])
-      Role.anonymous.add_permission! :add_issues
+      Role.anonymous.add_permission! :add_issues, :add_issue_notes
     end
     
     context "#new" do
@@ -595,6 +622,17 @@ class IssuesControllerTest < ActionController::TestCase
         assert_equal IssueStatus.default, issue.status
       end
       
+      should "accept default status" do
+        assert_difference 'Issue.count' do
+          post :create, :project_id => 1, 
+                     :issue => {:tracker_id => 1,
+                                :subject => 'This is an issue',
+                                :status_id => 1}
+        end
+        issue = Issue.last(:order => 'id')
+        assert_equal IssueStatus.default, issue.status
+      end
+      
       should "ignore unauthorized status" do
         assert_difference 'Issue.count' do
           post :create, :project_id => 1, 
@@ -604,6 +642,94 @@ class IssuesControllerTest < ActionController::TestCase
         end
         issue = Issue.last(:order => 'id')
         assert_equal IssueStatus.default, issue.status
+      end
+    end
+    
+    context "#update" do
+      should "ignore status change" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:status_id => 3}
+        end
+        assert_equal 1, Issue.find(1).status_id
+      end
+      
+      should "ignore attributes changes" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:subject => 'changed', :assigned_to_id => 2}
+        end
+        issue = Issue.find(1)
+        assert_equal "Can't print recipes", issue.subject
+        assert_nil issue.assigned_to
+      end
+    end
+  end
+  
+  context "with workflow privilege" do
+    setup do
+      Workflow.delete_all(["role_id = ?", Role.anonymous.id])
+      Workflow.create!(:role => Role.anonymous, :tracker_id => 1, :old_status_id => 1, :new_status_id => 3)
+      Workflow.create!(:role => Role.anonymous, :tracker_id => 1, :old_status_id => 1, :new_status_id => 4)
+      Role.anonymous.add_permission! :add_issues, :add_issue_notes
+    end
+    
+    context "#update" do
+      should "accept authorized status" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:status_id => 3}
+        end
+        assert_equal 3, Issue.find(1).status_id
+      end
+      
+      should "ignore unauthorized status" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:status_id => 2}
+        end
+        assert_equal 1, Issue.find(1).status_id
+      end
+      
+      should "accept authorized attributes changes" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:assigned_to_id => 2}
+        end
+        issue = Issue.find(1)
+        assert_equal 2, issue.assigned_to_id
+      end
+      
+      should "ignore unauthorized attributes changes" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:subject => 'changed'}
+        end
+        issue = Issue.find(1)
+        assert_equal "Can't print recipes", issue.subject
+      end
+    end
+    
+    context "and :edit_issues permission" do
+      setup do
+        Role.anonymous.add_permission! :add_issues, :edit_issues
+      end
+
+      should "accept authorized status" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:status_id => 3}
+        end
+        assert_equal 3, Issue.find(1).status_id
+      end
+      
+      should "ignore unauthorized status" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:status_id => 2}
+        end
+        assert_equal 1, Issue.find(1).status_id
+      end
+      
+      should "accept authorized attributes changes" do
+        assert_difference 'Journal.count' do
+          put :update, :id => 1, :notes => 'just trying', :issue => {:subject => 'changed', :assigned_to_id => 2}
+        end
+        issue = Issue.find(1)
+        assert_equal "changed", issue.subject
+        assert_equal 2, issue.assigned_to_id
       end
     end
   end
@@ -628,7 +754,8 @@ class IssuesControllerTest < ActionController::TestCase
   
   def test_get_edit_with_params
     @request.session[:user_id] = 2
-    get :edit, :id => 1, :issue => { :status_id => 5, :priority_id => 7 }
+    get :edit, :id => 1, :issue => { :status_id => 5, :priority_id => 7 },
+        :time_entry => { :hours => '2.5', :comments => 'test_get_edit_with_params', :activity_id => TimeEntryActivity.first.id }
     assert_response :success
     assert_template 'edit'
     
@@ -646,6 +773,12 @@ class IssuesControllerTest < ActionController::TestCase
                         :child => { :tag => 'option', 
                                     :content => 'Urgent',
                                     :attributes => { :selected => 'selected' } }
+
+    assert_tag :input, :attributes => { :name => 'time_entry[hours]', :value => '2.5' }
+    assert_tag :select, :attributes => { :name => 'time_entry[activity_id]' },
+                        :child => { :tag => 'option',
+                                    :attributes => { :selected => 'selected', :value => TimeEntryActivity.first.id } }
+    assert_tag :input, :attributes => { :name => 'time_entry[comments]', :value => 'test_get_edit_with_params' }
   end
 
   def test_update_edit_form
@@ -950,6 +1083,19 @@ class IssuesControllerTest < ActionController::TestCase
     assert_tag :select, :attributes => {:name => 'issue[custom_field_values][1]'}
   end
 
+  def test_get_bulk_edit_on_different_projects
+    @request.session[:user_id] = 2
+    get :bulk_edit, :ids => [1, 2, 6]
+    assert_response :success
+    assert_template 'bulk_edit'
+    
+    # Project specific custom field, date type
+    field = CustomField.find(9)
+    assert !field.is_for_all?
+    assert !field.project_ids.include?(Issue.find(6).project_id)
+    assert_no_tag :input, :attributes => {:name => 'issue[custom_field_values][9]'}
+  end
+
   def test_bulk_update
     @request.session[:user_id] = 2
     # update issues priority
@@ -969,6 +1115,39 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal 1, journal.details.size
   end
 
+  def test_bulk_update_on_different_projects
+    @request.session[:user_id] = 2
+    # update issues priority
+    post :bulk_update, :ids => [1, 2, 6], :notes => 'Bulk editing',
+                                     :issue => {:priority_id => 7,
+                                                :assigned_to_id => '',
+                                                :custom_field_values => {'2' => ''}}
+    
+    assert_response 302
+    # check that the issues were updated
+    assert_equal [7, 7, 7], Issue.find([1,2,6]).map(&:priority_id)
+    
+    issue = Issue.find(1)
+    journal = issue.journals.find(:first, :order => 'created_on DESC')
+    assert_equal '125', issue.custom_value_for(2).value
+    assert_equal 'Bulk editing', journal.notes
+    assert_equal 1, journal.details.size
+  end
+
+  def test_bulk_update_on_different_projects_without_rights
+    @request.session[:user_id] = 3
+    user = User.find(3)
+    action = { :controller => "issues", :action => "bulk_update" }
+    assert user.allowed_to?(action, Issue.find(1).project)
+    assert ! user.allowed_to?(action, Issue.find(6).project)
+    post :bulk_update, :ids => [1, 6], :notes => 'Bulk should fail',
+                                     :issue => {:priority_id => 7,
+                                                :assigned_to_id => '',
+                                                :custom_field_values => {'2' => ''}}
+    assert_response 403
+    assert_not_equal "Bulk should fail", Journal.last.notes
+  end
+    
   def test_bullk_update_should_send_a_notification
     @request.session[:user_id] = 2
     ActionMailer::Base.deliveries.clear
@@ -1098,6 +1277,25 @@ class IssuesControllerTest < ActionController::TestCase
     assert !(Issue.find_by_id(1) || Issue.find_by_id(3))
     assert_equal 2, TimeEntry.find(1).issue_id
     assert_equal 2, TimeEntry.find(2).issue_id
+  end
+  
+  def test_destroy_issues_from_different_projects
+    @request.session[:user_id] = 2
+    post :destroy, :ids => [1, 2, 6], :todo => 'destroy'
+    assert_redirected_to :controller => 'issues', :action => 'index'
+    assert !(Issue.find_by_id(1) || Issue.find_by_id(2) || Issue.find_by_id(6))
+  end
+  
+  def test_destroy_parent_and_child_issues
+    parent = Issue.generate!(:project_id => 1, :tracker_id => 1)
+    child = Issue.generate!(:project_id => 1, :tracker_id => 1, :parent_issue_id => parent.id)
+    assert child.is_descendant_of?(parent.reload)
+    
+    @request.session[:user_id] = 2
+    assert_difference 'Issue.count', -2 do
+      post :destroy, :ids => [parent.id, child.id], :todo => 'destroy'
+    end
+    assert_response 302
   end
   
   def test_default_search_scope
