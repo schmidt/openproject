@@ -1,5 +1,5 @@
-# redMine - project management software
-# Copyright (C) 2006-2007  Jean-Philippe Lang
+# Redmine - project management software
+# Copyright (C) 2006-2011  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@ require File.expand_path('../../test_helper', __FILE__)
 class MailerTest < ActiveSupport::TestCase
   include Redmine::I18n
   include ActionController::Assertions::SelectorAssertions
-  fixtures :projects, :enabled_modules, :issues, :users, :members, :member_roles, :roles, :documents, :attachments, :news, :tokens, :journals, :journal_details, :changesets, :trackers, :issue_statuses, :enumerations, :messages, :boards, :repositories
+  fixtures :all
   
   def setup
     ActionMailer::Base.deliveries.clear
@@ -302,6 +302,14 @@ class MailerTest < ActiveSupport::TestCase
     end
   end
   
+  def test_news_comment_added
+    comment = Comment.find(2)
+    valid_languages.each do |lang|
+      Setting.default_language = lang.to_s
+      assert Mailer.deliver_news_comment_added(comment)
+    end
+  end
+  
   def test_message_posted
     message = Message.find(:first)
     recipients = ([message.root] + message.root.children).collect {|m| m.author.mail if m.author}
@@ -432,9 +440,6 @@ class MailerTest < ActiveSupport::TestCase
           end
         end
       end
-      
     end
-    
   end
-  
 end

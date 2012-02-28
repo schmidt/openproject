@@ -33,6 +33,7 @@ class Version < ActiveRecord::Base
   validates_inclusion_of :status, :in => VERSION_STATUSES
   validates_inclusion_of :sharing, :in => VERSION_SHARINGS
 
+  named_scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
   named_scope :open, :conditions => {:status => 'open'}
   named_scope :visible, lambda {|*args| { :include => :project,
                                           :conditions => Project.allowed_to_condition(args.first || User.current, :view_issues) } }
@@ -42,6 +43,11 @@ class Version < ActiveRecord::Base
     user.allowed_to?(:view_issues, self.project)
   end
   
+  # Version files have same visibility as project files
+  def attachments_visible?(*args)
+    project.present? && project.attachments_visible?(*args)
+  end
+
   def start_date
     @start_date ||= fixed_issues.minimum('start_date')
   end

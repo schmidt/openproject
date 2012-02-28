@@ -56,26 +56,30 @@ class ContextMenusControllerTest < ActionController::TestCase
     get :issues, :ids => [1, 2]
     assert_response :success
     assert_template 'context_menu'
+    assert_not_nil assigns(:issues)
+    assert_equal [1, 2], assigns(:issues).map(&:id).sort
+                              
+    ids = assigns(:issues).map(&:id).map {|i| "ids%5B%5D=#{i}"}.join('&amp;')
     assert_tag :tag => 'a', :content => 'Edit',
-                            :attributes => { :href => '/issues/bulk_edit?ids%5B%5D=1&amp;ids%5B%5D=2',
+                            :attributes => { :href => "/issues/bulk_edit?#{ids}",
                                              :class => 'icon-edit' }
     assert_tag :tag => 'a', :content => 'Closed',
-                            :attributes => { :href => '/issues/bulk_edit?ids%5B%5D=1&amp;ids%5B%5D=2&amp;issue%5Bstatus_id%5D=5',
+                            :attributes => { :href => "/issues/bulk_edit?#{ids}&amp;issue%5Bstatus_id%5D=5",
                                              :class => '' }
     assert_tag :tag => 'a', :content => 'Immediate',
-                            :attributes => { :href => '/issues/bulk_edit?ids%5B%5D=1&amp;ids%5B%5D=2&amp;issue%5Bpriority_id%5D=8',
+                            :attributes => { :href => "/issues/bulk_edit?#{ids}&amp;issue%5Bpriority_id%5D=8",
                                              :class => '' }
     assert_tag :tag => 'a', :content => 'Dave Lopper',
-                            :attributes => { :href => '/issues/bulk_edit?ids%5B%5D=1&amp;ids%5B%5D=2&amp;issue%5Bassigned_to_id%5D=3',
+                            :attributes => { :href => "/issues/bulk_edit?#{ids}&amp;issue%5Bassigned_to_id%5D=3",
                                              :class => '' }
     assert_tag :tag => 'a', :content => 'Copy',
-                            :attributes => { :href => '/issues/move/new?copy_options%5Bcopy%5D=t&amp;ids%5B%5D=1&amp;ids%5B%5D=2',
+                            :attributes => { :href => "/issues/move/new?copy_options%5Bcopy%5D=t&amp;#{ids}",
                                              :class => 'icon-copy' }
     assert_tag :tag => 'a', :content => 'Move',
-                            :attributes => { :href => '/issues/move/new?ids%5B%5D=1&amp;ids%5B%5D=2',
+                            :attributes => { :href => "/issues/move/new?#{ids}",
                                              :class => 'icon-move' }
     assert_tag :tag => 'a', :content => 'Delete',
-                            :attributes => { :href => '/issues/destroy?ids%5B%5D=1&amp;ids%5B%5D=2',
+                            :attributes => { :href => "/issues/destroy?#{ids}",
                                              :class => 'icon-del' }
   end
 
@@ -84,7 +88,10 @@ class ContextMenusControllerTest < ActionController::TestCase
     get :issues, :ids => [1, 2, 6]
     assert_response :success
     assert_template 'context_menu'
-    ids = "ids%5B%5D=1&amp;ids%5B%5D=2&amp;ids%5B%5D=6"
+    assert_not_nil assigns(:issues)
+    assert_equal [1, 2, 6], assigns(:issues).map(&:id).sort
+    
+    ids = assigns(:issues).map(&:id).map {|i| "ids%5B%5D=#{i}"}.join('&amp;')
     assert_tag :tag => 'a', :content => 'Edit',
                             :attributes => { :href => "/issues/bulk_edit?#{ids}",
                                              :class => 'icon-edit' }
@@ -107,5 +114,24 @@ class ContextMenusControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'context_menu'
     assert_equal [1], assigns(:issues).collect(&:id)
+  end
+  
+  def test_time_entries_context_menu
+    @request.session[:user_id] = 2
+    get :time_entries, :ids => [1, 2]
+    assert_response :success
+    assert_template 'time_entries'
+    assert_tag 'a', :content => 'Edit'
+    assert_no_tag 'a', :content => 'Edit', :attributes => {:class => /disabled/}
+  end
+  
+  def test_time_entries_context_menu_without_edit_permission
+    @request.session[:user_id] = 2
+    Role.find_by_name('Manager').remove_permission! :edit_time_entries
+    
+    get :time_entries, :ids => [1, 2]
+    assert_response :success
+    assert_template 'time_entries'
+    assert_tag 'a', :content => 'Edit', :attributes => {:class => /disabled/}
   end
 end

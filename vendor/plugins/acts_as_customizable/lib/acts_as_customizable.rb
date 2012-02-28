@@ -1,5 +1,5 @@
-# redMine - project management software
-# Copyright (C) 2006-2008  Jean-Philippe Lang
+# Redmine - project management software
+# Copyright (C) 2006-2011  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -74,7 +74,7 @@ module Redmine
         end
         
         def custom_field_values
-          @custom_field_values ||= available_custom_fields.collect { |x| custom_values.detect { |v| v.custom_field == x } || custom_values.build(:custom_field => x, :value => nil) }
+          @custom_field_values ||= available_custom_fields.collect { |x| custom_values.detect { |v| v.custom_field == x } || custom_values.build(:customized => self, :custom_field => x, :value => nil) }
         end
         
         def visible_custom_field_values
@@ -91,6 +91,7 @@ module Redmine
         end
         
         def save_custom_field_values
+          self.custom_values = custom_field_values
           custom_field_values.each(&:save)
           @custom_field_values_changed = false
           @custom_field_values = nil

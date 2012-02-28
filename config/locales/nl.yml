@@ -16,7 +16,10 @@ nl:
     month_names: [~, januari, februari, maart, april, mei, juni, juli, augustus, september, oktober, november, december]
     abbr_month_names: [~, jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, dec]
     # Used in date_select and datime_select.
-    order: [ :day, :month, :year ]
+    order:
+      - :day
+      - :month
+      - :year
 
   time:
     formats:
@@ -120,7 +123,7 @@ nl:
         greater_than_start_date: "moet na de startdatum liggen"
         not_same_project: "hoort niet bij hetzelfde project"
         circular_dependency: "Deze relatie zou een circulaire afhankelijkheid tot gevolg hebben"
-        cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
+        cant_link_an_issue_with_a_descendant: "Een issue kan niet gelinked worden met een subtask"
 
   actionview_instancetag_blank_option: Selecteer
   
@@ -211,7 +214,7 @@ nl:
   field_default_value: Standaardwaarde
   field_delay: Vertraging
   field_description: Beschrijving
-  field_done_ratio: % Gereed
+  field_done_ratio: "% Gereed"
   field_downloads: Downloads
   field_due_date: Verwachte datum gereed
   field_effective_date: Datum
@@ -280,7 +283,7 @@ nl:
   general_csv_separator: ';'
   general_first_day_of_week: '7'
   general_lang_name: 'Nederlands'
-  general_pdf_encoding: ISO-8859-1
+  general_pdf_encoding: UTF-8
   general_text_No: 'Nee'
   general_text_Yes: 'Ja'
   general_text_no: 'nee'
@@ -699,9 +702,8 @@ nl:
   setting_autologin: Automatisch inloggen
   setting_bcc_recipients: Blind carbon copy ontvangers (bcc)
   setting_commit_fix_keywords: Gefixeerde trefwoorden
-  setting_commit_logs_encoding: Encodering van commit berichten
   setting_commit_ref_keywords: Refererende trefwoorden
-  setting_cross_project_issue_relations: Sta crossproject issuerelaties toe
+  setting_cross_project_issue_relations: Sta cross-project issuerelaties toe
   setting_date_format: Datumformaat
   setting_default_language: Standaard taal
   setting_default_projects_public: Nieuwe projecten zijn standaard publiek
@@ -742,7 +744,7 @@ nl:
   text_destroy_time_entries: Verwijder gerapporteerde uren
   text_destroy_time_entries_question: "%{hours} uren werden gerapporteerd op de issue(s) die u wilde verwijderen. Wat wil u doen?"
   text_diff_truncated: '... Deze diff werd afgekort omdat het de maximale weer te geven karakters overschreed.'
-  text_email_delivery_not_configured: "E-mailbezorging is niet geconfigureerd. Notificaties zijn uitgeschakeld.\nConfigureer uw SMTP server in config/email.yml en herstart de applicatie om dit te activeren."
+  text_email_delivery_not_configured: "E-mailbezorging is niet geconfigureerd. Mededelingen zijn uitgeschakeld.\nConfigureer uw SMTP server in config/configuration.yml en herstart de applicatie om dit te activeren."
   text_enumeration_category_reassign_to: 'Wijs de volgende waarde toe:'
   text_enumeration_destroy_question: "%{count} objecten zijn toegewezen aan deze waarde."
   text_file_repository_writable: Bestandsrepository beschrijfbaar
@@ -906,8 +908,8 @@ nl:
   label_user_mail_option_only_my_events: Alleen voor dingen die ik volg of bij betrokken ben
   label_user_mail_option_only_assigned: Alleen voor dingen die aan mij zijn toegewezen
   label_user_mail_option_none: Bij geen enkele gebeurtenis
-  field_member_of_group: Assignee's group
-  field_assigned_to_role: Assignee's role
+  field_member_of_group: Groep van toegewezene
+  field_assigned_to_role: Rol van toegewezene
   notice_not_authorized_archived_project: Het project dat u wilt bezoeken is gearchiveerd.
   label_principal_search: "Zoek naar gebruiker of groep:"
   label_user_search: "Zoek naar gebruiker:"
@@ -918,3 +920,41 @@ nl:
   setting_commit_logtime_enabled: Activeer tijdregistratie
   notice_gantt_chart_truncated: De gantt chart is ingekort omdat het meer objecten bevat dan kan worden weergegeven, (%{max})
   setting_gantt_items_limit: Max. aantal objecten op gantt chart
+  field_warn_on_leaving_unsaved: Waarschuw me wanneer ik een pagina verlaat waarvan de tekst niet opgeslagen is
+  text_warn_on_leaving_unsaved: De huidige pagina bevat tekst die niet is opgeslagen en dit zal verloren gaan als u deze pagina nu verlaat.
+  label_my_queries: Mijn aangepaste zoekopdrachten
+  text_journal_changed_no_detail: "%{label} updated"
+  label_news_comment_added: Commentaar toegevoegd aan een nieuwsitem
+  button_expand_all: Klap uit
+  button_collapse_all: Klap in
+  label_additional_workflow_transitions_for_assignee: Aanvullende veranderingen toegestaan wanneer de gebruiker de toegewezene is
+  label_additional_workflow_transitions_for_author: Aanvullende veranderingen toegestaan wanneer de gebruiker de auteur is
+  label_bulk_edit_selected_time_entries: Bulk edit selected time entries
+  text_time_entries_destroy_confirmation: Are you sure you want to delete the selected time entr(y/ies)?
+  label_role_anonymous: Anonymous
+  label_role_non_member: Non member
+  label_issue_note_added: Note added
+  label_issue_status_updated: Status updated
+  label_issue_priority_updated: Priority updated
+  label_issues_visibility_own: Issues created by or assigned to the user
+  field_issues_visibility: Issues visibility
+  label_issues_visibility_all: All issues
+  permission_set_own_issues_private: Set own issues public or private
+  field_is_private: Private
+  permission_set_issues_private: Set issues public or private
+  label_issues_visibility_public: All non private issues
+  text_issues_destroy_descendants_confirmation: This will also delete %{count} subtask(s).
+  field_commit_logs_encoding: Encodering van commit berichten
+  field_scm_path_encoding: Path encoding
+  text_scm_path_encoding_note: "Standaard: UTF-8"
+  field_path_to_repository: Path to repository
+  field_root_directory: Root directory
+  field_cvs_module: Module
+  field_cvsroot: CVSROOT
+  text_git_repository_note: Bare and local repository (e.g. /gitrepo, c:\gitrepo)
+  text_mercurial_repository_note: Local repository (e.g. /hgrepo, c:\hgrepo)
+  text_scm_command: Command
+  text_scm_command_version: Version
+  label_git_report_last_commit: Report last commit for files and directories
+  text_scm_config: You can configure your scm commands in config/configuration.yml. Please restart the application after editing it.
+  text_scm_command_not_available: Scm command is not available. Please check settings on the administration panel.

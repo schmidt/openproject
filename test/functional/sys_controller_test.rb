@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2009  Jean-Philippe Lang
+# Copyright (C) 2006-2011  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,12 +17,13 @@
 
 require File.expand_path('../../test_helper', __FILE__)
 require 'sys_controller'
+require 'mocha'
 
 # Re-raise errors caught by the controller.
 class SysController; def rescue_action(e) raise e end; end
 
 class SysControllerTest < ActionController::TestCase
-  fixtures :projects, :repositories
+  fixtures :projects, :repositories, :enabled_modules
   
   def setup
     @controller = SysController.new
@@ -38,7 +39,10 @@ class SysControllerTest < ActionController::TestCase
     assert_equal 'application/xml', @response.content_type
     with_options :tag => 'projects' do |test|
       test.assert_tag :children => { :count  => Project.active.has_module(:repository).count }
+      test.assert_tag 'project', :child => {:tag => 'identifier', :sibling => {:tag => 'is-public'}}
     end
+    assert_no_tag 'extra-info'
+    assert_no_tag 'extra_info'
   end
 
   def test_create_project_repository
@@ -48,18 +52,29 @@ class SysControllerTest < ActionController::TestCase
                                      :vendor => 'Subversion',
                                      :repository => { :url => 'file:///create/project/repository/subproject2'}
     assert_response :created
-    
+    assert_equal 'application/xml', @response.content_type
+
     r = Project.find(4).repository
     assert r.is_a?(Repository::Subversion)
     assert_equal 'file:///create/project/repository/subproject2', r.url
+    
+    assert_tag 'repository-subversion',
+      :child => {
+        :tag => 'id', :content => r.id.to_s,
+        :sibling => {:tag => 'url', :content => r.url}
+      }
+    assert_no_tag 'extra-info'
+    assert_no_tag 'extra_info'
   end
   
   def test_fetch_changesets
+    Repository::Subversion.any_instance.expects(:fetch_changesets).returns(true)
     get :fetch_changesets
     assert_response :success
   end
   
   def test_fetch_changesets_one_project
+    Repository::Subversion.any_instance.expects(:fetch_changesets).returns(true)
     get :fetch_changesets, :id => 'ecookbook'
     assert_response :success
   end

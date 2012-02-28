@@ -4,6 +4,183 @@ Redmine - project management software
 Copyright (C) 2006-2011  Jean-Philippe Lang
 http://www.redmine.org/
 
+== 2011-12-10 v1.2.3
+
+* Defect #8707: Reposman: wrong constant name
+* Defect #8809: Table in timelog report overflows
+* Defect #9055: Version files in Files module cannot be downloaded if issue tracking is disabled
+* Defect #9137: db:encrypt fails to handle repositories with blank password
+* Defect #9394: Custom date field only validating on regex and not a valid date
+* Defect #9405: Any user with :log_time permission can edit time entries via context menu
+* Defect #9448: The attached images are not shown in documents
+* Defect #9520: Copied private query not visible after project copy
+* Defect #9552: Error when reading ciphered text from the database without cipher key configured
+* Defect #9566: Redmine.pm considers all projects private when login_required is enabled
+* Defect #9567: Redmine.pm potential security issue with cache credential enabled and subversion
+* Defect #9577: Deleting a subtasks doesn't update parent's rgt & lft values
+* Defect #9597: Broken version links in wiki annotate history
+* Defect #9682: Wiki HTML Export only useful when Access history is accessible
+* Defect #9737: Custom values deleted before issue submit
+* Defect #9741: calendar-hr.js (Croatian) is not UTF-8
+* Patch #9558: Simplified Chinese translation for 1.2.2 updated
+* Patch #9695: Bulgarian translation (r7942)
+
+== 2011-11-11 v1.2.2
+
+* Defect #3276: Incorrect handling of anchors in Wiki to HTML export
+* Defect #7215: Wiki formatting mangles links to internal headers
+* Defect #7613: Generated test instances may share the same attribute value object
+* Defect #8411: Can't remove "Project" column on custom query
+* Defect #8615: Custom 'version' fields don't show shared versions
+* Defect #8633: Pagination counts non visible issues
+* Defect #8651: Email attachments are not added to issues any more in v1.2
+* Defect #8825: JRuby + Windows: SCMs do not work on Redmine 1.2
+* Defect #8836: Additional workflow transitions not available when set to both author and assignee
+* Defect #8865: Custom field regular expression is not validated
+* Defect #8880: Error deleting issue with grandchild
+* Defect #8884: Assignee is cleared when updating issue with locked assignee
+* Defect #8892: Unused fonts in rfpdf plugin folder
+* Defect #9161: pt-BR field_warn_on_leaving_unsaved has a small gramatical error
+* Defect #9308: Search fails when a role haven't "view wiki" permission
+* Defect #9465: Mercurial: can't browse named branch below Mercurial 1.5
+
+== 2011-07-11 v1.2.1
+
+* Defect #5089: i18N error on truncated revision diff view
+* Defect #7501: Search options get lost after clicking on a specific result type
+* Defect #8229: "project.xml" response does not include the parent ID
+* Defect #8449: Wiki annotated page does not display author of version 1
+* Defect #8467: Missing german translation - Warn me when leaving a page with unsaved text
+* Defect #8468: No warning when leaving page with unsaved text that has not lost focus
+* Defect #8472: Private checkbox ignored on issue creation with "Set own issues public or private" permission
+* Defect #8510: JRuby: Can't open administrator panel if scm command is not available
+* Defect #8512: Syntax highlighter on Welcome page
+* Defect #8554: Translation missing error on custom field validation
+* Defect #8565: JRuby: Japanese PDF export error
+* Defect #8566: Exported PDF UTF-8 Vietnamese not correct
+* Defect #8569: JRuby: PDF export error with TypeError
+* Defect #8576: Missing german translation - different things
+* Defect #8616: Circular relations
+* Defect #8646: Russian translation "label_follows" and "label_follows" are wrong
+* Defect #8712: False 'Description updated' journal details messages
+* Defect #8729: Not-public queries are not private
+* Defect #8737: Broken line of long issue description on issue PDF.
+* Defect #8738: Missing revision number/id of associated revisions on issue PDF
+* Defect #8739: Workflow copy does not copy advanced workflow settings
+* Defect #8759: Setting issue attributes from mail should be case-insensitive
+* Defect #8777: Mercurial: Not able to Resetting Redmine project respository
+
+== 2011-05-30 v1.2.0
+
+* Defect #61: Broken character encoding in pdf export
+* Defect #1965: Redmine is not Tab Safe
+* Defect #2274: Filesystem Repository path encoding of non UTF-8 characters
+* Defect #2664: Mercurial: Repository path encoding of non UTF-8 characters
+* Defect #3421: Mercurial reads files from working dir instead of changesets
+* Defect #3462: CVS: Repository path encoding of non UTF-8 characters
+* Defect #3715: Login page should not show projects link and search box if authentication is required
+* Defect #3724: Mercurial repositories display revision ID instead of changeset ID
+* Defect #3761: Most recent CVS revisions are missing in "revisions" view
+* Defect #4270: CVS Repository view in Project doesn't show Author, Revision, Comment
+* Defect #5138: Don't use Ajax for pagination
+* Defect #5152: Cannot use certain characters for user and role names.
+* Defect #5251: Git: Repository path encoding of non UTF-8 characters
+* Defect #5373: Translation missing when adding invalid watchers
+* Defect #5817: Shared versions not shown in subproject's gantt chart
+* Defect #6013: git tab,browsing, very slow -- even after first time
+* Defect #6148: Quoting, newlines, and nightmares...
+* Defect #6256: Redmine considers non ASCII and UTF-16 text files as binary in SCM
+* Defect #6476: Subproject's issues are not shown in the subproject's gantt
+* Defect #6496: Remove i18n 0.3.x/0.4.x hack for Rails 2.3.5
+* Defect #6562: Context-menu deletion of issues deletes all subtasks too without explicit prompt
+* Defect #6604: Issues targeted at parent project versions' are not shown on gantt chart
+* Defect #6706: Resolving issues with the commit message produces the wrong comment with CVS
+* Defect #6901: Copy/Move an issue does not give any history of who actually did the action.
+* Defect #6905: Specific heading-content breaks CSS
+* Defect #7000: Project filter not applied on versions in Gantt chart
+* Defect #7097: Starting day of week cannot be set to Saturday
+* Defect #7114: New gantt doesn't display some projects
+* Defect #7146: Git adapter lost commits before 7 days from database latest changeset
+* Defect #7218: Date range error on issue query
+* Defect #7257: "Issues by" version links bad criterias
+* Defect #7279: CSS class ".icon-home" is not used.
+* Defect #7320: circular dependency >2 issues
+* Defect #7352: Filters not working in Gantt charts
+* Defect #7367: Receiving pop3 email should not output debug messages
+* Defect #7373: Error with PDF output and ruby 1.9.2
+* Defect #7379: Remove extraneous hidden_field on wiki history
+* Defect #7516: Redmine does not work with RubyGems 1.5.0
+* Defect #7518: Mercurial diff can be wrong if the previous changeset isn't the parent
+* Defect #7581: Not including a spent time value on the main issue update screen causes silent data loss
+* Defect #7582: hiding form pages from search engines
+* Defect #7597: Subversion and Mercurial log have the possibility to miss encoding
+* Defect #7604: ActionView::TemplateError (undefined method `name' for nil:NilClass)
+* Defect #7605: Using custom queries always redirects to "Issues" tab
+* Defect #7615: CVS diffs do not handle new files properly
+* Defect #7618: SCM diffs do not handle one line new files properly
+* Defect #7639: Some date fields do not have requested format.
+* Defect #7657: Wrong commit range in git log command on Windows
+* Defect #7818: Wiki pages don't use the local timezone to display the "Updated ? hours ago" mouseover
+* Defect #7821: Git "previous" and "next" revisions are incorrect
+* Defect #7827: CVS: Age column on repository view is off by timezone delta
+* Defect #7843: Add a relation between issues = explicit login window ! (basic authentication popup is prompted on AJAX request)
+* Defect #8011: {{toc}} does not display headlines with inline code markup
+* Defect #8029: List of users for adding to a group may be empty if 100 first users have been added
+* Defect #8064: Text custom fields do not wrap on the issue list
+* Defect #8071: Watching a subtask from the context menu updates main issue watch link
+* Defect #8072: Two untranslatable default role names
+* Defect #8075: Some "notifiable" names are not i18n-enabled
+* Defect #8081: GIT: Commits missing when user has the "decorate" git option enabled
+* Defect #8088: Colorful indentation of subprojects must be on right in RTL locales
+* Defect #8239: notes field is not propagated during issue copy
+* Defect #8356: GET /time_entries.xml ignores limit/offset parameters
+* Defect #8432: Private issues information shows up on Activity page for unauthorized users
+* Feature #746: Versioned issue descriptions
+* Feature #1067: Differentiate public/private saved queries in the sidebar
+* Feature #1236: Make destination folder for attachment uploads configurable
+* Feature #1735: Per project repository log encoding setting
+* Feature #1763: Autologin-cookie should be configurable
+* Feature #1981: display mercurial tags
+* Feature #2074: Sending email notifications when comments are added in the news section
+* Feature #2096: Custom fields referencing system tables (users and versions)
+* Feature #2732: Allow additional workflow transitions for author and assignee
+* Feature #2910: Warning on leaving edited issue/wiki page without saving
+* Feature #3396: Git: use --encoding=UTF-8 in "git log"
+* Feature #4273: SCM command availability automatic check in administration panel
+* Feature #4477: Use mime types in downloading from repository
+* Feature #5518: Graceful fallback for "missing translation" needed
+* Feature #5520: Text format buttons and preview link missing when editing comment
+* Feature #5831: Parent Task to Issue Bulk Edit
+* Feature #6887: Upgrade to Rails 2.3.11
+* Feature #7139: Highlight changes inside diff lines
+* Feature #7236: Collapse All for Groups
+* Feature #7246: Handle "named branch" for mercurial
+* Feature #7296: Ability for admin to delete users
+* Feature #7318: Add user agent to Redmine Mailhandler
+* Feature #7408: Add an application configuration file
+* Feature #7409: Cross project Redmine links
+* Feature #7410: Add salt to user passwords
+* Feature #7411: Option to cipher LDAP ans SCM passwords stored in the database
+* Feature #7412: Add an issue visibility level to each role
+* Feature #7414: Private issues
+* Feature #7517: Configurable path of executable for scm adapters
+* Feature #7640: Add "mystery man" gravatar to options
+* Feature #7858: RubyGems 1.6 support
+* Feature #7893: Group filter on the users list
+* Feature #7899: Box for editing comments should open with the formatting toolbar
+* Feature #7921: issues by pulldown should have 'status' option
+* Feature #7996: Bulk edit and context menu for time entries
+* Feature #8006: Right click context menu for Related Issues
+* Feature #8209: I18n YAML files not parsable with psych yaml library
+* Feature #8345: Link to user profile from account page
+* Feature #8365: Git: per project setting to report last commit or not in repository tree
+* Patch #5148: metaKey not handled in issues selection
+* Patch #5629: Wrap text fields properly in PDF
+* Patch #7418: Redmine Persian Translation
+* Patch #8295: Wrap title fields properly in PDF
+* Patch #8310: fixes automatic line break problem with TCPDF
+* Patch #8312: Switch to TCPDF from FPDF for PDF export
+
 == 2011-04-29 v1.1.3
 
 * Defect #5773: Email reminders are sent to locked users
@@ -280,7 +457,7 @@ http://www.redmine.org/
 * #819: Add a body ID and class to all pages
 * #871: Commit new CSS styles!
 * #3301: Add favicon to base layout
-* #4656: On Issue#show page, clicking on “Add related issue” should focus on the input
+* #4656: On Issue#show page, clicking on â€œAdd related issueâ€� should focus on the input
 * #4896: Project identifier should be a limited field
 * #5084: Filter all isssues by projects
 * #5477: Replace Test::Unit::TestCase with ActiveSupport::TestCase
@@ -1289,7 +1466,7 @@ http://www.redmine.org/
 * Search engines now supports pagination. Results are sorted in reverse chronological order
 * Added "Estimated hours" attribute on issues
 * A category with assigned issue can now be deleted. 2 options are proposed: remove assignments or reassign issues to another category
-* Forum notifications are now also sent to the authors of the thread, even if they don�t watch the board
+* Forum notifications are now also sent to the authors of the thread, even if they donï¿½t watch the board
 * Added an application setting to specify the application protocol (http or https) used to generate urls in emails
 * Gantt chart: now starts at the current month by default
 * Gantt chart: month count and zoom factor are automatically saved as user preferences
@@ -1297,7 +1474,7 @@ http://www.redmine.org/
 * Added wiki index by date
 * Added preview on add/edit issue form
 * Emails footer can now be customized from the admin interface (Admin -> Email notifications)
-* Default encodings for repository files can now be set in application settings (used to convert files content and diff to UTF-8 so that they�re properly displayed)
+* Default encodings for repository files can now be set in application settings (used to convert files content and diff to UTF-8 so that theyï¿½re properly displayed)
 * Calendar: first day of week can now be set in lang files
 * Automatic closing of duplicate issues
 * Added a cross-project issue list
@@ -1309,7 +1486,7 @@ http://www.redmine.org/
 * Added some accesskeys
 * Added "Float" as a custom field format
 * Added basic Theme support
-* Added the ability to set the �done ratio� of issues fixed by commit (Nikolay Solakov)
+* Added the ability to set the ï¿½done ratioï¿½ of issues fixed by commit (Nikolay Solakov)
 * Added custom fields in issue related mail notifications
 * Email notifications are now sent in plain text and html
 * Gantt chart can now be exported to a graphic file (png). This functionality is only available if RMagick is installed.
@@ -1342,7 +1519,7 @@ http://www.redmine.org/
 * Added Korean translation (Choi Jong Yoon)
 * Fixed: the link to delete issue relations is displayed even if the user is not authorized to delete relations
 * Performance improvement on calendar and gantt
-* Fixed: wiki preview doesn�t work on long entries
+* Fixed: wiki preview doesnï¿½t work on long entries
 * Fixed: queries with multiple custom fields return no result
 * Fixed: Can not authenticate user against LDAP if its DN contains non-ascii characters
 * Fixed: URL with ~ broken in wiki formatting
@@ -1353,7 +1530,7 @@ http://www.redmine.org/
 
 * per project forums added
 * added the ability to archive projects
-* added �Watch� functionality on issues. It allows users to receive notifications about issue changes
+* added ï¿½Watchï¿½ functionality on issues. It allows users to receive notifications about issue changes
 * custom fields for issues can now be used as filters on issue list
 * added per user custom queries
 * commit messages are now scanned for referenced or fixed issue IDs (keywords defined in Admin -> Settings)
@@ -1394,7 +1571,7 @@ http://www.redmine.org/
 * added swedish translation (Thomas Habets)
 * italian translation update (Alessio Spadaro)
 * japanese translation update (Satoru Kurashiki)
-* fixed: error on history atom feed when there�s no notes on an issue change
+* fixed: error on history atom feed when thereï¿½s no notes on an issue change
 * fixed: error in journalizing an issue with longtext custom fields (Postgresql)
 * fixed: creation of Oracle schema
 * fixed: last day of the month not included in project activity

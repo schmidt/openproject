@@ -49,7 +49,7 @@ module CustomFieldsHelper
       blank_option = custom_field.is_required? ?
                        (custom_field.default_value.blank? ? "<option value=\"\">--- #{l(:actionview_instancetag_blank_option)} ---</option>" : '') : 
                        '<option></option>'
-      select_tag(field_name, blank_option + options_for_select(custom_field.possible_values, custom_value.value), :id => field_id)
+      select_tag(field_name, blank_option + options_for_select(custom_field.possible_values_options(custom_value.customized), custom_value.value), :id => field_id)
     else
       text_field_tag(field_name, custom_value.value, :id => field_id)
     end
@@ -68,7 +68,7 @@ module CustomFieldsHelper
     custom_field_label_tag(name, custom_value) + custom_field_tag(name, custom_value)
   end
   
-  def custom_field_tag_for_bulk_edit(name, custom_field)
+  def custom_field_tag_for_bulk_edit(name, custom_field, projects=nil)
     field_name = "#{name}[custom_field_values][#{custom_field.id}]"
     field_id = "#{name}_custom_field_values_#{custom_field.id}"
     field_format = Redmine::CustomFieldFormat.find_by_name(custom_field.field_format)
@@ -83,7 +83,7 @@ module CustomFieldsHelper
                                                    [l(:general_text_yes), '1'],
                                                    [l(:general_text_no), '0']]), :id => field_id)
       when "list"
-        select_tag(field_name, options_for_select([[l(:label_no_change_option), '']] + custom_field.possible_values), :id => field_id)
+        select_tag(field_name, options_for_select([[l(:label_no_change_option), '']] + custom_field.possible_values_options(projects)), :id => field_id)
       else
         text_field_tag(field_name, '', :id => field_id)
     end
@@ -101,8 +101,8 @@ module CustomFieldsHelper
   end
 
   # Return an array of custom field formats which can be used in select_tag
-  def custom_field_formats_for_select
-    Redmine::CustomFieldFormat.as_select
+  def custom_field_formats_for_select(custom_field)
+    Redmine::CustomFieldFormat.as_select(custom_field.class.customized_class.name)
   end
   
   # Renders the custom_values in api views
