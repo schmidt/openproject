@@ -17,13 +17,34 @@
 
 class QueryColumn  
   attr_accessor :name, :sortable
+  include GLoc
   
   def initialize(name, options={})
     self.name = name
     self.sortable = options[:sortable]
   end
   
-  def default?; default end
+  def caption
+    set_language_if_valid(User.current.language)
+    l("field_#{name}")
+  end
+end
+
+class QueryCustomFieldColumn < QueryColumn
+
+  def initialize(custom_field)
+    self.name = "cf_#{custom_field.id}".to_sym
+    self.sortable = false
+    @cf = custom_field
+  end
+  
+  def caption
+    @cf.name
+  end
+  
+  def custom_field
+    @cf
+  end
 end
 
 class Query < ActiveRecord::Base
@@ -33,7 +54,6 @@ class Query < ActiveRecord::Base
   serialize :column_names
   
   attr_protected :project, :user
-  attr_accessor :executed_by
   
   validates_presence_of :name, :on => :save
   validates_length_of :name, :maximum => 255
@@ -79,6 +99,7 @@ class Query < ActiveRecord::Base
     QueryColumn.new(:assigned_to, :sortable => "#{User.table_name}.lastname"),
     QueryColumn.new(:updated_on, :sortable => "#{Issue.table_name}.updated_on"),
     QueryColumn.new(:category, :sortable => "#{IssueCategory.table_name}.name"),
+    QueryColumn.new(:fixed_version),
     QueryColumn.new(:start_date, :sortable => "#{Issue.table_name}.start_date"),
     QueryColumn.new(:due_date, :sortable => "#{Issue.table_name}.due_date"),
     QueryColumn.new(:estimated_hours, :sortable => "#{Issue.table_name}.estimated_hours"),
@@ -90,11 +111,7 @@ class Query < ActiveRecord::Base
   def initialize(attributes = nil)
     super attributes
     self.filters ||= { 'status_id' => {:operator => "o", :values => [""]} }
-  end
-  
-  def executed_by=(user)
-    @executed_by = user
-    set_language_if_valid(user.language) if user
+    set_language_if_valid(User.current.language)
   end
   
   def validate
@@ -126,12 +143,12 @@ class Query < ActiveRecord::Base
                            "done_ratio" =>  { :type => :integer, :order => 13 }}                          
     
     user_values = []
+    user_values << ["<< #{l(:label_me)} >>", "me"] if User.current.logged?
     if project
-      user_values += project.users.collect{|s| [s.name, s.id.to_s] }
-    elsif executed_by
-      user_values << ["<< #{l(:label_me)} >>", "me"] if executed_by
+      user_values += project.users.sort.collect{|s| [s.name, s.id.to_s] }
+    else
       # members of the user's projects
-      user_values += executed_by.projects.collect(&:users).flatten.uniq.sort.collect{|s| [s.name, s.id.to_s] }
+      user_values += User.current.projects.collect(&:users).flatten.uniq.sort.collect{|s| [s.name, s.id.to_s] }
     end
     @available_filters["assigned_to_id"] = { :type => :list_optional, :order => 4, :values => user_values } unless user_values.empty?
     @available_filters["author_id"] = { :type => :list, :order => 5, :values => user_values } unless user_values.empty?
@@ -145,8 +162,6 @@ class Query < ActiveRecord::Base
       end
       @project.all_custom_fields.select(&:is_filter?).each do |field|
         case field.field_format
-        when "string", "int"
-          options = { :type => :string, :order => 20 }
         when "text"
           options = { :type => :text, :order => 20 }
         when "list"
@@ -155,6 +170,8 @@ class Query < ActiveRecord::Base
           options = { :type => :date, :order => 20 }
         when "bool"
           options = { :type => :list, :values => [[l(:general_text_yes), "1"], [l(:general_text_no), "0"]], :order => 20 }
+        else
+          options = { :type => :string, :order => 20 }
         end          
         @available_filters["cf_#{field.id}"] = options.merge({ :name => field.name })
       end
@@ -203,7 +220,12 @@ class Query < ActiveRecord::Base
   end
 
   def available_columns
-    cols = Query.available_columns
+    return @available_columns if @available_columns
+    @available_columns = Query.available_columns
+    @available_columns += (project ? 
+                            project.custom_fields :
+                            IssueCustomField.find(:all, :conditions => {:is_for_all => true})
+                           ).collect {|cf| QueryCustomFieldColumn.new(cf) }      
   end
   
   def columns
@@ -243,7 +265,7 @@ class Query < ActiveRecord::Base
     elsif project
       clause << "#{Issue.table_name}.project_id=%d" % project.id
     else
-      clause << Project.visible_by(executed_by)
+      clause << Project.visible_by(User.current)
     end
     
     # filters clauses
@@ -268,7 +290,7 @@ class Query < ActiveRecord::Base
       
       # "me" value subsitution
       if %w(assigned_to_id author_id).include?(field)
-        v.push(executed_by ? executed_by.id.to_s : "0") if v.delete("me")
+        v.push(User.current.logged? ? User.current.id.to_s : "0") if v.delete("me")
       end
       
       case operator_for field

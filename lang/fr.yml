@@ -75,6 +75,7 @@ notice_email_error: "Erreur lors de l'envoi de l'email (%s)"
 notice_feeds_access_key_reseted: Votre clé d'accès aux flux RSS a été réinitialisée.
 notice_failed_to_save_issues: "%d demande(s) sur les %d sélectionnées n'ont pas pu être mise(s) à jour: %s."
 notice_no_issue_selected: "Aucune demande sélectionnée ! Cochez les demandes que vous voulez mettre à jour."
+notice_account_pending: "Votre compte a été créé et attend l'approbation de l'administrateur."
 
 mail_subject_lost_password: Votre mot de passe redMine
 mail_body_lost_password: 'Pour changer votre mot de passe Redmine, cliquez sur le lien suivant:'
@@ -82,6 +83,8 @@ mail_subject_register: Activation de votre compte redMine
 mail_body_register: 'Pour activer votre compte Redmine, cliquez sur le lien suivant:'
 mail_body_account_information_external: Vous pouvez utiliser votre compte "%s" pour vous connecter à Redmine.
 mail_body_account_information: Paramètres de connexion de votre compte Redmine
+mail_subject_account_activation_request: "Demande d'activation d'un compte Redmine"
+mail_body_account_activation_request: "Un nouvel utilisateur (%s) s'est inscrit. Son compte nécessite votre approbation:"
 
 gui_validation_error: 1 erreur
 gui_validation_error_plural: %d erreurs
@@ -166,16 +169,19 @@ field_assignable: Demandes assignables à ce rôle
 field_redirect_existing_links: Rediriger les liens existants
 field_estimated_hours: Temps estimé
 field_column_names: Colonnes
+field_time_zone: Fuseau horaire
+field_searchable: Utilisé pour les recherches
 
 setting_app_title: Titre de l'application
 setting_app_subtitle: Sous-titre de l'application
 setting_welcome_text: Texte d'accueil
 setting_default_language: Langue par défaut
-setting_login_required: Authentif. obligatoire
-setting_self_registration: Enregistrement autorisé
+setting_login_required: Authentification obligatoire
+setting_self_registration: Inscription des nouveaux utilisateurs
 setting_attachment_max_size: Taille max des fichiers
 setting_issues_export_limit: Limite export demandes
 setting_mail_from: Adresse d'émission
+setting_bcc_recipients: Destinataires en copie cachée (cci)
 setting_host_name: Nom d'hôte
 setting_text_formatting: Formatage du texte
 setting_wiki_compression: Compression historique wiki
@@ -186,6 +192,7 @@ setting_commit_ref_keywords: Mot-clés de référencement
 setting_commit_fix_keywords: Mot-clés de résolution
 setting_autologin: Autologin
 setting_date_format: Format de date
+setting_time_format: Format d'heure
 setting_cross_project_issue_relations: Autoriser les relations entre demandes de différents projets
 setting_issue_list_default_columns: Colonnes affichées par défaut sur la liste des demandes
 setting_repositories_encodings: Encodages des dépôts
@@ -204,6 +211,7 @@ label_issue: Demande
 label_issue_new: Nouvelle demande
 label_issue_plural: Demandes
 label_issue_view_all: Voir toutes les demandes
+label_issues_by: Demandes par %s
 label_document: Document
 label_document_new: Nouveau document
 label_document_plural: Documents
@@ -425,7 +433,7 @@ label_month: Mois
 label_week: Semaine
 label_date_from: Du
 label_date_to: Au
-label_language_based: Basé sur la langue
+label_language_based: Basé sur la langue de l'utilisateur
 label_sort_by: Trier par %s
 label_send_test_email: Envoyer un email de test
 label_feeds_access_key_created_on: Clé d'accès RSS créée il y a %s
@@ -444,6 +452,10 @@ label_search_titles_only: Uniquement dans les titres
 label_user_mail_option_all: "Pour tous les événements de tous mes projets"
 label_user_mail_option_selected: "Pour tous les événements des projets sélectionnés..."
 label_user_mail_option_none: "Seulement pour ce que je surveille ou à quoi je participe"
+label_user_mail_no_self_notified: "Je ne veux pas être notifié des changements que j'effectue"
+label_registration_activation_by_email: activation du compte par email
+label_registration_manual_activation: activation manuelle du compte
+label_registration_automatic_activation: activation automatique du compte
 
 button_login: Connexion
 button_submit: Soumettre
@@ -479,6 +491,7 @@ button_reset: Réinitialiser
 button_rename: Renommer
 button_change_password: Changer de mot de passe
 button_copy: Copier
+button_annotate: Annoter
 
 status_active: actif
 status_registered: enregistré
@@ -498,6 +511,7 @@ text_tip_task_end_day: tâche finissant ce jour
 text_tip_task_begin_end_day: tâche commençant et finissant ce jour
 text_project_identifier_info: 'Lettres minuscules (a-z), chiffres et tirets autorisés.<br />Un fois sauvegardé, l''identifiant ne pourra plus être modifié.'
 text_caracters_maximum: %d caractères maximum.
+text_caracters_minimum: %d caractères minimum.
 text_length_between: Longueur comprise entre %d et %d caractères.
 text_tracker_no_workflow: Aucun worflow n'est défini pour ce tracker
 text_unallowed_characters: Caractères non autorisés

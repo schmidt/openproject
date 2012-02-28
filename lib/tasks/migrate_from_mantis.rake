@@ -53,9 +53,10 @@ task :migrate_from_mantis => :environment do
       TRACKER_BUG = Tracker.find_by_position(1)
       TRACKER_FEATURE = Tracker.find_by_position(2)
       
-      DEFAULT_ROLE = Role.find_by_position(3)
-      manager_role = Role.find_by_position(1)
-      developer_role = Role.find_by_position(2)
+      roles = Role.find(:all, :conditions => {:builtin => 0}, :order => 'position ASC')
+      manager_role = roles[0]
+      developer_role = roles[1]
+      DEFAULT_ROLE = roles.last
       ROLE_MAPPING = {10 => DEFAULT_ROLE,   # viewer
                       25 => DEFAULT_ROLE,   # reporter
                       40 => DEFAULT_ROLE,   # updater
@@ -114,7 +115,7 @@ task :migrate_from_mantis => :environment do
       has_many :members, :class_name => "MantisProjectUser", :foreign_key => :project_id
       
       def name
-        read_attribute(:name)[0..29].gsub(/[^\w\s\'\-]/, '-')
+        read_attribute(:name)[0..29]
       end
       
       def description
@@ -122,7 +123,7 @@ task :migrate_from_mantis => :environment do
       end
       
       def identifier
-        read_attribute(:name).underscore[0..11].gsub(/[^a-z0-9\-]/, '-')
+        read_attribute(:name).underscore[0..19].gsub(/[^a-z0-9\-]/, '-')
       end
     end
     
@@ -268,6 +269,9 @@ task :migrate_from_mantis => :environment do
     	p.identifier = project.identifier
     	next unless p.save
     	projects_map[project.id] = p.id
+    	p.enabled_module_names = ['issue_tracking', 'news', 'wiki']
+        p.trackers << TRACKER_BUG
+        p.trackers << TRACKER_FEATURE
     	print '.'
     	
     	# Project members

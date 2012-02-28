@@ -23,6 +23,7 @@ Rails::Initializer.run do |config|
   # Use the database for sessions instead of the file system
   # (create the session table with 'rake create_sessions_table')
   # config.action_controller.session_store = :active_record_store
+  config.action_controller.session_store = :PStore
 
   # Enable page/fragment caching by setting a file-based store
   # (remember to create the caching directory and make it readable to the application)
@@ -77,7 +78,10 @@ ActiveRecord::Errors.default_error_messages = {
 }
 
 ActionView::Base.field_error_proc = Proc.new{ |html_tag, instance| "#{html_tag}" }
-    
+
+Mime::SET << Mime::CSV unless Mime::SET.include?(Mime::CSV)
+Mime::Type.register 'application/pdf', :pdf
+
 GLoc.set_config :default_language => :en
 GLoc.clear_strings
 GLoc.set_kcode

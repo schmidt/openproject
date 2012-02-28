@@ -62,7 +62,10 @@ module RepositoriesHelper
       content_tag('p', form.text_field(:url, :size => 60, :required => true, :disabled => (repository && !repository.root_url.blank?)) +
                        '<br />(http://, https://, svn://, file:///)') +
       content_tag('p', form.text_field(:login, :size => 30)) +
-      content_tag('p', form.password_field(:password, :size => 30))
+      content_tag('p', form.password_field(:password, :size => 30, :name => 'ignore',
+                                           :value => ((repository.new_record? || repository.password.blank?) ? '' : ('x'*15)),
+                                           :onfocus => "this.value=''; this.name='repository[password]';",
+                                           :onchange => "this.name='repository[password]';"))
   end
 
   def darcs_field_tags(form, repository)
@@ -76,5 +79,9 @@ module RepositoriesHelper
   def cvs_field_tags(form, repository)
       content_tag('p', form.text_field(:root_url, :label => 'CVSROOT', :size => 60, :required => true, :disabled => !repository.new_record?)) +
       content_tag('p', form.text_field(:url, :label => 'Module', :size => 30, :required => true, :disabled => !repository.new_record?))
+  end
+
+  def bazaar_field_tags(form, repository)
+      content_tag('p', form.text_field(:url, :label => 'Root directory', :size => 60, :required => true, :disabled => (repository && !repository.new_record?)))
   end
 end

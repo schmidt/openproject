@@ -19,6 +19,7 @@ require "digest/sha1"
 
 class User < ActiveRecord::Base
   # Account statuses
+  STATUS_ANONYMOUS  = 0
   STATUS_ACTIVE     = 1
   STATUS_REGISTERED = 2
   STATUS_LOCKED     = 3
@@ -36,17 +37,16 @@ class User < ActiveRecord::Base
   # Prevents unauthorized assignments
   attr_protected :login, :admin, :password, :password_confirmation, :hashed_password
 	
-  validates_presence_of :login, :firstname, :lastname, :mail
+  validates_presence_of :login, :firstname, :lastname, :mail, :if => Proc.new { |user| !user.is_a?(AnonymousUser) }
   validates_uniqueness_of :login, :mail	
   # Login must contain lettres, numbers, underscores only
-  validates_format_of :login, :with => /^[a-z0-9_\-@\.]+$/i
+  validates_format_of :login, :with => /^[a-z0-9_\-@\.]*$/i
   validates_length_of :login, :maximum => 30
   validates_format_of :firstname, :lastname, :with => /^[\w\s\'\-]*$/i
   validates_length_of :firstname, :lastname, :maximum => 30
-  validates_format_of :mail, :with => /^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i
-  validates_length_of :mail, :maximum => 60
-  # Password length between 4 and 12
-  validates_length_of :password, :in => 4..12, :allow_nil => true
+  validates_format_of :mail, :with => /^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i, :allow_nil => true
+  validates_length_of :mail, :maximum => 60, :allow_nil => true
+  validates_length_of :password, :minimum => 4, :allow_nil => true
   validates_confirmation_of :password, :allow_nil => true
   validates_associated :custom_values, :on => :update
 
@@ -130,6 +130,10 @@ class User < ActiveRecord::Base
     self.preference ||= UserPreference.new(:user => self)
   end
   
+  def time_zone
+    self.pref.time_zone.nil? ? nil : TimeZone[self.pref.time_zone]
+  end
+  
   # Return user's RSS key (a 40 chars long string), used to access feeds
   def rss_key
     token = self.rss_token || Token.create(:user => self, :action => 'feeds')
@@ -159,7 +163,7 @@ class User < ActiveRecord::Base
   end
 
   def <=>(user)
-    lastname == user.lastname ? firstname <=> user.firstname : lastname <=> user.lastname
+    user.nil? ? -1 : (lastname == user.lastname ? firstname <=> user.firstname : lastname <=> user.lastname)
   end
   
   def to_s
@@ -174,14 +178,16 @@ class User < ActiveRecord::Base
   def role_for_project(project)
     # No role on archived projects
     return nil unless project && project.active?
-    # Find project membership
-    membership = memberships.detect {|m| m.project_id == project.id}
-    if membership
-      membership.role
-    elsif logged?
-      Role.non_member
+    if logged?
+      # Find project membership
+      membership = memberships.detect {|m| m.project_id == project.id}
+      if membership
+        membership.role
+      else
+        @role_non_member ||= Role.non_member
+      end
     else
-      Role.anonymous
+      @role_anonymous ||= Role.anonymous
     end
   end
   
@@ -212,11 +218,17 @@ class User < ActiveRecord::Base
   end
   
   def self.current
-    @current_user ||= AnonymousUser.new
+    @current_user ||= User.anonymous
   end
   
   def self.anonymous
-    AnonymousUser.new
+    return @anonymous_user if @anonymous_user
+    anonymous_user = AnonymousUser.find(:first)
+    if anonymous_user.nil?
+      anonymous_user = AnonymousUser.create(:lastname => 'Anonymous', :firstname => '', :mail => '', :login => '', :status => 0)
+      raise 'Unable to create the anonymous user.' if anonymous_user.new_record?
+    end
+    @anonymous_user = anonymous_user
   end
   
 private
@@ -227,12 +239,17 @@ private
 end
 
 class AnonymousUser < User
-  def logged?
-    false
+  
+  def validate_on_create
+    # There should be only one AnonymousUser in the database
+    errors.add_to_base 'An anonymous user already exists.' if AnonymousUser.find(:first)
   end
   
-  # Anonymous user has no RSS key
-  def rss_key
-    nil
-  end
+  # Overrides a few properties
+  def logged?; false end
+  def admin; false end
+  def name; 'Anonymous' end
+  def mail; nil end
+  def time_zone; nil end
+  def rss_key; nil end
 end

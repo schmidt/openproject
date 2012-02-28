@@ -25,14 +25,14 @@ class RepositoryTest < Test::Unit::TestCase
   end
   
   def test_create
-    repository = Repository::Subversion.new(:project => Project.find(2))
+    repository = Repository::Subversion.new(:project => Project.find(3))
     assert !repository.save
   
     repository.url = "svn://localhost"
     assert repository.save
     repository.reload
     
-    project = Project.find(2)
+    project = Project.find(3)
     assert_equal repository, project.repository
   end
   
@@ -68,7 +68,7 @@ class RepositoryTest < Test::Unit::TestCase
     COMMENT
     changeset = Changeset.new(
       :comments => comment, :commit_date => Time.now, :revision => 0, :scmid => 'f39b7922fb3c',
-      :committer => 'foo <foo@example.com>', :committed_on => Time.now, :repository_id => repository )
+      :committer => 'foo <foo@example.com>', :committed_on => Time.now, :repository => repository )
     assert( changeset.save )
     assert_not_equal( comment, changeset.comments )
     assert_equal( 'This is a loooooooooooooooooooooooooooong comment', changeset.comments )

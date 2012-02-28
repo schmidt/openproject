@@ -20,10 +20,11 @@ class Project < ActiveRecord::Base
   STATUS_ACTIVE     = 1
   STATUS_ARCHIVED   = 9
   
-  has_many :members, :dependent => :delete_all, :include => :user, :conditions => "#{User.table_name}.status=#{User::STATUS_ACTIVE}"
+  has_many :members, :include => :user, :conditions => "#{User.table_name}.status=#{User::STATUS_ACTIVE}"
   has_many :users, :through => :members
   has_many :custom_values, :dependent => :delete_all, :as => :customized
   has_many :enabled_modules, :dependent => :delete_all
+  has_and_belongs_to_many :trackers, :order => "#{Tracker.table_name}.position"
   has_many :issues, :dependent => :destroy, :order => "#{Issue.table_name}.created_on DESC", :include => [:status, :tracker]
   has_many :issue_changes, :through => :issues, :source => :journals
   has_many :versions, :dependent => :destroy, :order => "#{Version.table_name}.effective_date DESC, #{Version.table_name}.name DESC"
@@ -36,7 +37,13 @@ class Project < ActiveRecord::Base
   has_one :repository, :dependent => :destroy
   has_many :changesets, :through => :repository
   has_one :wiki, :dependent => :destroy
-  has_and_belongs_to_many :custom_fields, :class_name => 'IssueCustomField', :join_table => "#{table_name_prefix}custom_fields_projects#{table_name_suffix}", :association_foreign_key => 'custom_field_id'
+  # Custom field for the project issues
+  has_and_belongs_to_many :custom_fields, 
+                          :class_name => 'IssueCustomField',
+                          :order => "#{CustomField.table_name}.position",
+                          :join_table => "#{table_name_prefix}custom_fields_projects#{table_name_suffix}",
+                          :association_foreign_key => 'custom_field_id'
+                          
   acts_as_tree :order => "name", :counter_cache => true
 
   acts_as_searchable :columns => ['name', 'description'], :project_key => 'id'
@@ -50,11 +57,12 @@ class Project < ActiveRecord::Base
   validates_associated :custom_values, :on => :update
   validates_associated :repository, :wiki
   validates_length_of :name, :maximum => 30
-  validates_format_of :name, :with => /^[\w\s\'\-]*$/i
   validates_length_of :description, :maximum => 255
   validates_length_of :homepage, :maximum => 60
-  validates_length_of :identifier, :in => 3..12
+  validates_length_of :identifier, :in => 3..20
   validates_format_of :identifier, :with => /^[a-z0-9\-]*$/
+  
+  before_destroy :delete_all_members
   
   def identifier=(identifier)
     super unless identifier_frozen?
@@ -71,11 +79,22 @@ class Project < ActiveRecord::Base
       conditions = ["#{Issue.table_name}.project_id IN (#{ids.join(',')})"]
     end
     conditions ||= ["#{Issue.table_name}.project_id = ?", id]
-    Issue.with_scope :find => { :conditions => conditions } do 
+    # Quick and dirty fix for Rails 2 compatibility
+    Issue.send(:with_scope, :find => { :conditions => conditions }) do 
       yield
     end 
   end
-  
+
+  # Return all issues status changes for the project between the 2 given dates
+  def issues_status_changes(from, to)
+    Journal.find(:all, :include => [:issue, :details, :user],
+                       :conditions => ["#{Journal.table_name}.journalized_type = 'Issue'" +
+                                       " AND #{Issue.table_name}.project_id = ?" +
+                                       " AND #{JournalDetail.table_name}.prop_key = 'status_id'" +
+                                       " AND #{Journal.table_name}.created_on BETWEEN ? AND ?",
+                                       id, from, to+1])
+  end
+
   # returns latest created projects
   # non public projects will be returned only if user is a member of those
   def self.latest(user=nil, count=5)
@@ -113,9 +132,14 @@ class Project < ActiveRecord::Base
     children.select {|child| child.active?}
   end
   
+  # Deletes all project's members
+  def delete_all_members
+    Member.delete_all(['project_id = ?', id])
+  end
+  
   # Users issues can be assigned to
   def assignable_users
-    members.select {|m| m.role.assignable?}.collect {|m| m.user}
+    members.select {|m| m.role.assignable?}.collect {|m| m.user}.sort
   end
   
   # Returns the mail adresses of users that should be always notified on project events
@@ -134,7 +158,7 @@ class Project < ActiveRecord::Base
   end
   
   def <=>(project)
-    name <=> project.name
+    name.downcase <=> project.name.downcase
   end
   
   def allows_to?(action)

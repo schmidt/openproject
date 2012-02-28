@@ -40,7 +40,7 @@ class Issue < ActiveRecord::Base
   acts_as_event :title => Proc.new {|o| "#{o.tracker.name} ##{o.id}: #{o.subject}"},
                 :url => Proc.new {|o| {:controller => 'issues', :action => 'show', :id => o.id}}                
   
-  validates_presence_of :subject, :description, :priority, :tracker, :author, :status
+  validates_presence_of :subject, :description, :priority, :project, :tracker, :author, :status
   validates_length_of :subject, :maximum => 255
   validates_inclusion_of :done_ratio, :in => 0..100
   validates_numericality_of :estimated_hours, :allow_nil => true
@@ -61,6 +61,32 @@ class Issue < ActiveRecord::Base
     self
   end
   
+  # Move an issue to a new project and tracker
+  def move_to(new_project, new_tracker = nil)
+    transaction do
+      if new_project && project_id != new_project.id
+        # delete issue relations
+        self.relations_from.clear
+        self.relations_to.clear
+        # issue is moved to another project
+        self.category = nil 
+        self.fixed_version = nil
+        self.project = new_project
+      end
+      if new_tracker
+        self.tracker = new_tracker
+      end
+      if save
+        # Manually update project_id on related time entries
+        TimeEntry.update_all("project_id = #{new_project.id}", {:issue_id => id})
+      else
+        rollback_db_transaction
+        return false
+      end
+    end
+    return true
+  end
+  
   def priority_id=(pid)
     self.priority = nil
     write_attribute(:priority_id, pid)
@@ -78,6 +104,10 @@ class Issue < ActiveRecord::Base
     if start_date && soonest_start && start_date < soonest_start
       errors.add :start_date, :activerecord_error_invalid
     end
+  end
+  
+  def validate_on_create
+    errors.add :tracker_id, :activerecord_error_invalid unless project.trackers.include?(tracker)
   end
   
   def before_create

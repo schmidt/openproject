@@ -75,6 +75,12 @@ table.list td.checkbox { width: 15px; padding: 0px;}
 tr.issue { text-align: center; white-space: nowrap; }
 tr.issue td.subject, tr.issue td.category { white-space: normal; }
 tr.issue td.subject { text-align: left; }
+tr.issue td.done_ratio table.progress { margin-left:auto; margin-right: auto;}
+
+tr.message { height: 2.6em; }
+tr.message td.last_message { font-size: 80%; }
+tr.message.locked td.subject a { background-image: url(../images/locked.png); }
+tr.message.sticky td.subject a { background-image: url(../images/sticky.png); font-weight: bold; }
 
 table.list tbody tr:hover { background-color:#ffffdd; }
 table td {padding:2px;}
@@ -105,6 +111,8 @@ div.square {
 }
 
 .contextual {float:right; white-space: nowrap; line-height:1.4em;margin-top:5px;font-size:0.9em;}
+.contextual input {font-size:0.9em;}
+
 .splitcontentleft{float:left; width:49%;}
 .splitcontentright{float:right; width:49%;}
 form {display: inline;}
@@ -116,7 +124,7 @@ textarea.wiki-edit { width: 99%; }
 li p {margin-top: 0;}
 div.issue {background:#ffffdd; padding:6px; margin-bottom:6px;border: 1px solid #d7d7d7;}
 .autoscroll {overflow-x: auto; padding:1px; width:100%;}
-#user_firstname, #user_lastname, #user_mail, #notification_option { width: 90%; }
+#user_firstname, #user_lastname, #user_mail, #my_account_form select { width: 90%; }
 
 /***** Tabular forms ******/
 .tabular p{
@@ -145,8 +153,8 @@ width: 200px;
 
 #preview fieldset {margin-top: 1em; background: url(../images/draft.png)}
 
-#settings .tabular p{ padding-left: 300px; }
-#settings .tabular label{ margin-left: -300px; width: 295px; }
+.tabular.settings p{ padding-left: 300px; }
+.tabular.settings label{ margin-left: -300px; width: 295px; }
 
 .required {color: #bb0000;}
 .summary {font-style: italic;}
@@ -242,19 +250,24 @@ color:#505050;
 }
 
 /***** Progress bar *****/
-.progress {
+table.progress {
     border: 1px solid #D7D7D7;
     border-collapse: collapse;
     border-spacing: 0pt;
     empty-cells: show;
-    padding: 3px;
-    width: 40em;
     text-align: center;
+    float:left;
+    margin: 1px 6px 1px 0px;
 }
 
-.progress td { height: 1em; }
-.progress .closed { background: #BAE0BA none repeat scroll 0%; }
-.progress .open { background: #FFF none repeat scroll 0%; }
+table.progress td { height: 0.9em; }
+table.progress td.closed { background: #BAE0BA none repeat scroll 0%; }
+table.progress td.done { background: #DEF0DE none repeat scroll 0%; }
+table.progress td.open { background: #FFF none repeat scroll 0%; }
+p.pourcent {font-size: 80%;}
+p.progress-info {clear: left; font-style: italic; font-size: 80%;}
+
+div#status_by { float:right; width:380px; margin-left: 16px; margin-bottom: 16px; }
 
 /***** Tabs *****/
 #content .tabs{height: 2.6em;}

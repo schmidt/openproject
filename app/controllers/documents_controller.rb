@@ -39,20 +39,14 @@ class DocumentsController < ApplicationController
   def download
     @attachment = @document.attachments.find(params[:attachment_id])
     @attachment.increment_download
-    send_file @attachment.diskfile, :filename => @attachment.filename
+    send_file @attachment.diskfile, :filename => @attachment.filename, :type => @attachment.content_type
   rescue
     render_404
   end 
   
   def add_attachment
-    # Save the attachments
-    @attachments = []
-    params[:attachments].each { |file|
-      next unless file.size > 0
-      a = Attachment.create(:container => @document, :file => file, :author => logged_in_user)
-      @attachments << a unless a.new_record?
-    } if params[:attachments] and params[:attachments].is_a? Array
-    Mailer.deliver_attachments_added(@attachments) if !@attachments.empty? && Setting.notified_events.include?('document_added')
+    attachments = attach_files(@document, params[:attachments])
+    Mailer.deliver_attachments_added(attachments) if !attachments.empty? && Setting.notified_events.include?('document_added')
     redirect_to :action => 'show', :id => @document
   end
   

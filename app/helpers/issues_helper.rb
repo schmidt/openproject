@@ -15,7 +15,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'csv'
+
 module IssuesHelper
+  include ApplicationHelper
 
   def render_issue_tooltip(issue)
     @cached_label_start_date ||= l(:field_start_date)
@@ -100,5 +103,57 @@ module IssuesHelper
         "#{label} #{old_value} #{l(:label_deleted)}"
       end
     end
+  end
+  
+  def issues_to_csv(issues, project = nil)
+    ic = Iconv.new(l(:general_csv_encoding), 'UTF-8')    
+    export = StringIO.new
+    CSV::Writer.generate(export, l(:general_csv_separator)) do |csv|
+      # csv header fields
+      headers = [ "#",
+                  l(:field_status), 
+                  l(:field_project),
+                  l(:field_tracker),
+                  l(:field_priority),
+                  l(:field_subject),
+                  l(:field_assigned_to),
+                  l(:field_category),
+                  l(:field_fixed_version),
+                  l(:field_author),
+                  l(:field_start_date),
+                  l(:field_due_date),
+                  l(:field_done_ratio),
+                  l(:field_created_on),
+                  l(:field_updated_on)
+                  ]
+      # Export project custom fields if project is given
+      # otherwise export custom fields marked as "For all projects"
+      custom_fields = project.nil? ? IssueCustomField.for_all : project.all_custom_fields
+      custom_fields.each {|f| headers << f.name}
+      csv << headers.collect {|c| begin; ic.iconv(c.to_s); rescue; c.to_s; end }
+      # csv lines
+      issues.each do |issue|
+        fields = [issue.id,
+                  issue.status.name, 
+                  issue.project.name,
+                  issue.tracker.name, 
+                  issue.priority.name,
+                  issue.subject,
+                  issue.assigned_to,
+                  issue.category,
+                  issue.fixed_version,
+                  issue.author.name,
+                  format_date(issue.start_date),
+                  format_date(issue.due_date),
+                  issue.done_ratio,
+                  format_time(issue.created_on),  
+                  format_time(issue.updated_on)
+                  ]
+        custom_fields.each {|f| fields << show_value(issue.custom_value_for(f)) }
+        csv << fields.collect {|c| begin; ic.iconv(c.to_s); rescue; c.to_s; end }
+      end
+    end
+    export.rewind
+    export
   end
 end

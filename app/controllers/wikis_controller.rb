@@ -23,7 +23,7 @@ class WikisController < ApplicationController
   def edit
     @wiki = @project.wiki || Wiki.new(:project => @project)
     @wiki.attributes = params[:wiki]
-    @wiki.save if @request.post?
+    @wiki.save if request.post?
     render(:update) {|page| page.replace_html "tab-content-wiki", :partial => 'projects/settings/wiki'}
   end
 

@@ -103,8 +103,6 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           entries.sort_by_name
-        rescue Errno::ENOENT => e
-          raise CommandFailed    
         end  
 
         STARTLOG="----------------------------"
@@ -142,7 +140,8 @@ module Redmine
               
               if state=="entry_start"
                 branch_map=Hash.new
-                if /^RCS file: #{Regexp.escape(root_url)}\/#{Regexp.escape(path_with_project)}(.+),v$/ =~ line
+                # gsub(/^:.*@[^:]+:/, '') is here to remove :pserver:anonymous@foo.bar: string if present in the url
+                if /^RCS file: #{Regexp.escape(root_url.gsub(/^:.*@[^:]+:/, ''))}\/#{Regexp.escape(path_with_project)}(.+),v$/ =~ line
                   entry_path = normalize_cvs_path($1)
                   entry_name = normalize_path(File.basename($1))
                   logger.debug("Path #{entry_path} <=> Name #{entry_name}")
@@ -233,8 +232,6 @@ module Redmine
               end 
             end
           end
-        rescue Errno::ENOENT => e
-          raise CommandFailed    
         end  
         
         def diff(path, identifier_from, identifier_to=nil, type="inline")
@@ -249,8 +246,6 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           DiffTableList.new diff, type
-        rescue Errno::ENOENT => e
-          raise CommandFailed    
         end  
         
         def cat(path, identifier=nil)
@@ -264,10 +259,24 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           cat
-        rescue Errno::ENOENT => e
-          raise CommandFailed    
         end  
-        
+
+        def annotate(path, identifier=nil)
+          identifier = (identifier) ? identifier : "HEAD"
+          logger.debug "<cvs> annotate path:'#{path}',identifier #{identifier}"
+          path_with_project="#{url}#{with_leading_slash(path)}"
+          cmd = "#{CVS_BIN} -d #{root_url} rannotate -r#{identifier} #{path_with_project}"
+          blame = Annotate.new
+          shellout(cmd) do |io|
+            io.each_line do |line|
+              next unless line =~ %r{^([\d\.]+)\s+\(([^\)]+)\s+[^\)]+\):\s(.*)$}
+              blame.add_line($3.rstrip, Revision.new(:revision => $1, :author => $2.strip))
+            end
+          end
+          return nil if $? && $?.exitstatus != 0
+          blame
+        end
+         
         private
 
         # convert a date/time into the CVS-format

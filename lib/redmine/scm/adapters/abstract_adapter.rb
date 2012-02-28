@@ -38,6 +38,10 @@ module Redmine
         def supports_cat?
           true
         end
+
+        def supports_annotate?
+          respond_to?('annotate')
+        end
         
         def root_url
           @root_url
@@ -76,7 +80,7 @@ module Redmine
         def cat(path, identifier=nil)
           return nil
         end
-
+        
         def with_leading_slash(path)
           path ||= ''
           (path[0,1]!="/") ? "/#{path}" : path
@@ -108,9 +112,15 @@ module Redmine
       
         def shellout(cmd, &block)
           logger.debug "Shelling out: #{cmd}" if logger && logger.debug?
-          IO.popen(cmd, "r+") do |io|
-            io.close_write
-            block.call(io) if block_given?
+          begin
+            IO.popen(cmd, "r+") do |io|
+              io.close_write
+              block.call(io) if block_given?
+            end
+          rescue Errno::ENOENT => e
+            # The command failed, log it and re-raise
+            log.error("SCM command failed: #{cmd}\n  with: #{e.message}")
+            raise CommandFailed
           end
         end  
       end
@@ -237,7 +247,7 @@ module Redmine
     
         # Initialize with a Diff file and the type of Diff View
         # The type view must be inline or sbs (side_by_side)
-        def initialize (type="inline")
+        def initialize(type="inline")
           @parsing = false
           @nb_line = 1
           @start = false
@@ -312,7 +322,7 @@ module Redmine
             CGI.escapeHTML(line)
         end
     
-        def parse_line (line, type="inline")
+        def parse_line(line, type="inline")
           if line[0, 1] == "+"
             diff = sbs? type, 'add'
             @before = 'add'
@@ -346,6 +356,28 @@ module Redmine
           else
             false
           end
+        end
+      end
+    
+      class Annotate
+        attr_reader :lines, :revisions
+        
+        def initialize
+          @lines = []
+          @revisions = []
+        end
+        
+        def add_line(line, revision)
+          @lines << line
+          @revisions << revision
+        end
+        
+        def content
+          content = lines.join("\n")
+        end
+        
+        def empty?
+          lines.empty?
         end
       end
     end

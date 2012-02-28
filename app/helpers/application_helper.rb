@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 module ApplicationHelper
+  include Redmine::WikiFormatting::Macros::Definitions
 
   def current_role
     @current_role ||= User.current.role_for_project(@project)
@@ -33,7 +34,7 @@ module ApplicationHelper
 
   # Display a link to user's account page
   def link_to_user(user)
-    link_to user.name, :controller => 'account', :action => 'show', :id => user
+    user ? link_to(user, :controller => 'account', :action => 'show', :id => user) : 'Anonymous'
   end
   
   def link_to_issue(issue)
@@ -70,20 +71,28 @@ module ApplicationHelper
   
   def format_date(date)
     return nil unless date
-    @date_format ||= (Setting.date_format.to_i == 0 ? l(:general_fmt_date) : "%Y-%m-%d")
+    # "Setting.date_format.size < 2" is a temporary fix (content of date_format setting changed)
+    @date_format ||= (Setting.date_format.blank? || Setting.date_format.size < 2 ? l(:general_fmt_date) : Setting.date_format)
     date.strftime(@date_format)
   end
   
-  def format_time(time)
+  def format_time(time, include_date = true)
     return nil unless time
-    @date_format_setting ||= Setting.date_format.to_i
     time = time.to_time if time.is_a?(String)
-    @date_format_setting == 0 ? l_datetime(time) : (time.strftime("%Y-%m-%d") + ' ' + l_time(time))
+    zone = User.current.time_zone
+    if time.utc?
+      local = zone ? zone.adjust(time) : time.getlocal
+    else
+      local = zone ? zone.adjust(time.getutc) : time
+    end
+    @date_format ||= (Setting.date_format.blank? || Setting.date_format.size < 2 ? l(:general_fmt_date) : Setting.date_format)
+    @time_format ||= (Setting.time_format.blank? ? l(:general_fmt_time) : Setting.time_format)
+    include_date ? local.strftime("#{@date_format} #{@time_format}") : local.strftime(@time_format)
   end
   
   def authoring(created, author)
     time_tag = content_tag('acronym', distance_of_time_in_words(Time.now, created), :title => format_time(created))
-    l(:label_added_time_by, author.name, time_tag)
+    l(:label_added_time_by, author || 'Anonymous', time_tag)
   end
   
   def day_name(day)
@@ -130,15 +139,28 @@ module ApplicationHelper
                 :preview => 'r',
                 :quick_search => 'f',
                 :search => '4',
-                }.freeze
+                }.freeze unless const_defined?(:ACCESSKEYS)
 
   def accesskey(s)
     ACCESSKEYS[s]
   end
 
-  # format text according to system settings
-  def textilizable(text, options = {})
-    return "" if text.blank?
+  # Formats text according to system settings.
+  # 2 ways to call this method:
+  # * with a String: textilizable(text, options)
+  # * with an object and one of its attribute: textilizable(issue, :description, options)
+  def textilizable(*args)
+    options = args.last.is_a?(Hash) ? args.pop : {}
+    case args.size
+    when 1
+      obj = nil
+      text = args.shift || ''
+    when 2
+      obj = args.shift
+      text = obj.send(args.shift)
+    else
+      raise ArgumentError, 'invalid arguments to textilizable'
+    end
 
     # when using an image link, try to use an attachment, if possible
     attachments = options[:attachments]
@@ -158,7 +180,8 @@ module ApplicationHelper
     end
     
     text = (Setting.text_formatting == 'textile') ?
-      Redmine::WikiFormatting.to_html(text) : simple_format(auto_link(h(text)))
+      Redmine::WikiFormatting.to_html(text) { |macro, args| exec_macro(macro, obj, args) } :
+      simple_format(auto_link(h(text)))
 
     # different methods for formatting wiki links
     case options[:wiki_links]
@@ -208,7 +231,7 @@ module ApplicationHelper
     # example:
     #   #52 -> <a href="/issues/show/52">#52</a>
     #   r52 -> <a href="/repositories/revision/6?rev=52">r52</a> (project.id is 6)
-    text = text.gsub(%r{([\s,-^])(#|r)(\d+)(?=[[:punct:]]|\s|<|$)}) do |m|
+    text = text.gsub(%r{([\s\(,-^])(#|r)(\d+)(?=[[:punct:]]|\s|<|$)}) do |m|
       leading, otype, oid = $1, $2, $3
       link = nil
       if otype == 'r'
@@ -276,7 +299,7 @@ module ApplicationHelper
   
   def lang_options_for_select(blank=true)
     (blank ? [["(auto)", ""]] : []) + 
-      GLoc.valid_languages.collect{|lang| [ ll(lang.to_s, :general_lang_name), lang.to_s]}.sort{|x,y| x.first <=> y.first }
+      GLoc.valid_languages.collect{|lang| [ ll(lang.to_s, :general_lang_name), lang.to_s]}.sort{|x,y| x.last <=> y.last }
   end
   
   def label_tag_for(name, option_tags = nil, options = {})
@@ -294,6 +317,21 @@ module ApplicationHelper
     link_to_function(l(:button_check_all), "checkAll('#{form_name}', true)") +
     " | " +
     link_to_function(l(:button_uncheck_all), "checkAll('#{form_name}', false)")   
+  end
+  
+  def progress_bar(pcts, options={})
+    pcts = [pcts, pcts] unless pcts.is_a?(Array)
+    pcts[1] = pcts[1] - pcts[0]
+    pcts << (100 - pcts[1] - pcts[0])
+    width = options[:width] || '100px;'
+    legend = options[:legend] || ''
+    content_tag('table',
+      content_tag('tr',
+        (pcts[0] > 0 ? content_tag('td', '', :width => "#{pcts[0].floor}%;", :class => 'closed') : '') +
+        (pcts[1] > 0 ? content_tag('td', '', :width => "#{pcts[1].floor}%;", :class => 'done') : '') +
+        (pcts[2] > 0 ? content_tag('td', '', :width => "#{pcts[2].floor}%;", :class => 'todo') : '')
+      ), :class => 'progress', :style => "width: #{width};") +
+      content_tag('p', legend, :class => 'pourcent')
   end
   
   def context_menu_link(name, url, options={})

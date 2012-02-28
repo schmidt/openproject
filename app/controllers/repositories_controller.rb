@@ -19,6 +19,9 @@ require 'SVG/Graph/Bar'
 require 'SVG/Graph/BarHorizontal'
 require 'digest/sha1'
 
+class ChangesetNotFound < Exception
+end
+
 class RepositoriesController < ApplicationController
   layout 'base'
   before_filter :find_repository, :except => :edit
@@ -89,24 +92,44 @@ class RepositoriesController < ApplicationController
     show_error and return unless @content
     if 'raw' == params[:format]      
       send_data @content, :filename => @path.split('/').last
+    else
+      # Prevent empty lines when displaying a file with Windows style eol
+      @content.gsub!("\r\n", "\n")
     end
+  end
+  
+  def annotate
+    @annotate = @repository.scm.annotate(@path, @rev)
+    show_error and return if @annotate.nil? || @annotate.empty?
   end
   
   def revision
     @changeset = @repository.changesets.find_by_revision(@rev)
-    show_error and return unless @changeset
+    raise ChangesetNotFound unless @changeset
     @changes_count = @changeset.changes.size
     @changes_pages = Paginator.new self, @changes_count, 150, params['page']								
     @changes = @changeset.changes.find(:all,
   						:limit  =>  @changes_pages.items_per_page,
   						:offset =>  @changes_pages.current.offset)
-  	
-  	render :action => "revision", :layout => false if request.xhr?	
+
+    respond_to do |format|
+      format.html
+      format.js {render :layout => false}
+    end
+  rescue ChangesetNotFound
+    show_error
   end
   
   def diff
     @rev_to = params[:rev_to] ? params[:rev_to].to_i : (@rev - 1)
-    @diff_type = ('sbs' == params[:type]) ? 'sbs' : 'inline'
+    @diff_type = params[:type] || User.current.pref[:diff_type] || 'inline'
+    @diff_type = 'inline' unless %w(inline sbs).include?(@diff_type)
+    
+    # Save diff type as user preference
+    if User.current.logged? && @diff_type != User.current.pref[:diff_type]
+      User.current.pref[:diff_type] = @diff_type
+      User.current.preference.save
+    end
     
     @cache_key = "repositories/diff/#{@repository.id}/" + Digest::MD5.hexdigest("#{@path}-#{@rev}-#{@rev_to}-#{@diff_type}")    
     unless read_fragment(@cache_key)

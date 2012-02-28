@@ -10,7 +10,7 @@
 
 <h2><%= @issue.tracker.name %> #<%= @issue.id %></h2>
 
-<div class="issue">
+<div class="issue <%= "status-#{@issue.status.position} priority-#{@issue.priority.position}" %>">
         <h3><%=h @issue.subject %></h3>
         <p class="author">
         <%= authoring @issue.created_on, @issue.author %>.
@@ -28,7 +28,7 @@
 </tr>
 <tr>
     <td><b><%=l(:field_assigned_to)%> :</b></td><td><%= @issue.assigned_to ? link_to_user(@issue.assigned_to) : "-" %></td>
-    <td><b><%=l(:field_done_ratio)%> :</b></td><td><%= @issue.done_ratio %> %</td>
+    <td><b><%=l(:field_done_ratio)%> :</b></td><td><%= progress_bar @issue.done_ratio, :width => '80px', :legend => "#{@issue.done_ratio}%" %></td>
 </tr>
 <tr>
     <td><b><%=l(:field_category)%> :</b></td><td><%=h @issue.category ? @issue.category.name : "-" %></td>
@@ -64,7 +64,7 @@ end %>
 <% end %>
 
 <p><strong><%=l(:field_description)%></strong></p>
-<%= textilizable @issue.description, :attachments => @issue.attachments %>
+<%= textilizable @issue, :description, :attachments => @issue.attachments %>
 
 <% if @issue.attachments.any? %>
 <%= link_to_attachments @issue.attachments, :delete_url => (authorize_for('issues', 'destroy_attachment') ? {:controller => 'issues', :action => 'destroy_attachment', :id => @issue} : nil) %>

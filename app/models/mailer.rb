@@ -88,6 +88,14 @@ class Mailer < ActionMailer::Base
          :password => password,
          :login_url => url_for(:controller => 'account', :action => 'login')
   end
+  
+  def account_activation_request(user)
+    # Send the email to all active administrators
+    recipients User.find_active(:all, :conditions => {:admin => true}).collect { |u| u.mail }.compact
+    subject l(:mail_subject_account_activation_request)
+    body :user => user,
+         :url => url_for(:controller => 'users', :action => 'index', :status => User::STATUS_REGISTERED, :sort_key => 'created_on', :sort_order => 'desc')
+  end
 
   def lost_password(token)
     set_language_if_valid(token.user.language)
@@ -102,7 +110,7 @@ class Mailer < ActionMailer::Base
     recipients token.user.mail
     subject l(:mail_subject_register)
     body :token => token,
-         :url => url_for(:controller => 'account', :action => 'register', :token => token.value)
+         :url => url_for(:controller => 'account', :action => 'activate', :token => token.value)
   end
   
   def test(user)
@@ -121,10 +129,32 @@ class Mailer < ActionMailer::Base
     default_url_options[:protocol] = Setting.protocol
   end
   
+  # Overrides the create_mail method
+  def create_mail
+    # Removes the current user from the recipients and cc
+    # if he doesn't want to receive notifications about what he does
+    if User.current.pref[:no_self_notified]
+      recipients.delete(User.current.mail) if recipients
+      cc.delete(User.current.mail) if cc
+    end
+    # Blind carbon copy recipients
+    if Setting.bcc_recipients?
+      bcc([recipients, cc].flatten.compact.uniq)
+      recipients []
+      cc []
+    end    
+    super
+  end
+  
   # Renders a message with the corresponding layout
   def render_message(method_name, body)
     layout = method_name.match(%r{text\.html\.(rhtml|rxml)}) ? 'layout.text.html.rhtml' : 'layout.text.plain.rhtml'
     body[:content_for_layout] = render(:file => method_name, :body => body)
-    ActionView::Base.new(File.join(template_root, 'mailer'), body, self).render(:file => layout)
+    ActionView::Base.new(template_root, body, self).render(:file => "mailer/#{layout}")
   end
+  
+  # Makes partial rendering work with Rails 1.2 (retro-compatibility)
+  def self.controller_path
+    ''
+  end unless respond_to?('controller_path')
 end

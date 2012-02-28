@@ -5,10 +5,10 @@
 	<ul>
 	<% unless @project.homepage.blank? %><li><%=l(:field_homepage)%>: <%= auto_link @project.homepage %></li><% end %>
     <% if @subprojects.any? %>
- 	<li><%=l(:label_subproject_plural)%>: <%= @subprojects.collect{|p| link_to(p.name, :action => 'show', :id => p)}.join(", ") %></li>
+ 	<li><%=l(:label_subproject_plural)%>: <%= @subprojects.collect{|p| link_to(h(p.name), :action => 'show', :id => p)}.join(", ") %></li>
     <% end %>
 	<% if @project.parent %>
-	<li><%=l(:field_parent)%>: <%= link_to @project.parent.name, :controller => 'projects', :action => 'show', :id => @project.parent %></li>
+	<li><%=l(:field_parent)%>: <%= link_to h(@project.parent.name), :controller => 'projects', :action => 'show', :id => @project.parent %></li>
 	<% end %>
 	<% for custom_value in @custom_values %>
 	<% if !custom_value.value.empty? %>
@@ -22,14 +22,14 @@
     <h3 class="icon22 icon22-tracker"><%=l(:label_issue_tracking)%></h3>
     <ul>
     <% for tracker in @trackers %>    
-      <li><%= link_to tracker.name, :controller => 'projects', :action => 'list_issues', :id => @project, 
+      <li><%= link_to tracker.name, :controller => 'issues', :action => 'index', :project_id => @project, 
                                                 :set_filter => 1, 
                                                 "tracker_id" => tracker.id %>:
       <%= @open_issues_by_tracker[tracker] || 0 %> <%= lwr(:label_open_issues, @open_issues_by_tracker[tracker] || 0) %>
       <%= l(:label_on) %> <%= @total_issues_by_tracker[tracker] || 0 %></li>
     <% end %>
     </ul>
-    <p><%= link_to l(:label_issue_view_all), :controller => 'projects', :action => 'list_issues', :id => @project, :set_filter => 1 %></p>
+    <p><%= link_to l(:label_issue_view_all), :controller => 'issues', :action => 'index', :project_id => @project, :set_filter => 1 %></p>
   </div>
   <% end %>
 </div>
@@ -46,17 +46,17 @@
 	</div>
 	<% end %>
     
-  <% if @news.any? && authorize_for('projects', 'list_news') %>
+  <% if @news.any? && authorize_for('news', 'index') %>
   <div class="box">
     <h3><%=l(:label_news_latest)%></h3>  
     <%= render :partial => 'news/news', :collection => @news %>
-    <p><%= link_to l(:label_news_view_all), :controller => 'projects', :action => 'list_news', :id => @project %></p>
+    <p><%= link_to l(:label_news_view_all), :controller => 'news', :action => 'index', :project_id => @project %></p>
   </div>  
   <% end %>
 </div>
 
 <% content_for :sidebar do %>
-    <% if authorize_for('projects', 'add_issue') %>
+    <% if authorize_for('projects', 'add_issue') && @project.trackers.any? %>
     <h3><%= l(:label_issue_new) %></h3>
     <%= l(:label_tracker) %>: <%= new_issue_selector %>
     <% end %>
@@ -81,3 +81,5 @@
 <% content_for :header_tags do %>
 <%= auto_discovery_link_tag(:atom, {:action => 'activity', :id => @project, :format => 'atom', :key => User.current.rss_key}) %>
 <% end %>
+
+<% set_html_title l(:label_overview) -%>

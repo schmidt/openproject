@@ -36,7 +36,7 @@ module Redmine
                            :lastrev => revisions(nil,nil,nil,{:limit => 1}).last
                          })
           info
-        rescue Errno::ENOENT => e
+        rescue CommandFailed
           return nil
         end
         
@@ -58,8 +58,6 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           entries.sort_by_name
-        rescue Errno::ENOENT => e
-          raise CommandFailed
         end
   
         def entry(path=nil, identifier=nil)
@@ -91,7 +89,7 @@ module Redmine
                                              :author => changeset[:user],
                                              :time => Time.parse(changeset[:date]),
                                              :message => changeset[:description],
-                                             :paths => changeset[:files].split.collect{|path| {:action => 'X', :path => "/#{path}"}}
+                                             :paths => changeset[:files].to_s.split.collect{|path| {:action => 'X', :path => "/#{path}"}}
                   })
                   changeset = {}
                 end
@@ -119,8 +117,6 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           revisions
-        rescue Errno::ENOENT => e
-          raise CommandFailed
         end
         
         def diff(path, identifier_from, identifier_to=nil, type="inline")
@@ -140,9 +136,6 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           DiffTableList.new diff, type
-    
-        rescue Errno::ENOENT => e
-          raise CommandFailed
         end
         
         def cat(path, identifier=nil)
@@ -154,8 +147,23 @@ module Redmine
           end
           return nil if $? && $?.exitstatus != 0
           cat
-        rescue Errno::ENOENT => e
-          raise CommandFailed
+        end
+        
+        def annotate(path, identifier=nil)
+          path ||= ''
+          cmd = "#{HG_BIN} -R #{target('')}"
+          cmd << " annotate -n -u"
+          cmd << " -r #{identifier.to_i}" if identifier
+          cmd << " #{target(path)}"
+          blame = Annotate.new
+          shellout(cmd) do |io|
+            io.each_line do |line|
+              next unless line =~ %r{^([^:]+)\s(\d+):(.*)$}
+              blame.add_line($3.rstrip, Revision.new(:identifier => $2.to_i, :author => $1.strip))
+            end
+          end
+          return nil if $? && $?.exitstatus != 0
+          blame
         end
       end
     end

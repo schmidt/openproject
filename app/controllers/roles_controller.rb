@@ -33,7 +33,8 @@ class RolesController < ApplicationController
   end
 
   def new
-    @role = Role.new(params[:role])
+    # Prefills the form with 'Non member' role permissions
+    @role = Role.new(params[:role] || {:permissions => Role.non_member.permissions})
     if request.post? && @role.save
       flash[:notice] = l(:notice_successful_create)
       redirect_to :action => 'list'
@@ -93,7 +94,7 @@ class RolesController < ApplicationController
     end
     @roles = Role.find(:all, :order => 'builtin, position')
     @trackers = Tracker.find(:all, :order => 'position')
-    @statuses = IssueStatus.find(:all, :include => :workflows, :order => 'position')
+    @statuses = IssueStatus.find(:all, :order => 'position')
   end
   
   def report    

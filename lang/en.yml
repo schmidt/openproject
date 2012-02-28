@@ -75,6 +75,7 @@ notice_email_error: An error occurred while sending mail (%s)
 notice_feeds_access_key_reseted: Your RSS access key was reseted.
 notice_failed_to_save_issues: "Failed to save %d issue(s) on %d selected: %s."
 notice_no_issue_selected: "No issue is selected! Please, check the issues you want to edit."
+notice_account_pending: "Your account was created and is now pending administrator approval."
 
 mail_subject_lost_password: Your Redmine password
 mail_body_lost_password: 'To change your Redmine password, click on the following link:'
@@ -82,6 +83,8 @@ mail_subject_register: Redmine account activation
 mail_body_register: 'To activate your Redmine account, click on the following link:'
 mail_body_account_information_external: You can use your "%s" account to log into Redmine.
 mail_body_account_information: Your Redmine account information
+mail_subject_account_activation_request: Redmine account activation request
+mail_body_account_activation_request: 'A new user (%s) has registered. His account his pending your approval:'
 
 gui_validation_error: 1 error
 gui_validation_error_plural: %d errors
@@ -166,16 +169,19 @@ field_assignable: Issues can be assigned to this role
 field_redirect_existing_links: Redirect existing links
 field_estimated_hours: Estimated time
 field_column_names: Columns
+field_time_zone: Time zone
+field_searchable: Searchable
 
 setting_app_title: Application title
 setting_app_subtitle: Application subtitle
 setting_welcome_text: Welcome text
 setting_default_language: Default language
-setting_login_required: Authent. required
-setting_self_registration: Self-registration enabled
+setting_login_required: Authentication required
+setting_self_registration: Self-registration
 setting_attachment_max_size: Attachment max. size
 setting_issues_export_limit: Issues export limit
 setting_mail_from: Emission email address
+setting_bcc_recipients: Blind carbon copy recipients (bcc)
 setting_host_name: Host name
 setting_text_formatting: Text formatting
 setting_wiki_compression: Wiki history compression
@@ -186,6 +192,7 @@ setting_commit_ref_keywords: Referencing keywords
 setting_commit_fix_keywords: Fixing keywords
 setting_autologin: Autologin
 setting_date_format: Date format
+setting_time_format: Time format
 setting_cross_project_issue_relations: Allow cross-project issue relations
 setting_issue_list_default_columns: Default columns displayed on the issue list
 setting_repositories_encodings: Repositories encodings
@@ -204,6 +211,7 @@ label_issue: Issue
 label_issue_new: New issue
 label_issue_plural: Issues
 label_issue_view_all: View all issues
+label_issues_by: Issues by %s
 label_document: Document
 label_document_new: New document
 label_document_plural: Documents
@@ -425,7 +433,7 @@ label_month: Month
 label_week: Week
 label_date_from: From
 label_date_to: To
-label_language_based: Language based
+label_language_based: Based on user's language
 label_sort_by: Sort by %s
 label_send_test_email: Send a test email
 label_feeds_access_key_created_on: RSS access key created %s ago
@@ -444,6 +452,10 @@ label_search_titles_only: Search titles only
 label_user_mail_option_all: "For any event on all my projects"
 label_user_mail_option_selected: "For any event on the selected projects only..."
 label_user_mail_option_none: "Only for things I watch or I'm involved in"
+label_user_mail_no_self_notified: "I don't want to be notified of changes that I make myself"
+label_registration_activation_by_email: account activation by email
+label_registration_manual_activation: manual account activation
+label_registration_automatic_activation: automatic account activation
 
 button_login: Login
 button_submit: Submit
@@ -479,6 +491,7 @@ button_reset: Reset
 button_rename: Rename
 button_change_password: Change password
 button_copy: Copy
+button_annotate: Annotate
 
 status_active: active
 status_registered: registered
@@ -498,6 +511,7 @@ text_tip_task_end_day: task ending this day
 text_tip_task_begin_end_day: task beginning and ending this day
 text_project_identifier_info: 'Lower case letters (a-z), numbers and dashes allowed.<br />Once saved, the identifier can not be changed.'
 text_caracters_maximum: %d characters maximum.
+text_caracters_minimum: Must be at least %d characters long.
 text_length_between: Length between %d and %d characters.
 text_tracker_no_workflow: No workflow defined for this tracker
 text_unallowed_characters: Unallowed characters

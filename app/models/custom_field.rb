@@ -17,6 +17,7 @@
 
 class CustomField < ActiveRecord::Base
   has_many :custom_values, :dependent => :delete_all
+  acts_as_list :scope => 'type = \'#{self.class}\''
   serialize :possible_values
   
   FIELD_FORMATS = { "string" => { :name => :label_string, :order => 1 },
@@ -42,6 +43,9 @@ class CustomField < ActiveRecord::Base
   def before_validation
     # remove empty values
     self.possible_values = self.possible_values.collect{|v| v unless v.empty?}.compact
+    # make sure these fields are not searchable
+    self.searchable = false if %w(int float date bool).include?(field_format)
+    true
   end
   
   def validate
@@ -51,6 +55,10 @@ class CustomField < ActiveRecord::Base
     end
   end
 
+  def <=>(field)
+    position <=> field.position
+  end
+  
   # to move in project_custom_field
   def self.for_all
     find(:all, :conditions => ["is_for_all=?", true])

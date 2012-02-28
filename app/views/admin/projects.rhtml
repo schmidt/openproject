@@ -26,7 +26,7 @@
   <tbody>
 <% for project in @projects %>
   <tr class="<%= cycle("odd", "even") %>">
-	<td><%= project.active? ? link_to(project.name, :controller => 'projects', :action => 'settings', :id => project) : h(project.name) %>
+	<td><%= project.active? ? link_to(h(project.name), :controller => 'projects', :action => 'settings', :id => project) : h(project.name) %>
 	<td><%= textilizable project.description, :project => project %>
 	<td align="center"><%= image_tag 'true.png' if project.is_public? %>
 	<td align="center"><%= project.children.size %>
@@ -47,3 +47,5 @@
 
 <p><%= pagination_links_full @project_pages, :status => @status %>
 [ <%= @project_pages.current.first_item %> - <%= @project_pages.current.last_item %> / <%= @project_count %> ]</p>
+
+<% set_html_title l(:label_project_plural) -%>

@@ -10,7 +10,7 @@ rescue LoadError
   # RMagick is not available
 end
 
-REDMINE_SUPPORTED_SCM = %w( Subversion Darcs Mercurial Cvs )
+REDMINE_SUPPORTED_SCM = %w( Subversion Darcs Mercurial Cvs Bazaar )
 
 # Permissions
 Redmine::AccessControl.map do |map|
@@ -25,15 +25,16 @@ Redmine::AccessControl.map do |map|
     # Issue categories
     map.permission :manage_categories, {:projects => [:settings, :add_issue_category], :issue_categories => [:edit, :destroy]}, :require => :member
     # Issues
-    map.permission :view_issues, {:projects => [:list_issues, :export_issues_csv, :export_issues_pdf, :changelog, :roadmap], 
-                                  :issues => [:show, :context_menu],
+    map.permission :view_issues, {:projects => [:changelog, :roadmap], 
+                                  :issues => [:index, :changes, :show, :context_menu],
+                                  :versions => [:show, :status_by],
                                   :queries => :index,
                                   :reports => :issue_report}, :public => true                    
-    map.permission :add_issues, {:projects => :add_issue}, :require => :loggedin
+    map.permission :add_issues, {:projects => :add_issue}
     map.permission :edit_issues, {:projects => :bulk_edit_issues,
-                                  :issues => [:edit, :destroy_attachment]}, :require => :loggedin
-    map.permission :manage_issue_relations, {:issue_relations => [:new, :destroy]}, :require => :loggedin
-    map.permission :add_issue_notes, {:issues => :add_note}, :require => :loggedin
+                                  :issues => [:edit, :destroy_attachment]}
+    map.permission :manage_issue_relations, {:issue_relations => [:new, :destroy]}
+    map.permission :add_issue_notes, {:issues => :add_note}
     map.permission :change_issue_status, {:issues => :change_status}, :require => :loggedin
     map.permission :move_issues, {:projects => :move_issues}, :require => :loggedin
     map.permission :delete_issues, {:issues => :destroy}, :require => :member
@@ -52,8 +53,8 @@ Redmine::AccessControl.map do |map|
   
   map.project_module :news do |map|
     map.permission :manage_news, {:projects => :add_news, :news => [:edit, :destroy, :destroy_comment]}, :require => :member
-    map.permission :view_news, {:projects => :list_news, :news => :show}, :public => true
-    map.permission :comment_news, {:news => :add_comment}, :require => :loggedin
+    map.permission :view_news, {:news => [:index, :show]}, :public => true
+    map.permission :comment_news, {:news => :add_comment}
   end
 
   map.project_module :documents do |map|
@@ -76,14 +77,16 @@ Redmine::AccessControl.map do |map|
     
   map.project_module :repository do |map|
     map.permission :manage_repository, {:repositories => [:edit, :destroy]}, :require => :member
-    map.permission :browse_repository, :repositories => [:show, :browse, :entry, :changes, :diff, :stats, :graph]
+    map.permission :browse_repository, :repositories => [:show, :browse, :entry, :annotate, :changes, :diff, :stats, :graph]
     map.permission :view_changesets, :repositories => [:show, :revisions, :revision]
   end
 
   map.project_module :boards do |map|
     map.permission :manage_boards, {:boards => [:new, :edit, :destroy]}, :require => :member
     map.permission :view_messages, {:boards => [:index, :show], :messages => [:show]}, :public => true
-    map.permission :add_messages, {:messages => [:new, :reply]}, :require => :loggedin
+    map.permission :add_messages, {:messages => [:new, :reply]}
+    map.permission :edit_messages, {:messages => :edit}, :require => :member
+    map.permission :delete_messages, {:messages => :destroy}, :require => :member
   end
 end
 
@@ -92,8 +95,8 @@ Redmine::MenuManager.map :project_menu do |menu|
   menu.push :label_overview, :controller => 'projects', :action => 'show'
   menu.push :label_activity, :controller => 'projects', :action => 'activity'
   menu.push :label_roadmap, :controller => 'projects', :action => 'roadmap'
-  menu.push :label_issue_plural, :controller => 'projects', :action => 'list_issues'
-  menu.push :label_news_plural, :controller => 'projects', :action => 'list_news'
+  menu.push :label_issue_plural, { :controller => 'issues', :action => 'index' }, :param => :project_id
+  menu.push :label_news_plural, { :controller => 'news', :action => 'index' }, :param => :project_id
   menu.push :label_document_plural, :controller => 'projects', :action => 'list_documents'
   menu.push :label_wiki, { :controller => 'wiki', :action => 'index', :page => nil }, :if => Proc.new { |p| p.wiki && !p.wiki.new_record? }
   menu.push :label_board_plural, { :controller => 'boards', :action => 'index', :id => nil }, :param => :project_id, :if => Proc.new { |p| p.boards.any? }

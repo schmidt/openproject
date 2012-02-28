@@ -38,10 +38,10 @@ activerecord_error_circular_dependency: Aceasta relatie ar crea dependenta circu
 
 general_fmt_age: %d an
 general_fmt_age_plural: %d ani
-general_fmt_date: %%m/%%d/%%A
-general_fmt_datetime: %%m/%%d/%%A %%Z:%%L %%p
-general_fmt_datetime_short: %%b %%d, %%Z:%%L %%p
-general_fmt_time: %%Z:%%L %%p
+general_fmt_date: %%m/%%d/%%Y
+general_fmt_datetime: %%m/%%d/%%Y %%I:%%M %%p
+general_fmt_datetime_short: %%b %%d, %%I:%%M %%p
+general_fmt_time: %%I:%%M %%p
 general_text_No: 'Nu'
 general_text_Yes: 'Da'
 general_text_no: 'nu'
@@ -74,9 +74,9 @@ notice_email_sent: Un e-mail a fost trimis la adresa %s
 notice_email_error: Eroare in trimiterea e-mailului (%s)
 notice_feeds_access_key_reseted: Parola de acces RSS a fost resetat.
 
-mail_subject_lost_password: Parola clair.ro|PM
+mail_subject_lost_password: Your Redmine password
 mail_body_lost_password: 'To change your Redmine password, click on the following link:'
-mail_subject_register: Activare cont clair.ro|PM
+mail_subject_register: Redmine account activation
 mail_body_register: 'To activate your Redmine account, click on the following link:'
 
 gui_validation_error: 1 eroare
@@ -536,3 +536,17 @@ button_copy: Copy
 mail_body_account_information_external: You can use your "%s" account to log into Redmine.
 mail_body_account_information: Your Redmine account information
 setting_protocol: Protocol
+label_user_mail_no_self_notified: "I don't want to be notified of changes that I make myself"
+setting_time_format: Time format
+label_registration_activation_by_email: account activation by email
+mail_subject_account_activation_request: Redmine account activation request
+mail_body_account_activation_request: 'A new user (%s) has registered. His account his pending your approval:'
+label_registration_automatic_activation: automatic account activation
+label_registration_manual_activation: manual account activation
+notice_account_pending: "Your account was created and is now pending administrator approval."
+field_time_zone: Time zone
+text_caracters_minimum: Must be at least %d characters long.
+setting_bcc_recipients: Blind carbon copy recipients (bcc)
+button_annotate: Annotate
+label_issues_by: Issues by %s
+field_searchable: Searchable

@@ -31,7 +31,7 @@ class SearchController < ApplicationController
     begin; offset = params[:offset].to_time if params[:offset]; rescue; end
     
     # quick jump to an issue
-    if @question.match(/^#?(\d+)$/) && Issue.find_by_id($1, :include => :project, :conditions => Project.visible_by(logged_in_user))
+    if @question.match(/^#?(\d+)$/) && Issue.find_by_id($1, :include => :project, :conditions => Project.visible_by(User.current))
       redirect_to :controller => "issues", :action => "show", :id => $1
       return
     end
@@ -52,8 +52,11 @@ class SearchController < ApplicationController
       @object_types = @scope = %w(projects)
     end
     
+    # extract tokens from the question
+    # eg. hello "bye bye" => ["hello", "bye bye"]
+    @tokens = @question.scan(%r{((\s|^)"[\s\w]+"(\s|$)|\S+)}).collect {|m| m.first.gsub(%r{(^\s*"\s*|\s*"\s*$)}, '')}
     # tokens must be at least 3 character long
-    @tokens = @question.split.uniq.select {|w| w.length > 2 }
+    @tokens = @tokens.uniq.select {|w| w.length > 2 }
     
     if !@tokens.empty?
       # no more than 5 tokens to search for
@@ -87,13 +90,13 @@ class SearchController < ApplicationController
         end
       else
         operator = @all_words ? ' AND ' : ' OR '
-        Project.with_scope(:find => {:conditions => Project.visible_by(logged_in_user)}) do
-          @results += Project.find(:all, :limit => limit, :conditions => [ (["(LOWER(name) like ? OR LOWER(description) like ?)"] * like_tokens.size).join(operator), * (like_tokens * 2).sort] ) if @scope.include? 'projects'
-        end
+        @results += Project.find(:all, 
+                                 :limit => limit,
+                                 :conditions => [ (["(#{Project.visible_by(User.current)}) AND (LOWER(name) like ? OR LOWER(description) like ?)"] * like_tokens.size).join(operator), * (like_tokens * 2).sort]
+                                 ) if @scope.include? 'projects'
         # if only one project is found, user is redirected to its overview
         redirect_to :controller => 'projects', :action => 'show', :id => @results.first and return if @results.size == 1
       end
-      @question = @tokens.join(" ")
     else
       @question = ""
     end

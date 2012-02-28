@@ -69,7 +69,7 @@ class WikiController < ApplicationController
       #@content.text = params[:content][:text]
       #@content.comments = params[:content][:comments]
       @content.attributes = params[:content]
-      @content.author = logged_in_user
+      @content.author = User.current
       # if page is new @page.save will also save content, but not if page isn't a new record
       if (@page.new_record? ? @page.save : @content.save)
         redirect_to :action => 'index', :id => @project, :page => @page.title
@@ -154,11 +154,7 @@ class WikiController < ApplicationController
 
   def add_attachment
     @page = @wiki.find_page(params[:page])
-    # Save the attachments
-    params[:attachments].each { |file|
-      next unless file.size > 0
-      a = Attachment.create(:container => @page, :file => file, :author => logged_in_user)
-    } if params[:attachments] and params[:attachments].is_a? Array
+    attach_files(@page, params[:attachments])
     redirect_to :action => 'index', :page => @page.title
   end
 

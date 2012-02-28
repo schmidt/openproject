@@ -24,6 +24,7 @@ namespace :redmine do
   task :migrate_from_trac => :environment do
     
     module TracMigrate
+        TICKET_MAP = []
      
         DEFAULT_STATUS = IssueStatus.default
         assigned_status = IssueStatus.find_by_position(2)
@@ -53,10 +54,11 @@ namespace :redmine do
                            'task' => TRACKER_FEATURE,
                            'patch' =>TRACKER_FEATURE
                            }
-                            
-        DEFAULT_ROLE = Role.find_by_position(3)
-        manager_role = Role.find_by_position(1)
-        developer_role = Role.find_by_position(2)
+        
+        roles = Role.find(:all, :conditions => {:builtin => 0}, :order => 'position ASC')
+        manager_role = roles[0]
+        developer_role = roles[1]
+        DEFAULT_ROLE = roles.last
         ROLE_MAPPING = {'admin' => manager_role,
                         'developer' => developer_role
                         }
@@ -143,6 +145,11 @@ namespace :redmine do
       
       class TracWikiPage < ActiveRecord::Base
         set_table_name :wiki  
+        
+        def self.columns
+          # Hides readonly Trac field to prevent clash with AR readonly? method (Rails 2.0)
+          super.select {|column| column.name.to_s != 'readonly'}
+        end
       end
       
       class TracPermission < ActiveRecord::Base
@@ -172,7 +179,7 @@ namespace :redmine do
           elsif TracPermission.find_by_username_and_action(username, 'developer')
             role = ROLE_MAPPING['developer']
           end
-          Member.create(:user => u, :project => @target_project, :role => DEFAULT_ROLE)
+          Member.create(:user => u, :project => @target_project, :role => role)
           u.reload
         end
         u
@@ -181,25 +188,46 @@ namespace :redmine do
       # Basic wiki syntax conversion
       def self.convert_wiki_text(text)
         # Titles
-        text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "h#{$1.length}. #{$2}\n"}
-        # Links
+        text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
+        # External Links
         text = text.gsub(/\[(http[^\s]+)\s+([^\]]+)\]/) {|s| "\"#{$2}\":#{$1}"}
+        # Internal Links
+        text = text.gsub(/\[\[BR\]\]/, "\n") # This has to go before the rules below
+        text = text.gsub(/\[\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:([^\s\]]+).*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
         # Revisions links
         text = text.gsub(/\[(\d+)\]/, 'r\1')
+        # Ticket number re-writing
+        text = text.gsub(/#(\d+)/) do |s|
+          TICKET_MAP[$1.to_i] ||= $1
+          "\##{TICKET_MAP[$1.to_i] || $1}"
+        end
+        # Preformatted blocks
+        text = text.gsub(/\{\{\{/, '<pre>')
+        text = text.gsub(/\}\}\}/, '</pre>')          
+        # Highlighting
+        text = text.gsub(/'''''([^\s])/, '_*\1')
+        text = text.gsub(/([^\s])'''''/, '\1*_')
+        text = text.gsub(/'''/, '*')
+        text = text.gsub(/''/, '_')
+        text = text.gsub(/__/, '+')
+        text = text.gsub(/~~/, '-')
+        text = text.gsub(/`/, '@')
+        text = text.gsub(/,,/, '~')        
+        # Lists
+        text = text.gsub(/^([ ]+)\* /) {|s| '*' * $1.length + " "}
+
         text
       end
     
       def self.migrate
-        # Quick database test before clearing Redmine data
+        establish_connection
+
+        # Quick database test
         TracComponent.count
-        
-        puts "Deleting data"
-        CustomField.destroy_all
-        Issue.destroy_all
-        IssueCategory.destroy_all
-        Version.destroy_all
-        User.destroy_all "login <> 'admin'"
-        
+                
         migrated_components = 0
         migrated_milestones = 0
         migrated_tickets = 0
@@ -212,6 +240,7 @@ namespace :redmine do
         issues_category_map = {}
         TracComponent.find(:all).each do |component|
       	print '.'
+      	STDOUT.flush
           c = IssueCategory.new :project => @target_project,
                                 :name => encode(component.name[0, limit_for(IssueCategory, 'name')])
       	next unless c.save
@@ -225,9 +254,10 @@ namespace :redmine do
         version_map = {}
         TracMilestone.find(:all).each do |milestone|
           print '.'
+          STDOUT.flush
           v = Version.new :project => @target_project,
                           :name => encode(milestone.name[0, limit_for(Version, 'name')]),
-                          :description => encode(milestone.description[0, limit_for(Version, 'description')]),
+                          :description => encode(milestone.description.to_s[0, limit_for(Version, 'description')]),
                           :effective_date => milestone.due
           next unless v.save
           version_map[milestone.name] = v
@@ -241,9 +271,16 @@ namespace :redmine do
         custom_field_map = {}
         TracTicketCustom.find_by_sql("SELECT DISTINCT name FROM #{TracTicketCustom.table_name}").each do |field|
           print '.'
-          f = IssueCustomField.new :name => encode(field.name[0, limit_for(IssueCustomField, 'name')]).humanize,
-                                   :field_format => 'string'
-          next unless f.save
+          STDOUT.flush
+          # Redmine custom field name
+          field_name = encode(field.name[0, limit_for(IssueCustomField, 'name')]).humanize
+          # Find if the custom already exists in Redmine
+          f = IssueCustomField.find_by_name(field_name)
+          # Or create a new one
+          f ||= IssueCustomField.create(:name => encode(field.name[0, limit_for(IssueCustomField, 'name')]).humanize,
+                                        :field_format => 'string')
+                                   
+          next if f.new_record?
           f.trackers = Tracker.find(:all)
           f.projects << @target_project
           custom_field_map[field.name] = f
@@ -251,9 +288,10 @@ namespace :redmine do
         puts
         
         # Trac 'resolution' field as a Redmine custom field
-        r = IssueCustomField.new :name => 'Resolution',
+        r = IssueCustomField.find(:first, :conditions => { :name => "Resolution" })
+        r = IssueCustomField.new(:name => 'Resolution',
                                  :field_format => 'list',
-                                 :is_filter => true
+                                 :is_filter => true) if r.nil?
         r.trackers = Tracker.find(:all)
         r.projects << @target_project
         r.possible_values = %w(fixed invalid wontfix duplicate worksforme)
@@ -261,8 +299,9 @@ namespace :redmine do
             
         # Tickets
         print "Migrating tickets"
-          TracTicket.find(:all).each do |ticket|
+          TracTicket.find(:all, :order => 'id ASC').each do |ticket|
         	print '.'
+        	STDOUT.flush
         	i = Issue.new :project => @target_project, 
                           :subject => encode(ticket.summary[0, limit_for(Issue, 'subject')]),
                           :description => convert_wiki_text(encode(ticket.description)),
@@ -273,9 +312,10 @@ namespace :redmine do
         	i.fixed_version = version_map[ticket.milestone] unless ticket.milestone.blank?
         	i.status = STATUS_MAPPING[ticket.status] || DEFAULT_STATUS
         	i.tracker = TRACKER_MAPPING[ticket.ticket_type] || DEFAULT_TRACKER
-        	i.id = ticket.id
         	i.custom_values << CustomValue.new(:custom_field => custom_field_map['resolution'], :value => ticket.resolution) unless ticket.resolution.blank?
+        	i.id = ticket.id unless Issue.exists?(ticket.id)
         	next unless i.save
+        	TICKET_MAP[ticket.id] = i.id
         	migrated_tickets += 1
         	
         	# Owner
@@ -324,6 +364,7 @@ namespace :redmine do
         	
         	# Custom fields
         	ticket.customs.each do |custom|
+        	  next if custom_field_map[custom.name].nil?
               v = CustomValue.new :custom_field => custom_field_map[custom.name],
                                   :value => custom.value
               v.customized = i
@@ -341,6 +382,7 @@ namespace :redmine do
         if wiki.save
           TracWikiPage.find(:all, :order => 'name, version').each do |page|
             print '.'
+            STDOUT.flush
             p = wiki.find_or_new_page(page.name)
             p.content = WikiContent.new(:page => p) if p.new_record?
             p.content.text = page.text
@@ -370,7 +412,7 @@ namespace :redmine do
       def self.limit_for(klass, attribute)
         klass.columns_hash[attribute.to_s].limit
       end
-    
+      
       def self.encoding(charset)
         @ic = Iconv.new('UTF-8', charset)
       rescue Iconv::InvalidEncoding
@@ -379,19 +421,54 @@ namespace :redmine do
       end
       
       def self.set_trac_directory(path)
-        @trac_directory = path
+        @@trac_directory = path
         raise "This directory doesn't exist!" unless File.directory?(path)
-        raise "#{trac_db_path} doesn't exist!" unless File.exist?(trac_db_path)
         raise "#{trac_attachments_directory} doesn't exist!" unless File.directory?(trac_attachments_directory)
-        @trac_directory
+        @@trac_directory
+      rescue Exception => e
+        puts e
+        return false
+      end
+
+      def self.trac_directory
+        @@trac_directory
+      end
+
+      def self.set_trac_adapter(adapter)
+        return false if adapter.blank?
+        raise "Unknown adapter: #{adapter}!" unless %w(sqlite sqlite3 mysql postgresql).include?(adapter)
+        # If adapter is sqlite or sqlite3, make sure that trac.db exists
+        raise "#{trac_db_path} doesn't exist!" if %w(sqlite sqlite3).include?(adapter) && !File.exist?(trac_db_path)
+        @@trac_adapter = adapter
       rescue Exception => e
         puts e
         return false
       end
       
-      def self.trac_directory
-        @trac_directory
+      def self.set_trac_db_host(host)
+        return nil if host.blank?
+        @@trac_db_host = host
       end
+
+      def self.set_trac_db_port(port)
+        return nil if port.to_i == 0
+        @@trac_db_port = port.to_i
+      end
+      
+      def self.set_trac_db_name(name)
+        return nil if name.blank?
+        @@trac_db_name = name
+      end
+
+      def self.set_trac_db_username(username)
+        @@trac_db_username = username
+      end
+      
+      def self.set_trac_db_password(password)
+        @@trac_db_password = password
+      end
+      
+      mattr_reader :trac_directory, :trac_adapter, :trac_db_host, :trac_db_port, :trac_db_name, :trac_db_username, :trac_db_password
       
       def self.trac_db_path; "#{trac_directory}/db/trac.db" end
       def self.trac_attachments_directory; "#{trac_directory}/attachments" end
@@ -404,15 +481,33 @@ namespace :redmine do
                                 :description => identifier.humanize
           project.identifier = identifier
           puts "Unable to create a project with identifier '#{identifier}'!" unless project.save
+          # enable issues and wiki for the created project
+          project.enabled_module_names = ['issue_tracking', 'wiki']
         end        
+        project.trackers << TRACKER_BUG
+        project.trackers << TRACKER_FEATURE          
         @target_project = project.new_record? ? nil : project
       end
       
-      def self.establish_connection(params)
+      def self.connection_params
+        if %w(sqlite sqlite3).include?(trac_adapter)
+          {:adapter => trac_adapter, 
+           :database => trac_db_path}
+        else
+          {:adapter => trac_adapter,
+           :database => trac_db_name,
+           :host => trac_db_host,
+           :port => trac_db_port,
+           :username => trac_db_username,
+           :password => trac_db_password}
+        end
+      end
+      
+      def self.establish_connection
         constants.each do |const|
           klass = const_get(const)
           next unless klass.respond_to? 'establish_connection'
-          klass.establish_connection params
+          klass.establish_connection connection_params
         end
       end
       
@@ -425,7 +520,7 @@ namespace :redmine do
     end
     
     puts
-    puts "WARNING: Your Redmine data will be deleted during this process."
+    puts "WARNING: a new project will be added to Redmine during this process."
     print "Are you sure you want to continue ? [y/N] "
     break unless STDIN.gets.match(/^y$/i)  
     puts
@@ -440,13 +535,21 @@ namespace :redmine do
       end
     end
     
+    DEFAULT_PORTS = {'mysql' => 3306, 'postgresl' => 5432}
+    
     prompt('Trac directory') {|directory| TracMigrate.set_trac_directory directory}
+    prompt('Trac database adapter (sqlite, sqlite3, mysql, postgresql)', :default => 'sqlite') {|adapter| TracMigrate.set_trac_adapter adapter}
+    unless %w(sqlite sqlite3).include?(TracMigrate.trac_adapter)
+      prompt('Trac database host', :default => 'localhost') {|host| TracMigrate.set_trac_db_host host}
+      prompt('Trac database port', :default => DEFAULT_PORTS[TracMigrate.trac_adapter]) {|port| TracMigrate.set_trac_db_port port}
+      prompt('Trac database name') {|name| TracMigrate.set_trac_db_name name}
+      prompt('Trac database username') {|username| TracMigrate.set_trac_db_username username}
+      prompt('Trac database password') {|password| TracMigrate.set_trac_db_password password}
+    end
     prompt('Trac database encoding', :default => 'UTF-8') {|encoding| TracMigrate.encoding encoding}
     prompt('Target project identifier') {|identifier| TracMigrate.target_project_identifier identifier}
     puts
     
-    TracMigrate.establish_connection({:adapter => 'sqlite', 
-                                      :database => "#{TracMigrate.trac_db_path}"})
     TracMigrate.migrate
   end
 end

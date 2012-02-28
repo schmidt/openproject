@@ -54,7 +54,7 @@ class TimelogController < ApplicationController
       begin; @date_to = params[:date_to].to_date; rescue; end
     end
     @date_from ||= Date.civil(Date.today.year, 1, 1)
-    @date_to ||= Date.civil(Date.today.year, Date.today.month+1, 1) - 1
+    @date_to ||= (Date.civil(Date.today.year, Date.today.month, 1) >> 1) - 1
     
     unless @criterias.empty?
       sql_select = @criterias.collect{|criteria| @available_criterias[criteria][:sql] + " AS " + criteria}.join(', ')
@@ -107,15 +107,15 @@ class TimelogController < ApplicationController
     @entries = (@issue ? @issue : @project).time_entries.find(:all, :include => [:activity, :user, {:issue => [:tracker, :assigned_to, :priority]}], :order => sort_clause)
 
     @total_hours = @entries.inject(0) { |sum,entry| sum + entry.hours }
-    @owner_id = logged_in_user ? logged_in_user.id : 0
+    @owner_id = User.current.id
     
     send_csv and return if 'csv' == params[:export]    
     render :action => 'details', :layout => false if request.xhr?
   end
   
   def edit
-    render_404 and return if @time_entry && @time_entry.user != logged_in_user
-    @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => logged_in_user, :spent_on => Date.today)
+    render_404 and return if @time_entry && @time_entry.user != User.current
+    @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => Date.today)
     @time_entry.attributes = params[:time_entry]
     if request.post? and @time_entry.save
       flash[:notice] = l(:notice_successful_update)

@@ -22,14 +22,13 @@ class QueriesController < ApplicationController
   def index
     @queries = @project.queries.find(:all, 
                                      :order => "name ASC",
-                                     :conditions => ["is_public = ? or user_id = ?", true, (logged_in_user ? logged_in_user.id : 0)])
+                                     :conditions => ["is_public = ? or user_id = ?", true, (User.current.logged? ? User.current.id : 0)])
   end
   
   def new
     @query = Query.new(params[:query])
     @query.project = @project
-    @query.user = logged_in_user
-    @query.executed_by = logged_in_user
+    @query.user = User.current
     @query.is_public = false unless current_role.allowed_to?(:manage_public_queries)
     @query.column_names = nil if params[:default_columns]
     
@@ -39,7 +38,7 @@ class QueriesController < ApplicationController
     
     if request.post? && params[:confirm] && @query.save
       flash[:notice] = l(:notice_successful_create)
-      redirect_to :controller => 'projects', :action => 'list_issues', :id => @project, :query_id => @query
+      redirect_to :controller => 'issues', :action => 'index', :project_id => @project, :query_id => @query
       return
     end
     render :layout => false if request.xhr?
@@ -57,7 +56,7 @@ class QueriesController < ApplicationController
       
       if @query.save
         flash[:notice] = l(:notice_successful_update)
-        redirect_to :controller => 'projects', :action => 'list_issues', :id => @project, :query_id => @query
+        redirect_to :controller => 'issues', :action => 'index', :project_id => @project, :query_id => @query
       end
     end
   end
@@ -71,9 +70,8 @@ private
   def find_project
     if params[:id]
       @query = Query.find(params[:id])
-      @query.executed_by = logged_in_user
       @project = @query.project
-      render_403 unless @query.editable_by?(logged_in_user)
+      render_403 unless @query.editable_by?(User.current)
     else
       @project = Project.find(params[:project_id])
     end

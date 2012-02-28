@@ -1,8 +1,7 @@
 <h2><%= l(:label_settings) %></h2>
 
-<div id="settings">
 <% form_tag({:action => 'edit'}) do %>
-<div class="box tabular">
+<div class="box tabular settings">
 <p><label><%= l(:setting_app_title) %></label>
 <%= text_field_tag 'settings[app_title]', Setting.app_title, :size => 30 %></p>
 
@@ -20,7 +19,10 @@
 <%= select_tag 'settings[default_language]', options_for_select( lang_options_for_select(false), Setting.default_language) %></p>
 
 <p><label><%= l(:setting_date_format) %></label>
-<%= select_tag 'settings[date_format]', options_for_select( [[l(:label_language_based), '0'], ['ISO 8601 (YYYY-MM-DD)', '1']], Setting.date_format) %></p>
+<%= select_tag 'settings[date_format]', options_for_select( [[l(:label_language_based), '']] + Setting::DATE_FORMATS.collect {|f| [Date.today.strftime(f), f]}, Setting.date_format) %></p>
+
+<p><label><%= l(:setting_time_format) %></label>
+<%= select_tag 'settings[time_format]', options_for_select( [[l(:label_language_based), '']] + Setting::TIME_FORMATS.collect {|f| [Time.now.strftime(f), f]}, Setting.time_format) %></p>
 
 <p><label><%= l(:setting_attachment_max_size) %></label>
 <%= text_field_tag 'settings[attachment_max_size]', Setting.attachment_max_size, :size => 6 %> KB</p>
@@ -30,9 +32,6 @@
 
 <p><label><%= l(:setting_cross_project_issue_relations) %></label>
 <%= check_box_tag 'settings[cross_project_issue_relations]', 1, Setting.cross_project_issue_relations? %><%= hidden_field_tag 'settings[cross_project_issue_relations]', 0 %></p>
-
-<p><label><%= l(:setting_mail_from) %></label>
-<%= text_field_tag 'settings[mail_from]', Setting.mail_from, :size => 60 %></p>
 
 <p><label><%= l(:setting_host_name) %></label>
 <%= text_field_tag 'settings[host_name]', Setting.host_name, :size => 60 %></p>
@@ -61,9 +60,9 @@
 
 <fieldset class="box"><legend><%= l(:setting_issue_list_default_columns) %></legend>
 <%= hidden_field_tag 'settings[issue_list_default_columns][]', '' %>
-<p><% Query.available_columns.each do |column| %>
+<p><% Query.new.available_columns.each do |column| %>
   <label><%= check_box_tag 'settings[issue_list_default_columns][]', column.name, Setting.issue_list_default_columns.include?(column.name.to_s) %>
-  <%= l("field_#{column.name}") %></label>
+  <%= column.caption %></label>
 <% end %></p>
 </fieldset>
 
@@ -75,7 +74,12 @@
 <%= select_tag 'settings[autologin]', options_for_select( [[l(:label_disabled), "0"]] + [1, 7, 30, 365].collect{|days| [lwr(:actionview_datehelper_time_in_words_day, days), days.to_s]}, Setting.autologin) %></p>
 
 <p><label><%= l(:setting_self_registration) %></label>
-<%= check_box_tag 'settings[self_registration]', 1, Setting.self_registration? %><%= hidden_field_tag 'settings[self_registration]', 0 %></p>
+<%= select_tag 'settings[self_registration]',
+      options_for_select( [[l(:label_disabled), "0"],
+                           [l(:label_registration_activation_by_email), "1"],
+                           [l(:label_registration_manual_activation), "2"],
+                           [l(:label_registration_automatic_activation), "3"]
+                          ], Setting.self_registration ) %></p>
 
 <p><label><%= l(:label_password_lost) %></label>
 <%= check_box_tag 'settings[lost_password]', 1, Setting.lost_password? %><%= hidden_field_tag 'settings[lost_password]', 0 %></p>
@@ -93,5 +97,6 @@
 </fieldset>
 
 <%= submit_tag l(:button_save) %>
-</div>
 <% end %>
+
+<% set_html_title(l(:label_settings)) -%>
