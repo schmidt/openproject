@@ -15,5 +15,66 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'coderay'
+require 'coderay/helpers/file_type'
+require 'iconv'
+
 module RepositoriesHelper
+  def syntax_highlight(name, content)
+    type = CodeRay::FileType[name]
+    type ? CodeRay.scan(content, type).html : h(content)
+  end
+  
+  def to_utf8(str)
+    return str if /\A[\r\n\t\x20-\x7e]*\Z/n.match(str) # for us-ascii
+    @encodings ||= Setting.repositories_encodings.split(',').collect(&:strip)
+    @encodings.each do |encoding|
+      begin
+        return Iconv.conv('UTF-8', encoding, str)
+      rescue Iconv::Failure
+        # do nothing here and try the next encoding
+      end
+    end
+    str
+  end
+  
+  def repository_field_tags(form, repository)    
+    method = repository.class.name.demodulize.underscore + "_field_tags"
+    send(method, form, repository) if repository.is_a?(Repository) && respond_to?(method)
+  end
+  
+  def scm_select_tag(repository)
+    container = [[]]
+    REDMINE_SUPPORTED_SCM.each {|scm| container << ["Repository::#{scm}".constantize.scm_name, scm]}
+    select_tag('repository_scm', 
+               options_for_select(container, repository.class.name.demodulize),
+               :disabled => (repository && !repository.new_record?),
+               :onchange => remote_function(:url => { :controller => 'repositories', :action => 'edit', :id => @project }, :method => :get, :with => "Form.serialize(this.form)")
+               )
+  end
+  
+  def with_leading_slash(path)
+    path ||= ''
+    path.starts_with?("/") ? "/#{path}" : path
+  end
+
+  def subversion_field_tags(form, repository)
+      content_tag('p', form.text_field(:url, :size => 60, :required => true, :disabled => (repository && !repository.root_url.blank?)) +
+                       '<br />(http://, https://, svn://, file:///)') +
+      content_tag('p', form.text_field(:login, :size => 30)) +
+      content_tag('p', form.password_field(:password, :size => 30))
+  end
+
+  def darcs_field_tags(form, repository)
+      content_tag('p', form.text_field(:url, :label => 'Root directory', :size => 60, :required => true, :disabled => (repository && !repository.new_record?)))
+  end
+  
+  def mercurial_field_tags(form, repository)
+      content_tag('p', form.text_field(:url, :label => 'Root directory', :size => 60, :required => true, :disabled => (repository && !repository.root_url.blank?)))
+  end
+
+  def cvs_field_tags(form, repository)
+      content_tag('p', form.text_field(:root_url, :label => 'CVSROOT', :size => 60, :required => true, :disabled => !repository.new_record?)) +
+      content_tag('p', form.text_field(:url, :label => 'Module', :size => 30, :required => true, :disabled => !repository.new_record?))
+  end
 end

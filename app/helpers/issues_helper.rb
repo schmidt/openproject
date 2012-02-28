@@ -17,6 +17,19 @@
 
 module IssuesHelper
 
+  def render_issue_tooltip(issue)
+    @cached_label_start_date ||= l(:field_start_date)
+    @cached_label_due_date ||= l(:field_due_date)
+    @cached_label_assigned_to ||= l(:field_assigned_to)
+    @cached_label_priority ||= l(:field_priority)
+    
+    link_to_issue(issue) + ": #{h(issue.subject)}<br /><br />" +
+      "<strong>#{@cached_label_start_date}</strong>: #{format_date(issue.start_date)}<br />" +
+      "<strong>#{@cached_label_due_date}</strong>: #{format_date(issue.due_date)}<br />" +
+      "<strong>#{@cached_label_assigned_to}</strong>: #{issue.assigned_to}<br />" +
+      "<strong>#{@cached_label_priority}</strong>: #{issue.priority.name}"
+  end
+
   def show_detail(detail, no_html=false)
     case detail.property
     when 'attr'
@@ -60,13 +73,18 @@ module IssuesHelper
       label = content_tag('strong', label)
       old_value = content_tag("i", h(old_value)) if detail.old_value
       old_value = content_tag("strike", old_value) if detail.old_value and (!detail.value or detail.value.empty?)
-      value = content_tag("i", h(value)) if value
+      if detail.property == 'attachment' && !value.blank? && Attachment.find_by_id(detail.prop_key)
+        # Link to the attachment if it has not been removed
+        value = link_to(value, :controller => 'attachments', :action => 'download', :id => detail.prop_key)
+      else
+        value = content_tag("i", h(value)) if value
+      end
     end
     
-    if detail.value and !detail.value.to_s.empty?
+    if !detail.value.blank?
       case detail.property
       when 'attr', 'cf'
-        if old_value
+        if !detail.old_value.blank?
           label + " " + l(:text_journal_changed, old_value, value)
         else
           label + " " + l(:text_journal_set_to, value)

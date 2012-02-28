@@ -6,14 +6,23 @@ ActionController::Routing::Routes.draw do |map|
   # map.connect 'products/:id', :controller => 'catalog', :action => 'view'
   # Keep in mind you can assign values other than :controller and :action
 
-  # You can have the root of your site routed by hooking up '' 
-  # -- just remember to delete public/index.html.
-  map.connect '', :controller => "welcome"
+  map.home '', :controller => 'welcome'
 
   map.connect 'wiki/:id/:page/:action', :controller => 'wiki', :page => nil
   map.connect 'roles/workflow/:id/:role_id/:tracker_id', :controller => 'roles', :action => 'workflow'
   map.connect 'help/:ctrl/:page', :controller => 'help'
   #map.connect ':controller/:action/:id/:sort_key/:sort_order'
+  
+  map.connect 'issues/:issue_id/relations/:action/:id', :controller => 'issue_relations'
+  map.connect 'projects/:project_id/boards/:action/:id', :controller => 'boards'
+  map.connect 'boards/:board_id/topics/:action/:id', :controller => 'messages'
+
+  map.with_options :controller => 'repositories' do |omap|
+    omap.repositories_show 'repositories/browse/:id/*path', :action => 'browse'
+    omap.repositories_changes 'repositories/changes/:id/*path', :action => 'changes'
+    omap.repositories_diff 'repositories/diff/:id/*path', :action => 'diff'
+    omap.repositories_entry 'repositories/entry/:id/*path', :action => 'entry'
+  end
   
   # Allow downloading Web Service WSDL as a file with an extension
   # instead of a file named 'wsdl'

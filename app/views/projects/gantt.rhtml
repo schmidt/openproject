@@ -1,56 +1,7 @@
-<div class="contextual">
-<%= l(:label_export_to) %>
-<%= link_to 'PDF', {:zoom => @zoom, :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects], :output => 'pdf'}, :class => 'icon icon-pdf' %>
-</div>
-
-<h2><%= l(:label_gantt) %></h2>
-
-<% form_tag do %>
-<table width="100%">
-<tr>
-<td align="left">
-    <input type="text" name="months" size="2" value="<%= @months %>" />
-    <%= l(:label_months_from) %>
-    <%= select_month(@month_from, :prefix => "month", :discard_type => true) %>
-    <%= select_year(@year_from, :prefix => "year", :discard_type => true) %>
-    <%= hidden_field_tag 'zoom', @zoom %>
-    <%= submit_tag l(:button_submit), :class => "button-small" %>    
-</td>
-<td>
-    <%= toggle_link l(:label_options), "trackerselect" %>
-    <div id="trackerselect" class="rightbox overlay" style="width:140px; display: none;">
-    <p><strong><%=l(:label_tracker_plural)%></strong></p>
-    <% @trackers.each do |tracker| %>
-      <%= check_box_tag "tracker_ids[]", tracker.id, (@selected_tracker_ids.include? tracker.id.to_s) %>
-      <%= tracker.name %><br />
-    <% end %>
-    <% if @project.children.any? %>
-    <p><strong><%=l(:label_subproject_plural)%></strong></p>
-    <%= check_box_tag "with_subprojects", 1, params[:with_subprojects] %> <%= l(:general_text_Yes) %>
-    <% end %>
-    <p><center><%= submit_tag l(:button_apply), :class => 'button-small' %></center></p>
-    </div>
-</td>
-<td align="right">
-<%= if @zoom < 4
-    link_to image_tag('zoom_in.png'), {:zoom => (@zoom+1), :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects]}
-  else
-    image_tag 'zoom_in_g.png'
-  end %>
-<%= if @zoom > 1
-    link_to image_tag('zoom_out.png'),{:zoom => (@zoom-1), :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects]}
-  else
-    image_tag 'zoom_out_g.png'
-  end %>
-</td>
-</tr>
-</table>
-<% end %>
-
 <% zoom = 1
 @zoom.times { zoom = zoom * 2 }
 
-subject_width = 260
+subject_width = 330
 header_heigth = 18
 
 headers_height = header_heigth
@@ -71,9 +22,44 @@ g_height = [(20 * @events.length + 6)+150, 206].max
 t_height = g_height + headers_height
 %>
 
+<div class="contextual">
+</div>
+
+<h2><%= l(:label_gantt) %></h2>
+
+<% form_tag(params.merge(:month => nil, :year => nil, :months => nil)) do %>
+<table width="100%">
+<tr>
+<td align="left">
+    <input type="text" name="months" size="2" value="<%= @months %>" />
+    <%= l(:label_months_from) %>
+    <%= select_month(@month_from, :prefix => "month", :discard_type => true) %>
+    <%= select_year(@year_from, :prefix => "year", :discard_type => true) %>
+    <%= hidden_field_tag 'zoom', @zoom %>
+    <%= submit_tag l(:button_submit), :class => "button-small" %>    
+</td>
+
+<td align="right">
+<%= if @zoom < 4
+    link_to image_tag('zoom_in.png'), {:zoom => (@zoom+1), :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects]}
+  else
+    image_tag 'zoom_in_g.png'
+  end %>
+<%= if @zoom > 1
+    link_to image_tag('zoom_out.png'),{:zoom => (@zoom-1), :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects]}
+  else
+    image_tag 'zoom_out_g.png'
+  end %>
+</td>
+</tr>
+</table>
+<% end %>
+
+<% cache(:year => @year_from, :month => @month_from, :months => @months, :zoom => @zoom, :tracker_ids => @selected_tracker_ids, :subprojects => params[:with_subprojects], :lang => current_language) do %>
+
 <table width="100%" style="border:0; border-collapse: collapse;">
 <tr>
-<td style="width:260px;">
+<td style="width:<%= subject_width %>px;">
 
 <div style="position:relative;height:<%= t_height + 24 %>px;width:<%= subject_width + 1 %>px;">
 <div style="right:-2px;width:<%= subject_width %>px;height:<%= headers_height %>px;background: #eee;" class="gantt_hdr"></div>
@@ -86,10 +72,10 @@ top = headers_height + 8
 @events.each do |i| %>
     <div style="position: absolute;line-height:1.2em;height:16px;top:<%= top %>px;left:4px;overflow:hidden;"><small>    
     <% if i.is_a? Issue %>
-      	<%= link_to_issue i %>:
-      	<%=h i.subject.sub(/^(.{30}[^\s]*\s).*$/, '\1 (...)') %>
+      	<%= link_to_issue i %><%= " (#{i.project.name})" unless @project && @project == i.project %>:
+      	<%=h i.subject %>
   	<% else %>
-      	<strong><%= "#{l(:label_version)}: #{i.name}" %></strong>
+      	<%= link_to_version i, :class => "icon icon-package" %>
   	<% end %>  	
   	</small></div>
     <% top = top + 20
@@ -162,7 +148,7 @@ if show_days
 	width =  zoom - 1
 	%>
 	<div style="left:<%= left %>px;top:37px;width:<%= width %>px;height:<%= height %>px;font-size:0.7em;<%= "background:#f1f1f1;" if wday > 5 %>" class="gantt_hdr">
-	<%= day_name(wday)[0,1] %>
+	<%= day_name(wday).first %>
 	</div>
 	<% 
 	left = left + width+1
@@ -170,14 +156,6 @@ if show_days
 	wday = 1 if wday > 7
 	end
 end %>
-
-<%
-#
-# Today red line
-#
-if Date.today >= @date_from and Date.today <= @date_to %>
-    <div style="position: absolute;height:<%= g_height %>px;top:<%= headers_height + 1 %>px;left:<%= ((Date.today-@date_from+1)*zoom).floor()-1 %>px;width:10px;border-left: 1px dashed red;">&nbsp;</div>
-<% end %>
 
 <%
 #
@@ -214,7 +192,7 @@ top = headers_height + 10
 	<% # === tooltip === %>
 	<div class="tooltip" style="position: absolute;top:<%= top %>px;left:<%= i_left %>px;width:<%= i_width %>px;height:12px;">
 	<span class="tip">
-    <%= render :partial => "issues/tooltip", :locals => { :issue => i }%>
+    <%= render_issue_tooltip i %>
 	</span></div>
 <% else 
     i_left = ((i.start_date - @date_from)*zoom).floor
@@ -226,6 +204,18 @@ top = headers_height + 10
 <% end %>
 	<% top = top + 20
 end %>
+
+<% end # cache 
+%>
+
+<%
+#
+# Today red line (excluded from cache)
+#
+if Date.today >= @date_from and Date.today <= @date_to %>
+    <div style="position: absolute;height:<%= g_height %>px;top:<%= headers_height + 1 %>px;left:<%= ((Date.today-@date_from+1)*zoom).floor()-1 %>px;width:10px;border-left: 1px dashed red;">&nbsp;</div>
+<% end %>
+
 </div>
 </td>
 </tr>
@@ -237,3 +227,21 @@ end %>
 <td align="right"><%= link_to (l(:label_next) + ' &#187;'), :year => (@date_from >> @months).year, :month => (@date_from >> @months).month, :zoom => @zoom, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects] %></td>
 </tr>
 </table>
+
+<div class="contextual"><%= l(:label_export_to) %>
+<%= link_to 'PDF', {:zoom => @zoom, :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects], :format => 'pdf'}, :class => 'icon icon-pdf' %>
+<%= link_to 'PNG', {:zoom => @zoom, :year => @year_from, :month => @month_from, :months => @months, :tracker_ids => @selected_tracker_ids, :with_subprojects => params[:with_subprojects], :format => 'png'}, :class => 'icon icon-image' if respond_to?('gantt_image') %>
+</div>
+
+<% content_for :sidebar do %>
+    <h3><%= l(:label_gantt) %></h3>
+    <% form_tag(params.merge(:tracker_ids => nil, :with_subprojects => nil)) do %>
+    <% @trackers.each do |tracker| %>
+      <label><%= check_box_tag "tracker_ids[]", tracker.id, (@selected_tracker_ids.include? tracker.id.to_s) %> <%= tracker.name %></label><br />
+    <% end %>
+    <% if @project.active_children.any? %>
+    <br /><label><%= check_box_tag "with_subprojects", 1, params[:with_subprojects] %> <%=l(:label_subproject_plural)%></label>
+    <% end %>
+    <p><%= submit_tag l(:button_apply), :class => 'button-small' %></p>
+    <% end %>
+<% end %>

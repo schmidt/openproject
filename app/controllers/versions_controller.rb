@@ -19,6 +19,8 @@ class VersionsController < ApplicationController
   layout 'base'
   before_filter :find_project, :authorize
 
+  cache_sweeper :version_sweeper, :only => [ :edit, :destroy ]
+  
   def edit
     if request.post? and @version.update_attributes(params[:version])
       flash[:notice] = l(:notice_successful_update)
@@ -30,7 +32,7 @@ class VersionsController < ApplicationController
     @version.destroy
     redirect_to :controller => 'projects', :action => 'settings', :tab => 'versions', :id => @project
   rescue
-    flash[:notice] = "Unable to delete version"
+    flash[:error] = "Unable to delete version"
     redirect_to :controller => 'projects', :action => 'settings', :tab => 'versions', :id => @project
   end
 

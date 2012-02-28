@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,8 +17,34 @@
 
 class QueriesController < ApplicationController
   layout 'base'
-  before_filter :require_login, :find_query
+  before_filter :find_project, :authorize
 
+  def index
+    @queries = @project.queries.find(:all, 
+                                     :order => "name ASC",
+                                     :conditions => ["is_public = ? or user_id = ?", true, (logged_in_user ? logged_in_user.id : 0)])
+  end
+  
+  def new
+    @query = Query.new(params[:query])
+    @query.project = @project
+    @query.user = logged_in_user
+    @query.executed_by = logged_in_user
+    @query.is_public = false unless current_role.allowed_to?(:manage_public_queries)
+    @query.column_names = nil if params[:default_columns]
+    
+    params[:fields].each do |field|
+      @query.add_filter(field, params[:operators][field], params[:values][field])
+    end if params[:fields]
+    
+    if request.post? && params[:confirm] && @query.save
+      flash[:notice] = l(:notice_successful_create)
+      redirect_to :controller => 'projects', :action => 'list_issues', :id => @project, :query_id => @query
+      return
+    end
+    render :layout => false if request.xhr?
+  end
+  
   def edit
     if request.post?
       @query.filters = {}
@@ -26,7 +52,9 @@ class QueriesController < ApplicationController
         @query.add_filter(field, params[:operators][field], params[:values][field])
       end if params[:fields]
       @query.attributes = params[:query]
-          
+      @query.is_public = false unless current_role.allowed_to?(:manage_public_queries)
+      @query.column_names = nil if params[:default_columns]
+      
       if @query.save
         flash[:notice] = l(:notice_successful_update)
         redirect_to :controller => 'projects', :action => 'list_issues', :id => @project, :query_id => @query
@@ -36,15 +64,19 @@ class QueriesController < ApplicationController
 
   def destroy
     @query.destroy if request.post?
-    redirect_to :controller => 'reports', :action => 'issue_report', :id => @project
+    redirect_to :controller => 'queries', :project_id => @project
   end
   
 private
-  def find_query
-    @query = Query.find(params[:id])
-    @project = @query.project
-    # check if user is allowed to manage queries (same permission as add_query)
-    authorize('projects', 'add_query')
+  def find_project
+    if params[:id]
+      @query = Query.find(params[:id])
+      @query.executed_by = logged_in_user
+      @project = @query.project
+      render_403 unless @query.editable_by?(logged_in_user)
+    else
+      @project = Project.find(params[:project_id])
+    end
   rescue ActiveRecord::RecordNotFound
     render_404
   end

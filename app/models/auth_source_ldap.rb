@@ -20,7 +20,8 @@ require 'iconv'
 
 class AuthSourceLdap < AuthSource 
   validates_presence_of :host, :port, :attr_login
-
+  validates_presence_of :attr_firstname, :attr_lastname, :attr_mail, :if => Proc.new { |a| a.onthefly_register? }
+  
   def after_initialize
     self.port = 389 if self.port == 0
   end
@@ -34,12 +35,13 @@ class AuthSourceLdap < AuthSource
     dn = String.new
     ldap_con.search( :base => self.base_dn, 
                      :filter => object_filter & login_filter, 
-                     :attributes=> ['dn', self.attr_firstname, self.attr_lastname, self.attr_mail]) do |entry|
+                     # only ask for the DN if on-the-fly registration is disabled
+                     :attributes=> (onthefly_register? ? ['dn', self.attr_firstname, self.attr_lastname, self.attr_mail] : ['dn'])) do |entry|
       dn = entry.dn
       attrs = [:firstname => AuthSourceLdap.get_attr(entry, self.attr_firstname),
                :lastname => AuthSourceLdap.get_attr(entry, self.attr_lastname),
                :mail => AuthSourceLdap.get_attr(entry, self.attr_mail),
-               :auth_source_id => self.id ]
+               :auth_source_id => self.id ] if onthefly_register?
     end
     return nil if dn.empty?
     logger.debug "DN found for #{login}: #{dn}" if logger && logger.debug?
@@ -69,7 +71,8 @@ private
   def initialize_ldap_con(ldap_user, ldap_password)
     Net::LDAP.new( {:host => self.host, 
                     :port => self.port, 
-                    :auth => { :method => :simple, :username => Iconv.new('iso-8859-15', 'utf-8').iconv(ldap_user), :password => Iconv.new('iso-8859-15', 'utf-8').iconv(ldap_password) }} 
+                    :auth => { :method => :simple, :username => ldap_user, :password => ldap_password },
+                    :encryption => (self.tls ? :simple_tls : nil)} 
     ) 
   end
   

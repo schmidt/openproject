@@ -17,37 +17,23 @@
 
 module ApplicationHelper
 
-  # Return current logged in user or nil
-  def loggedin?
-    @logged_in_user
+  def current_role
+    @current_role ||= User.current.role_for_project(@project)
   end
   
-  # Return true if user is logged in and is admin, otherwise false
-  def admin_loggedin?
-    @logged_in_user and @logged_in_user.admin?
-  end
-
   # Return true if user is authorized for controller/action, otherwise false
-  def authorize_for(controller, action)  
-    # check if action is allowed on public projects
-    if @project.is_public? and Permission.allowed_to_public "%s/%s" % [ controller, action ]
-      return true
-    end
-    # check if user is authorized    
-    if @logged_in_user and (@logged_in_user.admin? or Permission.allowed_to_role( "%s/%s" % [ controller, action ], @logged_in_user.role_for_project(@project)  )  )
-      return true
-    end
-    return false
+  def authorize_for(controller, action)
+    User.current.allowed_to?({:controller => controller, :action => action}, @project)
   end
 
   # Display a link if user is authorized
   def link_to_if_authorized(name, options = {}, html_options = nil, *parameters_for_method_reference)
-    link_to(name, options, html_options, *parameters_for_method_reference) if authorize_for(options[:controller], options[:action])
+    link_to(name, options, html_options, *parameters_for_method_reference) if authorize_for(options[:controller] || params[:controller], options[:action])
   end
 
   # Display a link to user's account page
   def link_to_user(user)
-    link_to user.display_name, :controller => 'account', :action => 'show', :id => user
+    link_to user.name, :controller => 'account', :action => 'show', :id => user
   end
   
   def link_to_issue(issue)
@@ -61,6 +47,14 @@ module ApplicationHelper
     link_to(name, "#", :onclick => onclick)
   end
   
+  def show_and_goto_link(name, id, options={})
+    onclick = "Element.show('#{id}'); "
+    onclick << (options[:focus] ? "Form.Element.focus('#{options[:focus]}'); " : "this.blur(); ")
+    onclick << "location.href='##{id}-anchor'; "
+    onclick << "return false;"
+    link_to(name, "#", options.merge(:onclick => onclick))
+  end
+  
   def image_to_function(name, function, html_options = {})
     html_options.symbolize_keys!
     tag(:input, html_options.merge({ 
@@ -69,12 +63,27 @@ module ApplicationHelper
         }))
   end
   
+  def prompt_to_remote(name, text, param, url, html_options = {})
+    html_options[:onclick] = "promptToRemote('#{text}', '#{param}', '#{url_for(url)}'); return false;"
+    link_to name, {}, html_options
+  end
+  
   def format_date(date)
-    l_date(date) if date
+    return nil unless date
+    @date_format ||= (Setting.date_format.to_i == 0 ? l(:general_fmt_date) : "%Y-%m-%d")
+    date.strftime(@date_format)
   end
   
   def format_time(time)
-    l_datetime((time.is_a? String) ? time.to_time : time) if time
+    return nil unless time
+    @date_format_setting ||= Setting.date_format.to_i
+    time = time.to_time if time.is_a?(String)
+    @date_format_setting == 0 ? l_datetime(time) : (time.strftime("%Y-%m-%d") + ' ' + l_time(time))
+  end
+  
+  def authoring(created, author)
+    time_tag = content_tag('acronym', distance_of_time_in_words(Time.now, created), :title => format_time(created))
+    l(:label_added_time_by, author.name, time_tag)
   end
   
   def day_name(day)
@@ -86,60 +95,146 @@ module ApplicationHelper
   end
 
   def pagination_links_full(paginator, options={}, html_options={})
+    page_param = options.delete(:page_param) || :page
+  
     html = ''    
     html << link_to_remote(('&#171; ' + l(:label_previous)), 
-                            {:update => "content", :url => options.merge(:page => paginator.current.previous)},
-                            {:href => url_for(:params => options.merge(:page => paginator.current.previous))}) + ' ' if paginator.current.previous
+                            {:update => "content", :url => options.merge(page_param => paginator.current.previous)},
+                            {:href => url_for(:params => options.merge(page_param => paginator.current.previous))}) + ' ' if paginator.current.previous
                             
     html << (pagination_links_each(paginator, options) do |n|
       link_to_remote(n.to_s, 
-                      {:url => {:params => options.merge(:page => n)}, :update => 'content'},
-                      {:href => url_for(:params => options.merge(:page => n))})
+                      {:url => {:params => options.merge(page_param => n)}, :update => 'content'},
+                      {:href => url_for(:params => options.merge(page_param => n))})
     end || '')
     
     html << ' ' + link_to_remote((l(:label_next) + ' &#187;'), 
-                                 {:update => "content", :url => options.merge(:page => paginator.current.next)},
-                                 {:href => url_for(:params => options.merge(:page => paginator.current.next))}) if paginator.current.next
+                                 {:update => "content", :url => options.merge(page_param => paginator.current.next)},
+                                 {:href => url_for(:params => options.merge(page_param => paginator.current.next))}) if paginator.current.next
     html  
   end
   
-  # textilize text according to system settings and RedCloth availability
+  def set_html_title(text)
+    @html_header_title = text
+  end
+  
+  def html_title
+    title = []
+    title << @project.name if @project
+    title << @html_header_title
+    title << Setting.app_title
+    title.compact.join(' - ')
+  end
+  
+  ACCESSKEYS = {:edit => 'e',
+                :preview => 'r',
+                :quick_search => 'f',
+                :search => '4',
+                }.freeze
+
+  def accesskey(s)
+    ACCESSKEYS[s]
+  end
+
+  # format text according to system settings
   def textilizable(text, options = {})
+    return "" if text.blank?
+
+    # when using an image link, try to use an attachment, if possible
+    attachments = options[:attachments]
+    if attachments
+      text = text.gsub(/!([<>=]*)(\S+\.(gif|jpg|jpeg|png))!/) do |m|
+        align = $1
+        filename = $2
+        rf = Regexp.new(filename,  Regexp::IGNORECASE)
+        # search for the picture in attachments
+        if found = attachments.detect { |att| att.filename =~ rf }
+          image_url = url_for :controller => 'attachments', :action => 'download', :id => found.id
+          "!#{align}#{image_url}!"
+        else
+          "!#{align}#{filename}!"
+        end
+      end
+    end
+    
+    text = (Setting.text_formatting == 'textile') ?
+      Redmine::WikiFormatting.to_html(text) : simple_format(auto_link(h(text)))
+
     # different methods for formatting wiki links
     case options[:wiki_links]
     when :local
       # used for local links to html files
-      format_wiki_link = Proc.new {|title| "#{title}.html" }
+      format_wiki_link = Proc.new {|project, title| "#{title}.html" }
     when :anchor
       # used for single-file wiki export
-      format_wiki_link = Proc.new {|title| "##{title}" }
+      format_wiki_link = Proc.new {|project, title| "##{title}" }
     else
-      if @project
-        format_wiki_link = Proc.new {|title| url_for :controller => 'wiki', :action => 'index', :id => @project, :page => title }
-      else
-        format_wiki_link = Proc.new {|title| title }
-      end
+      format_wiki_link = Proc.new {|project, title| url_for :controller => 'wiki', :action => 'index', :id => project, :page => title }
     end
     
-    # turn wiki links into textile links: 
+    project = options[:project] || @project
+    
+    # turn wiki links into html links
     # example:
-    #   [[link]] -> "link":link
-    #   [[link|title]] -> "title":link
-    text = text.gsub(/\[\[([^\]\|]+)(\|([^\]\|]+))?\]\]/) {|m| "\"#{$3 || $1}\":" + format_wiki_link.call(Wiki.titleize($1)) }
+    #   [[mypage]]
+    #   [[mypage|mytext]]
+    # wiki links can refer other project wikis, using project name or identifier:
+    #   [[project:]] -> wiki starting page
+    #   [[project:|mytext]]
+    #   [[project:mypage]]
+    #   [[project:mypage|mytext]]
+    text = text.gsub(/\[\[([^\]\|]+)(\|([^\]\|]+))?\]\]/) do |m|
+      link_project = project
+      page = $1
+      title = $3
+      if page =~ /^([^\:]+)\:(.*)$/
+        link_project = Project.find_by_name($1) || Project.find_by_identifier($1)
+        page = title || $2
+        title = $1 if page.blank?
+      end
+      
+      if link_project && link_project.wiki
+        # check if page exists
+        wiki_page = link_project.wiki.find_page(page)
+        link_to((title || page), format_wiki_link.call(link_project, Wiki.titleize(page)),
+                                 :class => ('wiki-page' + (wiki_page ? '' : ' new')))
+      else
+        # project or wiki doesn't exist
+        title || page
+      end
+    end
 
-    # turn issue ids to textile links
+    # turn issue and revision ids into links
     # example:
-    #   #52 -> "#52":/issues/show/52
-    text = text.gsub(/#(\d+)(?=\b)/) {|m| "\"##{$1}\":" + url_for(:controller => 'issues', :action => 'show', :id => $1) }
-       
-    # turn revision ids to textile links (@project needed)
-    # example:
-    #   r52 -> "r52":/repositories/revision/6?rev=52 (@project.id is 6)
-    text = text.gsub(/(?=\b)r(\d+)(?=\b)/) {|m| "\"r#{$1}\":" + url_for(:controller => 'repositories', :action => 'revision', :id => @project.id, :rev => $1) } if @project
-   
-    # finally textilize text
-    @do_textilize ||= (Setting.text_formatting == 'textile') && (ActionView::Helpers::TextHelper.method_defined? "textilize")
-    text = @do_textilize ? auto_link(RedCloth.new(text).to_html) : simple_format(auto_link(h(text)))
+    #   #52 -> <a href="/issues/show/52">#52</a>
+    #   r52 -> <a href="/repositories/revision/6?rev=52">r52</a> (project.id is 6)
+    text = text.gsub(%r{([\s,-^])(#|r)(\d+)(?=[[:punct:]]|\s|<|$)}) do |m|
+      leading, otype, oid = $1, $2, $3
+      link = nil
+      if otype == 'r'
+        if project && (changeset = project.changesets.find_by_revision(oid))
+          link = link_to("r#{oid}", {:controller => 'repositories', :action => 'revision', :id => project.id, :rev => oid}, :class => 'changeset',
+                                    :title => truncate(changeset.comments, 100))
+        end
+      else
+        if issue = Issue.find_by_id(oid.to_i, :include => [:project, :status], :conditions => Project.visible_by(User.current))        
+          link = link_to("##{oid}", {:controller => 'issues', :action => 'show', :id => oid}, :class => 'issue',
+                                    :title => "#{truncate(issue.subject, 100)} (#{issue.status.name})")
+          link = content_tag('del', link) if issue.closed?
+        end
+      end
+      leading + (link || "#{otype}#{oid}")
+    end
+    
+    text
+  end
+  
+  # Same as Rails' simple_format helper without using paragraphs
+  def simple_format_without_paragraph(text)
+    text.to_s.
+      gsub(/\r\n?/, "\n").                    # \r\n and \r -> \n
+      gsub(/\n\n+/, "<br /><br />").          # 2+ newline  -> 2 br
+      gsub(/([^\n]\n)(?=[^\n])/, '\1<br />')  # 1 newline   -> br
   end
   
   def error_messages_for(object_name, options = {})
@@ -169,7 +264,7 @@ module ApplicationHelper
       end      
       content_tag("div",
         content_tag(
-          options[:header_tag] || "h2", lwr(:gui_validation_error, full_messages.length) + " :"
+          options[:header_tag] || "span", lwr(:gui_validation_error, full_messages.length) + ":"
         ) +
         content_tag("ul", full_messages.collect { |msg| content_tag("li", msg) }),
         "id" => options[:id] || "errorExplanation", "class" => options[:class] || "errorExplanation"
@@ -181,7 +276,7 @@ module ApplicationHelper
   
   def lang_options_for_select(blank=true)
     (blank ? [["(auto)", ""]] : []) + 
-      (GLoc.valid_languages.sort {|x,y| x.to_s <=> y.to_s }).collect {|lang| [ l_lang_name(lang.to_s, lang), lang.to_s]}
+      GLoc.valid_languages.collect{|lang| [ ll(lang.to_s, :general_lang_name), lang.to_s]}.sort{|x,y| x.first <=> y.first }
   end
   
   def label_tag_for(name, option_tags = nil, options = {})
@@ -201,9 +296,40 @@ module ApplicationHelper
     link_to_function(l(:button_uncheck_all), "checkAll('#{form_name}', false)")   
   end
   
+  def context_menu_link(name, url, options={})
+    options[:class] ||= ''
+    if options.delete(:selected)
+      options[:class] << ' icon-checked disabled'
+      options[:disabled] = true
+    end
+    if options.delete(:disabled)
+      options.delete(:method)
+      options.delete(:confirm)
+      options.delete(:onclick)
+      options[:class] << ' disabled'
+      url = '#'
+    end
+    link_to name, url, options
+  end
+  
   def calendar_for(field_id)
     image_tag("calendar.png", {:id => "#{field_id}_trigger",:class => "calendar-trigger"}) +
     javascript_tag("Calendar.setup({inputField : '#{field_id}', ifFormat : '%Y-%m-%d', button : '#{field_id}_trigger' });")
+  end
+  
+  def wikitoolbar_for(field_id)
+    return '' unless Setting.text_formatting == 'textile'
+    javascript_include_tag('jstoolbar') + javascript_tag("var toolbar = new jsToolBar($('#{field_id}')); toolbar.draw();")
+  end
+  
+  def content_for(name, content = nil, &block)
+    @has_content ||= {}
+    @has_content[name] = true
+    super(name, content, &block)
+  end
+  
+  def has_content?(name)
+    (@has_content && @has_content[name]) || false
   end
 end
 
@@ -219,7 +345,9 @@ class TabularFormBuilder < ActionView::Helpers::FormBuilder
     src = <<-END_SRC
     def #{selector}(field, options = {}) 
       return super if options.delete :no_label
-      label_text = l(("field_"+field.to_s.gsub(/\_id$/, "")).to_sym) + (options.delete(:required) ? @template.content_tag("span", " *", :class => "required"): "")
+      label_text = l(options[:label]) if options[:label]
+      label_text ||= l(("field_"+field.to_s.gsub(/\_id$/, "")).to_sym)
+      label_text << @template.content_tag("span", " *", :class => "required") if options.delete(:required)
       label = @template.content_tag("label", label_text, 
                     :class => (@object && @object.errors[field] ? "error" : nil), 
                     :for => (@object_name.to_s + "_" + field.to_s))

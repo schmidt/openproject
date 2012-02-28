@@ -1,7 +1,7 @@
 <h2><%= l(:label_home) %></h2>
 
 <div class="splitcontentleft">
-  <p><%= Setting.welcome_text %></p>
+  <%= textilizable Setting.welcome_text %>
   <div class="box">
 	<h3><%=l(:label_news_latest)%></h3>
 		<%= render :partial => 'news/news', :collection => @news %>
@@ -14,8 +14,8 @@
 		<ul>
 		<% for project in @projects %>
 			<li>
-			<%= link_to project.name, :controller => 'projects', :action => 'show', :id => project %> (<%= format_time(project.created_on) %>)<br />
-			<%=h project.description %>
+			<%= link_to project.name, :controller => 'projects', :action => 'show', :id => project %> (<%= format_time(project.created_on) %>)
+			<%= textilizable project.description, :project => project %>
 			</li>
 		<% end %>
 		</ul>
@@ -23,5 +23,6 @@
 </div>	
 
 <% content_for :header_tags do %>
-<%= auto_discovery_link_tag(:rss, {:controller => 'feeds' , :action => 'news' }) %>
+<%= auto_discovery_link_tag(:rss,  {:controller => 'feeds', :action => 'news', :key => @key}, {:title => l(:label_news_latest)}) %>
+<%= auto_discovery_link_tag(:atom, {:controller => 'feeds', :action => 'news', :key => @key, :format => 'atom'}, {:title => l(:label_news_latest)}) %>
 <% end %>

@@ -36,6 +36,8 @@ activerecord_error_taken: has already been taken
 activerecord_error_not_a_number: 不是数字
 activerecord_error_not_a_date: 不是有效的日期
 activerecord_error_greater_than_start_date: 必需大于开始日期
+activerecord_error_not_same_project: doesn't belong to the same project
+activerecord_error_circular_dependency: This relation would create a circular dependency
 
 general_fmt_age: %d yr
 general_fmt_age_plural: %d yrs
@@ -47,11 +49,12 @@ general_text_No: '否'
 general_text_Yes: '是'
 general_text_no: '否'
 general_text_yes: '是'
-general_lang_zh: 'Chinese (简体中文)'
+general_lang_name: 'Chinese (简体中文)'
 general_csv_separator: ','
 general_csv_encoding: gb2312
 general_pdf_encoding: Big5
 general_day_names: 一,二,三,四,五,六,日
+general_first_day_of_week: '7'
 
 notice_account_updated: 帐户更新成功。
 notice_account_invalid_creditentials: 用户名或密码不正确
@@ -69,9 +72,15 @@ notice_successful_connection: 连接成功
 notice_file_not_found: 您访问的页面不存在或已被删除。
 notice_locking_conflict: 数据已被另一个用户更新
 notice_scm_error: 在版本库中不存在该条目或修订
+notice_not_authorized: You are not authorized to access this page.
+notice_email_sent: An email was sent to %s
+notice_email_error: An error occurred while sending mail (%s)
+notice_feeds_access_key_reseted: Your RSS access key was reseted.
 
 mail_subject_lost_password: 您的redMine口令
+mail_body_lost_password: 'To change your Redmine password, click on the following link:'
 mail_subject_register: redMine帐户激活
+mail_body_register: 'To activate your Redmine account, click on the following link:'
 
 gui_validation_error: 1 个错误
 gui_validation_error_plural: %d 个错误
@@ -104,7 +113,6 @@ field_status: 状态
 field_notes: 说明
 field_is_closed: 已关闭的任务
 field_is_default: 默认状态
-field_html_color: 颜色
 field_tracker: 跟踪
 field_subject: 主题
 field_due_date: 到期日
@@ -142,7 +150,7 @@ field_start_date: 开始
 field_done_ratio: %% 完成
 field_auth_source: 认证模式
 field_hide_mail: 隐藏我的邮件
-field_comment: 注释
+field_comments: 注释
 field_url: URL
 field_start_page: 起始页
 field_subproject: 子项目
@@ -150,6 +158,12 @@ field_hours: Hours
 field_activity: 活动
 field_spent_on: 日期
 field_identifier: Identifier
+field_is_filter: Used as a filter
+field_issue_to_id: Related issue
+field_delay: Delay
+field_assignable: Issues can be assigned to this role
+field_redirect_existing_links: Redirect existing links
+field_estimated_hours: Estimated time
 
 setting_app_title: 应用程序标题
 setting_app_subtitle: 应用程序子标题
@@ -164,8 +178,13 @@ setting_host_name: 主机名称
 setting_text_formatting: 文本格式
 setting_wiki_compression: Wiki history compression
 setting_feeds_limit: Feed content limit
-setting_autofetch_changesets: Autofetch SVN commits
+setting_autofetch_changesets: Autofetch commits
 setting_sys_api_enabled: Enable WS for repository management
+setting_commit_ref_keywords: Referencing keywords
+setting_commit_fix_keywords: Fixing keywords
+setting_autologin: Autologin
+setting_date_format: Date format
+setting_cross_project_issue_relations: Allow cross-project issue relations
 
 label_user: 用户
 label_user_plural: 用户列表
@@ -173,6 +192,7 @@ label_user_new: 新建用户
 label_project: 项目
 label_project_new: 新建项目
 label_project_plural: 项目列表
+label_project_all: All Projects
 label_project_latest: 最近的项目列表
 label_issue: 任务
 label_issue_new: 新建任务
@@ -279,7 +299,7 @@ label_none: 无
 label_next: 下一个
 label_previous: 上一个
 label_used_by: 使用中
-label_details: 详情...
+label_details: 详情
 label_add_note: 添加说明
 label_per_page: 每面
 label_calendar: 日历
@@ -305,13 +325,14 @@ label_in_less_than: 剩余天数小于
 label_in_more_than: 剩余天数大于
 label_in: 剩余天数
 label_today: 今天
+label_this_week: this week
 label_less_than_ago: 之前天数少于
 label_more_than_ago: 之前天数大于
 label_ago: 之前天数
 label_contains: 包含
 label_not_contains: 不包含
 label_day_plural: 天数
-label_repository: SVN 版本库
+label_repository: 版本库
 label_browse: 浏览
 label_modification: %d 个更新
 label_modification_plural: %d 个更新
@@ -331,15 +352,17 @@ label_sort_lower: 下移
 label_sort_lowest: 置底
 label_roadmap: 路线图
 label_roadmap_due_in: Due in 
+label_roadmap_overdue: %s late
 label_roadmap_no_issues: 该版本没有任务
 label_search: 查找
-label_result: %d 个结果
-label_result_plural: %d 个结果
+label_result_plural: 个结果
 label_all_words: 所有单词
 label_wiki: Wiki
 label_wiki_edit: Wiki edit
 label_wiki_edit_plural: Wiki edits
-label_page_index: 索引
+label_wiki_page_plural: Wiki pages
+label_index_by_title: 索引
+label_index_by_date: Index by date
 label_current_version: 当前版本
 label_preview: 预览
 label_feed_plural: Feeds
@@ -359,6 +382,48 @@ label_diff_side_by_side: side by side
 label_options: Options
 label_copy_workflow_from: Copy workflow from
 label_permissions_report: Permissions report
+label_watched_issues: Watched issues
+label_related_issues: Related issues
+label_applied_status: Applied status
+label_loading: Loading...
+label_relation_new: New relation
+label_relation_delete: Delete relation
+label_relates_to: related to
+label_duplicates: duplicates
+label_blocks: blocks
+label_blocked_by: blocked by
+label_precedes: precedes
+label_follows: follows
+label_end_to_start: end to start
+label_end_to_end: end to end
+label_start_to_start: start to start
+label_start_to_end: start to end
+label_stay_logged_in: Stay logged in
+label_disabled: disabled
+label_show_completed_versions: Show completed versions
+label_me: me
+label_board: Forum
+label_board_new: New forum
+label_board_plural: Forums
+label_topic_plural: Topics
+label_message_plural: Messages
+label_message_last: Last message
+label_message_new: New message
+label_reply_plural: Replies
+label_send_information: Send account information to the user
+label_year: Year
+label_month: Month
+label_week: Week
+label_date_from: From
+label_date_to: To
+label_language_based: Language based
+label_sort_by: Sort by %s
+label_send_test_email: Send a test email
+label_feeds_access_key_created_on: RSS access key created %s ago
+label_module_plural: Modules
+label_added_time_by: Added by %s %s ago
+label_updated_time: Updated %s ago
+label_jump_to_a_project: Jump to a project...
 
 button_login: 登录
 button_submit: 提交
@@ -385,6 +450,13 @@ button_activate: 激活
 button_sort: 排序
 button_log_time: 登记工时
 button_rollback: Rollback to this version
+button_watch: Watch
+button_unwatch: Unwatch
+button_reply: Reply
+button_archive: Archive
+button_unarchive: Unarchive
+button_reset: Reset
+button_rename: Rename
 
 status_active: 激活
 status_registered: 已注册
@@ -406,6 +478,15 @@ text_project_identifier_info: 'Lower case letters (a-z), numbers and dashes allo
 text_caracters_maximum: %d characters maximum.
 text_length_between: Length between %d and %d characters.
 text_tracker_no_workflow: No workflow defined for this tracker
+text_unallowed_characters: Unallowed characters
+text_comma_separated: Multiple values allowed (comma separated).
+text_issues_ref_in_commit_messages: Referencing and fixing issues in commit messages
+text_issue_added: %s ѱ
+text_issue_updated: %s Ѹ
+text_wiki_destroy_confirmation: Are you sure you want to delete this wiki and all its content ?
+text_issue_category_destroy_question: Some issues (%d) are assigned to this category. What do you want to do ?
+text_issue_category_destroy_assignments: Remove category assignments
+text_issue_category_reassign_to: Reassing issues to this category
 
 default_role_manager: 管理员
 default_role_developper: 开发人员
@@ -432,3 +513,29 @@ default_activity_development: 开发
 enumeration_issue_priorities: 任务优先级
 enumeration_doc_categories: 文档类别
 enumeration_activities: Activities (time tracking)
+label_wiki_page: Wiki page
+label_file_plural: Files
+label_changeset_plural: Changesets
+field_column_names: Columns
+label_default_columns: Default columns
+setting_issue_list_default_columns: Default columns displayed on the issue list
+setting_repositories_encodings: Repositories encodings
+notice_no_issue_selected: "No issue is selected! Please, check the issues you want to edit."
+label_bulk_edit_selected_issues: Bulk edit selected issues
+label_no_change_option: (No change)
+notice_failed_to_save_issues: "Failed to save %d issue(s) on %d selected: %s."
+label_theme: Theme
+label_default: Default
+label_search_titles_only: Search titles only
+label_nobody: nobody
+button_change_password: Change password
+text_user_mail_option: "For unselected projects, you will only receive notifications about things you watch or you're involved in (eg. issues you're the author or assignee)."
+label_user_mail_option_selected: "For any event on the selected projects only..."
+label_user_mail_option_all: "For any event on all my projects"
+label_user_mail_option_none: "Only for things I watch or I'm involved in"
+setting_emails_footer: Emails footer
+label_float: Float
+button_copy: Copy
+mail_body_account_information_external: You can use your "%s" account to log into Redmine.
+mail_body_account_information: Your Redmine account information
+setting_protocol: Protocol

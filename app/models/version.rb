@@ -23,7 +23,8 @@ class Version < ActiveRecord::Base
 
   validates_presence_of :name
   validates_uniqueness_of :name, :scope => [:project_id]
-  validates_format_of :effective_date, :with => /^\d{4}-\d{2}-\d{2}$/, :message => :activerecord_error_not_a_date
+  validates_length_of :name, :maximum => 30
+  validates_format_of :effective_date, :with => /^\d{4}-\d{2}-\d{2}$/, :message => :activerecord_error_not_a_date, :allow_nil => true
   
   def start_date
     effective_date
@@ -31,6 +32,43 @@ class Version < ActiveRecord::Base
   
   def due_date
     effective_date
+  end
+  
+  # Returns true if the version is completed: due date reached and no open issues
+  def completed?
+    effective_date && (effective_date <= Date.today) && (open_issues_count == 0)
+  end
+  
+  # Returns true if the version is overdue: due date reached and some open issues
+  def overdue?
+    effective_date && (effective_date < Date.today) && (open_issues_count > 0)
+  end
+  
+  def open_issues_count
+    @open_issues_count ||= Issue.count(:all, :conditions => ["fixed_version_id = ? AND is_closed = ?", self.id, false], :include => :status)
+  end
+
+  def closed_issues_count
+    @closed_issues_count ||= Issue.count(:all, :conditions => ["fixed_version_id = ? AND is_closed = ?", self.id, true], :include => :status)
+  end
+  
+  def wiki_page
+    if project.wiki && !wiki_page_title.blank?
+      @wiki_page ||= project.wiki.find_page(wiki_page_title)
+    end
+    @wiki_page
+  end
+  
+  def to_s; name end
+  
+  # Versions are sorted by effective_date 
+  # Those with no effective_date are at the end, sorted by name
+  def <=>(version)
+    if self.effective_date
+      version.effective_date ? (self.effective_date <=> version.effective_date) : -1
+    else
+      version.effective_date ? 1 : (self.name <=> version.name)
+    end
   end
   
 private

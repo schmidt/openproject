@@ -16,6 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Setup < ActiveRecord::Migration
+
+  # model removed
+  class Permission < ActiveRecord::Base; end
+  
   def self.up
     create_table "attachments", :force => true do |t|
       t.column "container_id", :integer, :default => 0, :null => false
@@ -214,7 +218,7 @@ class Setup < ActiveRecord::Migration
       t.column "project_id", :integer, :default => 0, :null => false
       t.column "name", :string, :limit => 30, :default => "", :null => false
       t.column "description", :string, :default => ""
-      t.column "effective_date", :date, :null => false
+      t.column "effective_date", :date
       t.column "created_on", :timestamp
       t.column "updated_on", :timestamp
     end
@@ -280,7 +284,7 @@ class Setup < ActiveRecord::Migration
     Permission.create :controller => "versions", :action => "destroy_file", :description => "button_delete", :sort => 1322
     
     # create default administrator account
-    user = User.create :firstname => "redMine", :lastname => "Admin", :mail => "admin@somenet.foo", :mail_notification => true, :language => "en"
+    user = User.create :firstname => "Redmine", :lastname => "Admin", :mail => "admin@somenet.foo", :mail_notification => true, :language => "en"
     user.login = "admin"
     user.password = "admin"
     user.admin = true

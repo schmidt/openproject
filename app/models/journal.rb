@@ -23,4 +23,14 @@ class Journal < ActiveRecord::Base
   
   belongs_to :user
   has_many :details, :class_name => "JournalDetail", :dependent => :delete_all
+  
+  acts_as_searchable :columns => 'notes',
+                     :include => :issue,
+                     :project_key => "#{Issue.table_name}.project_id",
+                     :date_column => "#{Issue.table_name}.created_on"
+  
+  def save
+    # Do not save an empty journal
+    (details.empty? && notes.blank?) ? false : super
+  end
 end

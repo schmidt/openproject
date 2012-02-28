@@ -13,8 +13,8 @@ Rails::Initializer.run do |config|
   # Skip frameworks you're not going to use
   # config.frameworks -= [ :action_web_service, :action_mailer ]
 
-  # Add additional load paths for your own custom dirs
-  # config.load_paths += %W( #{RAILS_ROOT}/extras )
+  # Add additional load paths for sweepers
+  config.load_paths += %W( #{RAILS_ROOT}/app/sweepers )
 
   # Force all environments to use the same logger level 
   # (by default production uses :info, the others :debug)
@@ -27,9 +27,10 @@ Rails::Initializer.run do |config|
   # Enable page/fragment caching by setting a file-based store
   # (remember to create the caching directory and make it readable to the application)
   # config.action_controller.fragment_cache_store = :file_store, "#{RAILS_ROOT}/cache"
-
+  
   # Activate observers that should always be running
   # config.active_record.observers = :cacher, :garbage_collector
+  config.active_record.observers = :message_observer
 
   # Make Active Record use UTC-base instead of local time
   # config.active_record.default_timezone = :utc
@@ -57,6 +58,7 @@ Rails::Initializer.run do |config|
 	# ActionMailer::Base.deliveries array.
 	#config.action_mailer.delivery_method = :test
 	config.action_mailer.delivery_method = :smtp  
+
 end
 
 ActiveRecord::Errors.default_error_messages = {
@@ -82,4 +84,5 @@ GLoc.set_kcode
 GLoc.load_localized_strings
 GLoc.set_config(:raise_string_not_found_errors => false)
 
+require 'redmine'
 

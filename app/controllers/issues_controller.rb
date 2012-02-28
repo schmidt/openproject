@@ -17,29 +17,58 @@
 
 class IssuesController < ApplicationController
   layout 'base', :except => :export_pdf
-  before_filter :find_project, :authorize
+  before_filter :find_project, :authorize, :except => [:index, :preview]
+  accept_key_auth :index
+  
+  cache_sweeper :issue_sweeper, :only => [ :edit, :change_status, :destroy ]
 
+  helper :projects
+  include ProjectsHelper   
   helper :custom_fields
   include CustomFieldsHelper
   helper :ifpdf
   include IfpdfHelper
+  helper :issue_relations
+  include IssueRelationsHelper
+  helper :watchers
+  include WatchersHelper
+  helper :attachments
+  include AttachmentsHelper
+  helper :queries
+  helper :sort
+  include SortHelper
 
+  def index
+    sort_init "#{Issue.table_name}.id", "desc"
+    sort_update
+    retrieve_query
+    if @query.valid?
+      @issue_count = Issue.count(:include => [:status, :project], :conditions => @query.statement)		
+      @issue_pages = Paginator.new self, @issue_count, 25, params['page']								
+      @issues = Issue.find :all, :order => sort_clause,
+                           :include => [ :assigned_to, :status, :tracker, :project, :priority, :category ],
+                           :conditions => @query.statement,
+                           :limit  =>  @issue_pages.items_per_page,
+                           :offset =>  @issue_pages.current.offset						
+    end
+    respond_to do |format|
+      format.html { render :layout => false if request.xhr? }
+      format.atom { render_feed(@issues, :title => l(:label_issue_plural)) }
+    end
+  end
+  
   def show
-    @status_options = @issue.status.find_new_statuses_allowed_to(logged_in_user.role_for_project(@project), @issue.tracker) if logged_in_user
     @custom_values = @issue.custom_values.find(:all, :include => :custom_field)
-    @journals_count = @issue.journals.count
-    @journals = @issue.journals.find(:all, :include => [:user, :details], :limit => 15, :order => "#{Journal.table_name}.created_on desc")
-  end
-  
-  def history
-    @journals = @issue.journals.find(:all, :include => [:user, :details], :order => "#{Journal.table_name}.created_on desc")
-    @journals_count = @journals.length  
-  end
-  
-  def export_pdf
-    @custom_values = @issue.custom_values.find(:all, :include => :custom_field)
-    @options_for_rfpdf ||= {}
-    @options_for_rfpdf[:file_name] = "#{@project.name}_#{@issue.long_id}.pdf"
+    @journals = @issue.journals.find(:all, :include => [:user, :details], :order => "#{Journal.table_name}.created_on ASC")
+
+    if params[:format]=='pdf'
+      @options_for_rfpdf ||= {}
+      @options_for_rfpdf[:file_name] = "#{@project.identifier}-#{@issue.id}.pdf"
+      render :template => 'issues/show.rfpdf', :layout => false
+    else
+      @status_options = @issue.status.find_new_statuses_allowed_to(logged_in_user.role_for_project(@project), @issue.tracker) if logged_in_user
+      render :template => 'issues/show.rhtml'
+    end
   end
 
   def edit
@@ -50,32 +79,38 @@ class IssuesController < ApplicationController
       begin
         @issue.init_journal(self.logged_in_user)
         # Retrieve custom fields and values
-        @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, :customized => @issue, :value => params["custom_fields"][x.id.to_s]) }
-        @issue.custom_values = @custom_values
+        if params["custom_fields"]
+          @custom_values = @project.custom_fields_for_issues(@issue.tracker).collect { |x| CustomValue.new(:custom_field => x, :customized => @issue, :value => params["custom_fields"][x.id.to_s]) }
+          @issue.custom_values = @custom_values
+        end
         @issue.attributes = params[:issue]
         if @issue.save
           flash[:notice] = l(:notice_successful_update)
-          redirect_to :action => 'show', :id => @issue
+          redirect_to(params[:back_to] || {:action => 'show', :id => @issue})
         end
       rescue ActiveRecord::StaleObjectError
         # Optimistic locking exception
-        flash[:notice] = l(:notice_locking_conflict)
+        flash[:error] = l(:notice_locking_conflict)
       end
     end		
   end
   
   def add_note
-    unless params[:notes].empty?
-      journal = @issue.init_journal(self.logged_in_user, params[:notes])
-      if @issue.save
-        flash[:notice] = l(:notice_successful_update)
-        Mailer.deliver_issue_edit(journal) if Permission.find_by_controller_and_action(params[:controller], params[:action]).mail_enabled?
-        redirect_to :action => 'show', :id => @issue
-        return
-      end
+    journal = @issue.init_journal(User.current, params[:notes])
+    params[:attachments].each { |file|
+      next unless file.size > 0
+      a = Attachment.create(:container => @issue, :file => file, :author => logged_in_user)
+      journal.details << JournalDetail.new(:property => 'attachment',
+                                           :prop_key => a.id,
+                                           :value => a.filename) unless a.new_record?
+    } if params[:attachments] and params[:attachments].is_a? Array
+    if journal.save
+      flash[:notice] = l(:notice_successful_update)
+      Mailer.deliver_issue_edit(journal) if Setting.notified_events.include?('issue_updated')
+      redirect_to :action => 'show', :id => @issue
+      return
     end
     show
-    render :action => 'show'
   end
 
   def change_status
@@ -95,38 +130,29 @@ class IssuesController < ApplicationController
                                                  :value => a.filename) unless a.new_record?
           } if params[:attachments] and params[:attachments].is_a? Array
         
+          # Log time
+          if current_role.allowed_to?(:log_time)
+            @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => logged_in_user, :spent_on => Date.today)
+            @time_entry.attributes = params[:time_entry]
+            @time_entry.save
+          end
+          
           flash[:notice] = l(:notice_successful_update)
-          Mailer.deliver_issue_edit(journal) if Permission.find_by_controller_and_action(params[:controller], params[:action]).mail_enabled?
+          Mailer.deliver_issue_edit(journal) if Setting.notified_events.include?('issue_updated')
           redirect_to :action => 'show', :id => @issue
         end
       rescue ActiveRecord::StaleObjectError
         # Optimistic locking exception
-        flash[:notice] = l(:notice_locking_conflict)
+        flash[:error] = l(:notice_locking_conflict)
       end
     end    
     @assignable_to = @project.members.find(:all, :include => :user).collect{ |m| m.user }
+    @activities = Enumeration::get_values('ACTI')
   end
 
   def destroy
     @issue.destroy
     redirect_to :controller => 'projects', :action => 'list_issues', :id => @project
-  end
-
-  def add_attachment
-    # Save the attachments
-    @attachments = []
-    journal = @issue.init_journal(self.logged_in_user)
-    params[:attachments].each { |file|
-      next unless file.size > 0
-      a = Attachment.create(:container => @issue, :file => file, :author => logged_in_user)
-      @attachments << a unless a.new_record?
-      journal.details << JournalDetail.new(:property => 'attachment',
-                                           :prop_key => a.id,
-                                           :value => a.filename) unless a.new_record?
-    } if params[:attachments] and params[:attachments].is_a? Array
-    journal.save if journal.details.any?
-    Mailer.deliver_attachments_add(@attachments) if !@attachments.empty? and Permission.find_by_controller_and_action(params[:controller], params[:action]).mail_enabled?
-    redirect_to :action => 'show', :id => @issue
   end
 
   def destroy_attachment
@@ -139,21 +165,53 @@ class IssuesController < ApplicationController
     journal.save
     redirect_to :action => 'show', :id => @issue
   end
-
-  # Send the file in stream mode
-  def download
-    @attachment = @issue.attachments.find(params[:attachment_id])
-    send_file @attachment.diskfile, :filename => @attachment.filename
-  rescue
-    render_404
+  
+  def context_menu
+    @priorities = Enumeration.get_values('IPRI').reverse
+    @statuses = IssueStatus.find(:all, :order => 'position')
+    @allowed_statuses = @issue.status.find_new_statuses_allowed_to(User.current.role_for_project(@project), @issue.tracker)
+    @assignables = @issue.assignable_users
+    @assignables << @issue.assigned_to if @issue.assigned_to && !@assignables.include?(@issue.assigned_to)
+    @can = {:edit => User.current.allowed_to?(:edit_issues, @project),
+            :change_status => User.current.allowed_to?(:change_issue_status, @project),
+            :add => User.current.allowed_to?(:add_issues, @project),
+            :move => User.current.allowed_to?(:move_issues, @project),
+            :delete => User.current.allowed_to?(:delete_issues, @project)}
+    render :layout => false
   end
 
+  def preview
+    issue = Issue.find_by_id(params[:id])
+    @attachements = issue.attachments if issue
+    @text = params[:issue][:description]
+    render :partial => 'common/preview'
+  end
+  
 private
   def find_project
     @issue = Issue.find(params[:id], :include => [:project, :tracker, :status, :author, :priority, :category])
     @project = @issue.project
-    @html_title = "#{@project.name} - #{@issue.tracker.name} ##{@issue.id}"
   rescue ActiveRecord::RecordNotFound
     render_404
-  end  
+  end
+  
+  # Retrieve query from session or build a new query
+  def retrieve_query
+    if params[:set_filter] or !session[:query] or session[:query].project_id
+      # Give it a name, required to be valid
+      @query = Query.new(:name => "_", :executed_by => logged_in_user)
+      if params[:fields] and params[:fields].is_a? Array
+        params[:fields].each do |field|
+          @query.add_filter(field, params[:operators][field], params[:values][field])
+        end
+      else
+        @query.available_filters.keys.each do |field|
+          @query.add_short_filter(field, params[field]) if params[field]
+        end
+      end
+      session[:query] = @query
+    else
+      @query = session[:query]
+    end
+  end
 end

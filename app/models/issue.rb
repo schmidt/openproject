@@ -1,5 +1,5 @@
 # redMine - project management software
-# Copyright (C) 2006  Jean-Philippe Lang
+# Copyright (C) 2006-2007  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Issue < ActiveRecord::Base
-
   belongs_to :project
   belongs_to :tracker
   belongs_to :status, :class_name => 'IssueStatus', :foreign_key => 'status_id'
@@ -28,17 +27,43 @@ class Issue < ActiveRecord::Base
 
   has_many :journals, :as => :journalized, :dependent => :destroy
   has_many :attachments, :as => :container, :dependent => :destroy
-  has_many :time_entries
+  has_many :time_entries, :dependent => :nullify
   has_many :custom_values, :dependent => :delete_all, :as => :customized
   has_many :custom_fields, :through => :custom_values
-
+  has_and_belongs_to_many :changesets, :order => "revision ASC"
+  
+  has_many :relations_from, :class_name => 'IssueRelation', :foreign_key => 'issue_from_id', :dependent => :delete_all
+  has_many :relations_to, :class_name => 'IssueRelation', :foreign_key => 'issue_to_id', :dependent => :delete_all
+  
+  acts_as_watchable
+  acts_as_searchable :columns => ['subject', 'description'], :with => {:journal => :issue}
+  acts_as_event :title => Proc.new {|o| "#{o.tracker.name} ##{o.id}: #{o.subject}"},
+                :url => Proc.new {|o| {:controller => 'issues', :action => 'show', :id => o.id}}                
+  
   validates_presence_of :subject, :description, :priority, :tracker, :author, :status
+  validates_length_of :subject, :maximum => 255
   validates_inclusion_of :done_ratio, :in => 0..100
+  validates_numericality_of :estimated_hours, :allow_nil => true
   validates_associated :custom_values, :on => :update
 
-  # set default status for new issues
-  def before_validation
-    self.status = IssueStatus.default if status.nil?
+  def after_initialize
+    if new_record?
+      # set default values for new records only
+      self.status ||= IssueStatus.default
+      self.priority ||= Enumeration.default('IPRI')
+    end
+  end
+  
+  def copy_from(arg)
+    issue = arg.is_a?(Issue) ? arg : Issue.find(arg)
+    self.attributes = issue.attributes.dup
+    self.custom_values = issue.custom_values.collect {|v| v.clone}
+    self
+  end
+  
+  def priority_id=(pid)
+    self.priority = nil
+    write_attribute(:priority_id, pid)
   end
 
   def validate
@@ -49,13 +74,20 @@ class Issue < ActiveRecord::Base
     if self.due_date and self.start_date and self.due_date < self.start_date
       errors.add :due_date, :activerecord_error_greater_than_start_date
     end
+    
+    if start_date && soonest_start && start_date < soonest_start
+      errors.add :start_date, :activerecord_error_invalid
+    end
   end
-
-  #def before_create
-  #  build_history
-  #end
   
-  def before_save
+  def before_create
+    # default assignment based on category
+    if assigned_to.nil? && category && category.assigned_to
+      self.assigned_to = category.assigned_to
+    end
+  end
+  
+  def before_save  
     if @current_journal
       # attributes changes
       (Issue.column_names - %w(id description)).each {|c|
@@ -66,17 +98,33 @@ class Issue < ActiveRecord::Base
       }
       # custom fields changes
       custom_values.each {|c|
+        next if (@custom_values_before_change[c.custom_field_id]==c.value ||
+                  (@custom_values_before_change[c.custom_field_id].blank? && c.value.blank?))
         @current_journal.details << JournalDetail.new(:property => 'cf', 
                                                       :prop_key => c.custom_field_id,
                                                       :old_value => @custom_values_before_change[c.custom_field_id],
-                                                      :value => c.value) unless @custom_values_before_change[c.custom_field_id]==c.value
+                                                      :value => c.value)
       }      
-      @current_journal.save unless @current_journal.details.empty? and @current_journal.notes.empty?
+      @current_journal.save
     end
+    # Save the issue even if the journal is not saved (because empty)
+    true
   end
   
-  def long_id
-    "%05d" % self.id
+  def after_save
+    # Update start/due dates of following issues
+    relations_from.each(&:set_issue_to_dates)
+    
+    # Close duplicates if the issue was closed
+    if @issue_before_change && !@issue_before_change.closed? && self.closed?
+      duplicates.each do |duplicate|
+        # Don't re-close it if it's already closed
+        next if duplicate.closed?
+        # Same user and notes
+        duplicate.init_journal(@current_journal.user, @current_journal.notes)
+        duplicate.update_attribute :status, self.status
+      end
+    end
   end
   
   def custom_value_for(custom_field)
@@ -92,15 +140,52 @@ class Issue < ActiveRecord::Base
     @current_journal
   end
   
+  # Return true if the issue is closed, otherwise false
+  def closed?
+    self.status.is_closed?
+  end
+  
+  # Users the issue can be assigned to
+  def assignable_users
+    project.assignable_users
+  end
+  
+  # Returns the mail adresses of users that should be notified for the issue
+  def recipients
+    recipients = project.recipients
+    # Author and assignee are always notified
+    recipients << author.mail if author
+    recipients << assigned_to.mail if assigned_to
+    recipients.compact.uniq
+  end
+  
   def spent_hours
     @spent_hours ||= time_entries.sum(:hours) || 0
   end
-
-private
-  # Creates an history for the issue
-  #def build_history
-  #  @history = self.histories.build
-  #  @history.status = self.status
-  #  @history.author = self.author
-  #end
+  
+  def relations
+    (relations_from + relations_to).sort
+  end
+  
+  def all_dependent_issues
+    dependencies = []
+    relations_from.each do |relation|
+      dependencies << relation.issue_to
+      dependencies += relation.issue_to.all_dependent_issues
+    end
+    dependencies
+  end
+  
+  # Returns an array of the duplicate issues
+  def duplicates
+    relations.select {|r| r.relation_type == IssueRelation::TYPE_DUPLICATES}.collect {|r| r.other_issue(self)}
+  end
+  
+  def duration
+    (start_date && due_date) ? due_date - start_date : 0
+  end
+  
+  def soonest_start
+    @soonest_start ||= relations_to.collect{|relation| relation.successor_soonest_start}.compact.min
+  end
 end

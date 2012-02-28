@@ -27,12 +27,18 @@ class AdminController < ApplicationController
 	
   def projects
     sort_init 'name', 'asc'
-    sort_update		
-    @project_count = Project.count		
+    sort_update
+    
+    @status = params[:status] ? params[:status].to_i : 0
+    conditions = nil
+    conditions = ["status=?", @status] unless @status == 0
+    
+    @project_count = Project.count(:conditions => conditions)
     @project_pages = Paginator.new self, @project_count,
-								15,
+								25,
 								params['page']								
     @projects = Project.find :all, :order => sort_clause,
+                        :conditions => conditions,
 						:limit  =>  @project_pages.items_per_page,
 						:offset =>  @project_pages.current.offset
 
@@ -40,21 +46,36 @@ class AdminController < ApplicationController
   end
 
   def mail_options
-    @actions = Permission.find(:all, :conditions => ["mail_option=?", true]) || []
+    @notifiables = %w(issue_added issue_updated news_added document_added file_added message_posted)
     if request.post?
-      @actions.each { |a|
-        a.mail_enabled = (params[:action_ids] || []).include? a.id.to_s 
-        a.save
-      }
-      flash.now[:notice] = l(:notice_successful_update)
+      Setting.notified_events = (params[:notified_events] || [])
+      Setting.emails_footer = params[:emails_footer] if params[:emails_footer]
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to :controller => 'admin', :action => 'mail_options'
     end
+  end
+  
+  def test_email
+    raise_delivery_errors = ActionMailer::Base.raise_delivery_errors
+    # Force ActionMailer to raise delivery errors so we can catch it
+    ActionMailer::Base.raise_delivery_errors = true
+    begin
+      @test = Mailer.deliver_test(User.current)
+      flash[:notice] = l(:notice_email_sent, User.current.mail)
+    rescue Exception => e
+      flash[:error] = l(:notice_email_error, e.message)
+    end
+    ActionMailer::Base.raise_delivery_errors = raise_delivery_errors
+    redirect_to :action => 'mail_options'
   end
   
   def info
     @db_adapter_name = ActiveRecord::Base.connection.adapter_name
-    @flags = Hash.new
-    @flags[:default_admin_changed] = User.find(:first, :conditions => ["login=? and hashed_password=?", 'admin', User.hash_password('admin')]).nil?
-    @flags[:file_repository_writable] = File.writable?(Attachment.storage_path)
-    @flags[:textile_available] = ActionView::Helpers::TextHelper.method_defined? "textilize"
+    @flags = {
+      :default_admin_changed => User.find(:first, :conditions => ["login=? and hashed_password=?", 'admin', User.hash_password('admin')]).nil?,
+      :file_repository_writable => File.writable?(Attachment.storage_path),
+      :rmagick_available => Object.const_defined?(:Magick)
+    }
+    @plugins = Redmine::Plugin.registered_plugins
   end  
 end

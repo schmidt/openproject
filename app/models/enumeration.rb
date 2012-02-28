@@ -16,25 +16,42 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Enumeration < ActiveRecord::Base
+  acts_as_list :scope => 'opt = \'#{opt}\''
+
   before_destroy :check_integrity
   
   validates_presence_of :opt, :name
   validates_uniqueness_of :name, :scope => [:opt]
+  validates_length_of :name, :maximum => 30
   validates_format_of :name, :with => /^[\w\s\'\-]*$/i
-	
-	OPTIONS = {
-	  "IPRI" => :enumeration_issue_priorities,
-      "DCAT" => :enumeration_doc_categories,
-      "ACTI" => :enumeration_activities
-	}.freeze
-	
-	def self.get_values(option)
-		find(:all, :conditions => ['opt=?', option])
-	end
-	
+
+  OPTIONS = {
+    "IPRI" => :enumeration_issue_priorities,
+    "DCAT" => :enumeration_doc_categories,
+    "ACTI" => :enumeration_activities
+  }.freeze
+  
+  def self.get_values(option)
+    find(:all, :conditions => {:opt => option}, :order => 'position')
+  end
+  
+  def self.default(option)  
+    find(:first, :conditions => {:opt => option, :is_default => true}, :order => 'position')
+  end
+
   def option_name
     OPTIONS[self.opt]
   end
+
+  def before_save
+    Enumeration.update_all("is_default = #{connection.quoted_false}", {:opt => opt}) if is_default?
+  end
+  
+  def <=>(enumeration)
+    position <=> enumeration.position
+  end
+  
+  def to_s; name end
   
 private
   def check_integrity

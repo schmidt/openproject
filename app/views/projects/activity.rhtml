@@ -1,67 +1,41 @@
 <h2><%=l(:label_activity)%>: <%= "#{month_name(@month).downcase} #{@year}" %></h2>
 
-<div>
-<div class="rightbox">
-<% form_tag do %>
-<p><%= select_month(@month, :prefix => "month", :discard_type => true) %>
-<%= select_year(@year, :prefix => "year", :discard_type => true) %></p>
-<p>
-    <%= check_box_tag 'show_issues', 1, @show_issues %><%= hidden_field_tag 'show_issues', 0, :id => nil %> <%=l(:label_issue_plural)%><br />
-    <% if @project.repository %><%= check_box_tag 'show_changesets', 1, @show_changesets %><%= hidden_field_tag 'show_changesets', 0, :id => nil %> <%=l(:label_revision_plural)%><br /><% end %>
-    <%= check_box_tag 'show_news', 1, @show_news %><%= hidden_field_tag 'show_news', 0, :id => nil %> <%=l(:label_news_plural)%><br />
-    <%= check_box_tag 'show_files', 1, @show_files %><%= hidden_field_tag 'show_files', 0, :id => nil %> <%=l(:label_attachment_plural)%><br />
-    <%= check_box_tag 'show_documents', 1, @show_documents %><%= hidden_field_tag 'show_documents', 0, :id => nil %> <%=l(:label_document_plural)%><br />
-    <%= check_box_tag 'show_wiki_edits', 1, @show_wiki_edits %><%= hidden_field_tag 'show_wiki_edits', 0, :id => nil %> <%=l(:label_wiki_edit_plural)%>
-</p>
-<p class="textcenter"><%= submit_tag l(:button_apply), :class => 'button-small' %></p>
-<% end %>
-</div>
-
 <% @events_by_day.keys.sort {|x,y| y <=> x }.each do |day| %>
   <h3><%= day_name(day.cwday) %> <%= day.day %></h3>
   <ul>
-  <% @events_by_day[day].sort {|x,y| y.created_on <=> x.created_on }.each do |e| %>
-    <li><p>
-    <% if e.is_a? Issue %>
-      <%= e.created_on.strftime("%H:%M") %> <%= link_to_issue e %>: <%=h e.subject %><br />
-          <i><%= e.author.name %></i>
-    <% elsif e.is_a? News %>
-      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_news)%>: <%= link_to h(e.title), :controller => 'news', :action => 'show', :id => e %><br />
-          <% unless e.summary.empty? %><%=h e.summary %><br /><% end %>
-          <i><%= e.author.name %></i>
-    <% elsif (e.is_a? Attachment) and (e.container.is_a? Version) %>
-      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_attachment)%> (<%=h e.container.name %>): <%= link_to e.filename, :controller => 'projects', :action => 'list_files', :id => @project %><br />
-        <i><%= e.author.name %></i>
-    <% elsif (e.is_a? Attachment) and (e.container.is_a? Document) %>
-      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_attachment)%>: <%= e.filename %> (<%= link_to h(e.container.title), :controller => 'documents', :action => 'show', :id => e.container %>)<br />
-        <i><%= e.author.name %></i>
-    <% elsif e.is_a? Document %>
-      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_document)%>: <%= link_to h(e.title), :controller => 'documents', :action => 'show', :id => e %><br />
-    <% elsif e.is_a? WikiContent.versioned_class %>
-      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_wiki_edit)%>: <%= link_to h(WikiPage.pretty_title(e.title)), :controller => 'wiki', :page => e.title %> (<%= link_to '#' + e.version.to_s, :controller => 'wiki', :page => e.title, :version => e.version %>)<br />
-      <% unless e.comment.blank? %><em><%=h e.comment %></em><% end %>
-    <% elsif e.is_a? Changeset %>
-      <%= e.created_on.strftime("%H:%M") %> <%=l(:label_revision)%> <%= link_to h(e.revision), :controller => 'repositories', :action => 'revision', :id => @project, :rev => e.revision %><br />
-      <em><%=h e.committer.blank? ? "anonymous" : e.committer %><%= h(": #{truncate(e.comment, 500)}") unless e.comment.blank? %></em>
-    <% end %>
-    </p></li>
-  
+  <% @events_by_day[day].sort {|x,y| y.event_datetime <=> x.event_datetime }.each do |e| %>
+    <li><p><%= e.event_datetime.strftime("%H:%M") %> <%= link_to truncate(e.event_title, 100), e.event_url %><br />
+    <% unless e.event_description.blank? %><em><%= truncate(e.event_description, 500) %></em><br /><% end %>
+    <span class="author"><%= e.event_author if e.respond_to?(:author) %></span></p></li>
   <% end %>
   </ul>
 <% end %>
-<% if @events_by_day.empty? %><p><i><%= l(:label_no_data) %></i></p><% end %>
+
+<% if @events_by_day.empty? %><p class="nodata"><%= l(:label_no_data) %></p><% end %>
 
 <div style="float:left;">
+<% prev_params = params.clone.update :year => (@month==1 ? @year-1 : @year), :month =>(@month==1 ? 12 : @month-1) %>
 <%= link_to_remote ('&#171; ' + (@month==1 ? "#{month_name(12)} #{@year-1}" : "#{month_name(@month-1)}")), 
-                    {:update => "content", :url => { :year => (@month==1 ? @year-1 : @year), :month =>(@month==1 ? 12 : @month-1) }},
-                    {:href => url_for(:action => 'activity', :year => (@month==1 ? @year-1 : @year), :month =>(@month==1 ? 12 : @month-1))}
-                    %>
+                    {:update => "content", :url => prev_params}, {:href => url_for(prev_params)} %>
 </div>
 <div style="float:right;">
+<% next_params = params.clone.update :year => (@month==12 ? @year+1 : @year), :month =>(@month==12 ? 1 : @month+1) %>
 <%= link_to_remote ((@month==12 ? "#{month_name(1)} #{@year+1}" : "#{month_name(@month+1)}") + ' &#187;'), 
-                    {:update => "content", :url => { :year => (@month==12 ? @year+1 : @year), :month =>(@month==12 ? 1 : @month+1) }},
-                    {:href => url_for(:action => 'activity', :year => (@month==12 ? @year+1 : @year), :month =>(@month==12 ? 1 : @month+1))}
-                    %>&nbsp;
+                    {:update => "content", :url => next_params}, {:href => url_for(next_params)} %>
+&nbsp;
 </div>
 <br />
-</div>
+
+<% content_for :header_tags do %>
+<%= auto_discovery_link_tag(:atom, params.merge({:format => 'atom', :year => nil, :month => nil, :key => User.current.rss_key})) %>
+<% end %>
+
+<% content_for :sidebar do %>
+<% form_tag do %>
+<h3><%= l(:label_activity) %></h3>
+<p><% @event_types.each do |t| %>
+<label><%= check_box_tag "show_#{t}", 1, @scope.include?(t) %> <%= l("label_#{t.singularize}_plural")%></label><br />
+<% end %></p>
+<p><%= submit_tag l(:button_apply), :class => 'button-small' %></p>
+<% end %>
+<% end %>

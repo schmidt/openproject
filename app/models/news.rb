@@ -21,7 +21,12 @@ class News < ActiveRecord::Base
   has_many :comments, :as => :commented, :dependent => :delete_all, :order => "created_on"
   
   validates_presence_of :title, :description
-  
+  validates_length_of :title, :maximum => 60
+  validates_length_of :summary, :maximum => 255
+
+  acts_as_searchable :columns => ['title', 'description']
+  acts_as_event :url => Proc.new {|o| {:controller => 'news', :action => 'show', :id => o.id}}
+
   # returns latest news for projects visible by user
   def self.latest(user=nil, count=5)
     find(:all, :limit => count, :conditions => Project.visible_by(user), :include => [ :author, :project ], :order => "#{News.table_name}.created_on DESC")	

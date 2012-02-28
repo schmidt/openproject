@@ -22,7 +22,13 @@ class Attachment < ActiveRecord::Base
   belongs_to :author, :class_name => "User", :foreign_key => "author_id"
   
   validates_presence_of :container, :filename
-  
+  validates_length_of :filename, :maximum => 255
+  validates_length_of :disk_filename, :maximum => 255
+
+  acts_as_event :title => :filename,
+                :description => :filename,
+                :url => Proc.new {|o| {:controller => 'attachments', :action => 'download', :id => o.id}}
+
   cattr_accessor :storage_path
   @@storage_path = "#{RAILS_ROOT}/files"
   
@@ -36,7 +42,7 @@ class Attachment < ActiveRecord::Base
 			if @temp_file.size > 0
 				self.filename = sanitize_filename(@temp_file.original_filename)
 				self.disk_filename = DateTime.now.strftime("%y%m%d%H%M%S") + "_" + self.filename
-				self.content_type = @temp_file.content_type
+				self.content_type = @temp_file.content_type.chomp
 				self.filesize = @temp_file.size
 			end
 		end
@@ -54,6 +60,10 @@ class Attachment < ActiveRecord::Base
 				f.write(@temp_file.read)
 			end
 			self.digest = Digest::MD5.hexdigest(File.read(diskfile))
+		end
+		# Don't save the content type if it's longer than the authorized length
+		if self.content_type && self.content_type.length > 255
+		  self.content_type = nil
 		end
 	end
 	
@@ -77,7 +87,15 @@ class Attachment < ActiveRecord::Base
 	def self.most_downloaded
 		find(:all, :limit => 5, :order => "downloads DESC")	
 	end
-	
+
+  def project
+    container.is_a?(Project) ? container : container.project
+  end
+  
+  def image?
+    self.filename =~ /\.(jpeg|jpg|gif|png)$/i
+  end
+  
 private
   def sanitize_filename(value)
       # get only the filename, not the whole path

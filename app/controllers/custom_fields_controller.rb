@@ -25,7 +25,7 @@ class CustomFieldsController < ApplicationController
   end
 
   def list
-    @custom_fields_by_type = CustomField.find(:all).group_by {|f| f.type.to_s }
+    @custom_fields_by_type = CustomField.find(:all).group_by {|f| f.class.name }
     @tab = params[:tab] || 'IssueCustomField'
     render :action => "list", :layout => false if request.xhr?
   end
@@ -66,7 +66,7 @@ class CustomFieldsController < ApplicationController
     @custom_field = CustomField.find(params[:id]).destroy
     redirect_to :action => 'list', :tab => @custom_field.type
   rescue
-    flash[:notice] = "Unable to delete custom field"
+    flash[:error] = "Unable to delete custom field"
     redirect_to :action => 'list'
   end
 end

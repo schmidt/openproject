@@ -37,6 +37,7 @@ class FeedsController < ApplicationController
   def issues
     if @project && params[:query_id]
       query = Query.find(params[:query_id])
+      query.executed_by = @user
       # ignore query if it's not valid
       query = nil unless query.valid?
       # override with query conditions
@@ -56,6 +57,7 @@ class FeedsController < ApplicationController
   def history    
     if @project && params[:query_id]
       query = Query.find(params[:query_id])
+      query.executed_by = @user
       # ignore query if it's not valid
       query = nil unless query.valid?
       # override with query conditions
@@ -67,7 +69,7 @@ class FeedsController < ApplicationController
                                      :order => "#{Journal.table_name}.created_on DESC"
     end
     
-    @title = (@project ? @project.name : Setting.app_title) + ": " + (query ? query.name : l(:label_reported_issues))
+    @title = (@project ? @project.name : Setting.app_title) + ": " + (query ? query.name : l(:label_changes_details))
     headers["Content-Type"] = "application/rss+xml"
     render :action => 'history_atom' if 'atom' == params[:format]
   end
@@ -90,7 +92,7 @@ private
       # global feed
       scope = ["#{Project.table_name}.is_public=?", true]
     end
-    @find_options = {:conditions => scope, :limit => Setting.feeds_limit}
+    @find_options = {:conditions => scope, :limit => Setting.feeds_limit.to_i}
     return true
   end
 end

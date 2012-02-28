@@ -16,20 +16,34 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Project < ActiveRecord::Base
-  has_many :versions, :dependent => :destroy, :order => "#{Version.table_name}.effective_date DESC, #{Version.table_name}.name DESC"
+  # Project statuses
+  STATUS_ACTIVE     = 1
+  STATUS_ARCHIVED   = 9
+  
   has_many :members, :dependent => :delete_all, :include => :user, :conditions => "#{User.table_name}.status=#{User::STATUS_ACTIVE}"
   has_many :users, :through => :members
   has_many :custom_values, :dependent => :delete_all, :as => :customized
+  has_many :enabled_modules, :dependent => :delete_all
   has_many :issues, :dependent => :destroy, :order => "#{Issue.table_name}.created_on DESC", :include => [:status, :tracker]
+  has_many :issue_changes, :through => :issues, :source => :journals
+  has_many :versions, :dependent => :destroy, :order => "#{Version.table_name}.effective_date DESC, #{Version.table_name}.name DESC"
   has_many :time_entries, :dependent => :delete_all
   has_many :queries, :dependent => :delete_all
   has_many :documents, :dependent => :destroy
   has_many :news, :dependent => :delete_all, :include => :author
   has_many :issue_categories, :dependent => :delete_all, :order => "#{IssueCategory.table_name}.name"
+  has_many :boards, :order => "position ASC"
   has_one :repository, :dependent => :destroy
+  has_many :changesets, :through => :repository
   has_one :wiki, :dependent => :destroy
   has_and_belongs_to_many :custom_fields, :class_name => 'IssueCustomField', :join_table => "#{table_name_prefix}custom_fields_projects#{table_name_suffix}", :association_foreign_key => 'custom_field_id'
   acts_as_tree :order => "name", :counter_cache => true
+
+  acts_as_searchable :columns => ['name', 'description'], :project_key => 'id'
+  acts_as_event :title => Proc.new {|o| "#{l(:label_project)}: #{o.name}"},
+                :url => Proc.new {|o| {:controller => 'projects', :action => 'show', :id => o.id}}
+
+  attr_protected :status, :enabled_module_names
   
   validates_presence_of :name, :description, :identifier
   validates_uniqueness_of :name, :identifier
@@ -38,6 +52,7 @@ class Project < ActiveRecord::Base
   validates_length_of :name, :maximum => 30
   validates_format_of :name, :with => /^[\w\s\'\-]*$/i
   validates_length_of :description, :maximum => 255
+  validates_length_of :homepage, :maximum => 60
   validates_length_of :identifier, :in => 3..12
   validates_format_of :identifier, :with => /^[a-z0-9\-]*$/
   
@@ -51,12 +66,11 @@ class Project < ActiveRecord::Base
   
   def issues_with_subprojects(include_subprojects=false)
     conditions = nil
-    if include_subprojects && children.size > 0
-      ids = [id] + children.collect {|c| c.id}
+    if include_subprojects && !active_children.empty?
+      ids = [id] + active_children.collect {|c| c.id}
       conditions = ["#{Issue.table_name}.project_id IN (#{ids.join(',')})"]
-    else
-      conditions = ["#{Issue.table_name}.project_id = ?", id]
     end
+    conditions ||= ["#{Issue.table_name}.project_id = ?", id]
     Issue.with_scope :find => { :conditions => conditions } do 
       yield
     end 
@@ -69,11 +83,44 @@ class Project < ActiveRecord::Base
   end	
 
   def self.visible_by(user=nil)
-    if user && !user.memberships.empty?
-      return ["#{Project.table_name}.is_public = ? or #{Project.table_name}.id IN (#{user.memberships.collect{|m| m.project_id}.join(',')})", true]
+    if user && user.admin?
+      return "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"
+    elsif user && user.memberships.any?
+      return "#{Project.table_name}.status=#{Project::STATUS_ACTIVE} AND (#{Project.table_name}.is_public = #{connection.quoted_true} or #{Project.table_name}.id IN (#{user.memberships.collect{|m| m.project_id}.join(',')}))"
     else
-      return ["#{Project.table_name}.is_public = ?", true]
+      return "#{Project.table_name}.status=#{Project::STATUS_ACTIVE} AND #{Project.table_name}.is_public = #{connection.quoted_true}"
     end
+  end
+  
+  def active?
+    self.status == STATUS_ACTIVE
+  end
+  
+  def archive
+    # Archive subprojects if any
+    children.each do |subproject|
+      subproject.archive
+    end
+    update_attribute :status, STATUS_ARCHIVED
+  end
+  
+  def unarchive
+    return false if parent && !parent.active?
+    update_attribute :status, STATUS_ACTIVE
+  end
+  
+  def active_children
+    children.select {|child| child.active?}
+  end
+  
+  # Users issues can be assigned to
+  def assignable_users
+    members.select {|m| m.role.assignable?}.collect {|m| m.user}
+  end
+  
+  # Returns the mail adresses of users that should be always notified on project events
+  def recipients
+    members.select {|m| m.mail_notification? || m.user.mail_notification?}.collect {|m| m.user.mail}
   end
   
   # Returns an array of all custom fields enabled for project issues
@@ -85,10 +132,47 @@ class Project < ActiveRecord::Base
   def all_custom_fields
     @all_custom_fields ||= (IssueCustomField.for_all + custom_fields).uniq
   end
+  
+  def <=>(project)
+    name <=> project.name
+  end
+  
+  def allows_to?(action)
+    if action.is_a? Hash
+      allowed_actions.include? "#{action[:controller]}/#{action[:action]}"
+    else
+      allowed_permissions.include? action
+    end
+  end
+  
+  def module_enabled?(module_name)
+    module_name = module_name.to_s
+    enabled_modules.detect {|m| m.name == module_name}
+  end
+  
+  def enabled_module_names=(module_names)
+    enabled_modules.clear
+    module_names = [] unless module_names && module_names.is_a?(Array)
+    module_names.each do |name|
+      enabled_modules << EnabledModule.new(:name => name.to_s)
+    end
+  end
 
 protected
   def validate
     errors.add(parent_id, " must be a root project") if parent and parent.parent
     errors.add_to_base("A project with subprojects can't be a subproject") if parent and children.size > 0
+  end
+  
+private
+  def allowed_permissions
+    @allowed_permissions ||= begin
+      module_names = enabled_modules.collect {|m| m.name}
+      Redmine::AccessControl.modules_permissions(module_names).collect {|p| p.name}
+    end
+  end
+
+  def allowed_actions
+    @actions_allowed ||= allowed_permissions.inject([]) { |actions, permission| actions += Redmine::AccessControl.allowed_actions(permission) }.flatten
   end
 end

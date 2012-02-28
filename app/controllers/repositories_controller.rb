@@ -17,66 +17,102 @@
 
 require 'SVG/Graph/Bar'
 require 'SVG/Graph/BarHorizontal'
+require 'digest/sha1'
 
 class RepositoriesController < ApplicationController
   layout 'base'
-  before_filter :find_project
-  before_filter :authorize, :except => [:stats, :graph]
-  before_filter :check_project_privacy, :only => [:stats, :graph]
+  before_filter :find_repository, :except => :edit
+  before_filter :find_project, :only => :edit
+  before_filter :authorize
+  accept_key_auth :revisions
+  
+  def edit
+    @repository = @project.repository
+    if !@repository
+      @repository = Repository.factory(params[:repository_scm])
+      @repository.project = @project
+    end
+    if request.post?
+      @repository.attributes = params[:repository]
+      @repository.save
+    end
+    render(:update) {|page| page.replace_html "tab-content-repository", :partial => 'projects/settings/repository'}
+  end
+  
+  def destroy
+    @repository.destroy
+    redirect_to :controller => 'projects', :action => 'settings', :id => @project, :tab => 'repository'
+  end
   
   def show
-    # get entries for the browse frame
-    @entries = @repository.scm.entries('')
-    show_error and return unless @entries
     # check if new revisions have been committed in the repository
-    scm_latestrev = @entries.revisions.latest
-    if Setting.autofetch_changesets? && scm_latestrev && ((@repository.latest_changeset.nil?) || (@repository.latest_changeset.revision < scm_latestrev.identifier.to_i))
-      @repository.fetch_changesets
-      @repository.reload
-    end
-    @changesets = @repository.changesets.find(:all, :limit => 5, :order => "committed_on DESC")
+    @repository.fetch_changesets if Setting.autofetch_changesets?
+    # get entries for the browse frame
+    @entries = @repository.entries('')    
+    # latest changesets
+    @changesets = @repository.changesets.find(:all, :limit => 10, :order => "committed_on DESC")
+    show_error and return unless @entries || @changesets.any?
   end
   
   def browse
-    @entries = @repository.scm.entries(@path, @rev)
-    show_error and return unless @entries
+    @entries = @repository.entries(@path, @rev)
+    if request.xhr?
+      @entries ? render(:partial => 'dir_list_content') : render(:nothing => true)
+    else
+      show_error unless @entries
+    end
+  end
+  
+  def changes
+    @entry = @repository.scm.entry(@path, @rev)
+    show_error and return unless @entry
+    @changesets = @repository.changesets_for_path(@path)
   end
   
   def revisions
-    unless @path == ''
-      @entry = @repository.scm.entry(@path, @rev)  
-      show_error and return unless @entry
+    @changeset_count = @repository.changesets.count
+    @changeset_pages = Paginator.new self, @changeset_count,
+								      25,
+								      params['page']								
+    @changesets = @repository.changesets.find(:all,
+						:limit  =>  @changeset_pages.items_per_page,
+						:offset =>  @changeset_pages.current.offset)
+
+    respond_to do |format|
+      format.html { render :layout => false if request.xhr? }
+      format.atom { render_feed(@changesets, :title => "#{@project.name}: #{l(:label_revision_plural)}") }
     end
-    @repository.changesets_with_path @path do
-      @changeset_count = @repository.changesets.count
-      @changeset_pages = Paginator.new self, @changeset_count,
-  								      25,
-  								      params['page']								
-      @changesets = @repository.changesets.find(:all,
-  						:limit  =>  @changeset_pages.items_per_page,
-  						:offset =>  @changeset_pages.current.offset)
-    end
-    render :action => "revisions", :layout => false if request.xhr?
   end
   
   def entry
-    if 'raw' == params[:format]
-      content = @repository.scm.cat(@path, @rev)
-      show_error and return unless content
-      send_data content, :filename => @path.split('/').last
+    @content = @repository.scm.cat(@path, @rev)
+    show_error and return unless @content
+    if 'raw' == params[:format]      
+      send_data @content, :filename => @path.split('/').last
     end
   end
   
   def revision
     @changeset = @repository.changesets.find_by_revision(@rev)
     show_error and return unless @changeset
+    @changes_count = @changeset.changes.size
+    @changes_pages = Paginator.new self, @changes_count, 150, params['page']								
+    @changes = @changeset.changes.find(:all,
+  						:limit  =>  @changes_pages.items_per_page,
+  						:offset =>  @changes_pages.current.offset)
+  	
+  	render :action => "revision", :layout => false if request.xhr?	
   end
   
   def diff
-    @rev_to = params[:rev_to] || (@rev-1)
-    type = params[:type] || 'inline'
-    @diff = @repository.scm.diff(params[:path], @rev, @rev_to, type)
-    show_error and return unless @diff
+    @rev_to = params[:rev_to] ? params[:rev_to].to_i : (@rev - 1)
+    @diff_type = ('sbs' == params[:type]) ? 'sbs' : 'inline'
+    
+    @cache_key = "repositories/diff/#{@repository.id}/" + Digest::MD5.hexdigest("#{@path}-#{@rev}-#{@rev_to}-#{@diff_type}")    
+    unless read_fragment(@cache_key)
+      @diff = @repository.diff(@path, @rev, @rev_to, @diff_type)
+      show_error and return unless @diff
+    end
   end
   
   def stats  
@@ -101,28 +137,35 @@ class RepositoriesController < ApplicationController
 private
   def find_project
     @project = Project.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    render_404
+  end
+  
+  def find_repository
+    @project = Project.find(params[:id])
     @repository = @project.repository
     render_404 and return false unless @repository
-    @path = params[:path].squeeze('/').gsub(/^\//, '') if params[:path]
+    @path = params[:path].join('/') unless params[:path].nil?
     @path ||= ''
-    @rev = params[:rev].to_i if params[:rev] and params[:rev].to_i > 0
+    @rev = params[:rev].to_i if params[:rev]
   rescue ActiveRecord::RecordNotFound
     render_404
   end
 
   def show_error
-    flash.now[:notice] = l(:notice_scm_error)
+    flash.now[:error] = l(:notice_scm_error)
     render :nothing => true, :layout => true
   end
   
   def graph_commits_per_month(repository)
     @date_to = Date.today
-    @date_from = @date_to << 12
+    @date_from = @date_to << 11
+    @date_from = Date.civil(@date_from.year, @date_from.month, 1)
     commits_by_day = repository.changesets.count(:all, :group => :commit_date, :conditions => ["commit_date BETWEEN ? AND ?", @date_from, @date_to])
     commits_by_month = [0] * 12
     commits_by_day.each {|c| commits_by_month[c.first.to_date.months_ago] += c.last }
 
-    changes_by_day = repository.changes.count(:all, :group => :commit_date)
+    changes_by_day = repository.changes.count(:all, :group => :commit_date, :conditions => ["commit_date BETWEEN ? AND ?", @date_from, @date_to])
     changes_by_month = [0] * 12
     changes_by_day.each {|c| changes_by_month[c.first.to_date.months_ago] += c.last }
    
@@ -204,5 +247,11 @@ class Date
 
   def weeks_ago(date = Date.today)
     (date.year - self.year)*52 + (date.cweek - self.cweek)
+  end
+end
+
+class String
+  def with_leading_slash
+    starts_with?('/') ? self : "/#{self}"
   end
 end

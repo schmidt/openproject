@@ -20,7 +20,7 @@ require File.dirname(__FILE__) + '/../test_helper'
 class SettingTest < Test::Unit::TestCase
   
   def test_read_default
-    assert_equal "redMine", Setting.app_title
+    assert_equal "Redmine", Setting.app_title
     assert Setting.self_registration?
     assert !Setting.login_required?
   end
@@ -35,5 +35,11 @@ class SettingTest < Test::Unit::TestCase
     assert_equal "My other title", Setting.app_title
     # make sure db has been updated (UPDATE)
     assert_equal "My other title", Setting.find_by_name('app_title').value
+  end
+  
+  def test_serialized_setting
+    Setting.notified_events = ['issue_added', 'issue_updated', 'news_added']    
+    assert_equal ['issue_added', 'issue_updated', 'news_added'], Setting.notified_events
+    assert_equal ['issue_added', 'issue_updated', 'news_added'], Setting.find_by_name('notified_events').value
   end
 end

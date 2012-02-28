@@ -1,4 +1,4 @@
-<h2><%= @user.display_name %></h2>
+<h2><%=h @user.name %></h2>
 
 <p>
 <%= mail_to @user.mail unless @user.pref.hide_mail %>
@@ -12,15 +12,17 @@
 </ul>
 </p>
 
+<% unless @memberships.empty? %>
 <h3><%=l(:label_project_plural)%></h3>
-<p>
-<% for membership in @user.memberships %>
-	<%= membership.project.name %> (<%= membership.role.name %>, <%= format_date(membership.created_on) %>)
-	<br />
+<ul>
+<% for membership in @memberships %>
+	<li><%= link_to membership.project.name, :controller => 'projects', :action => 'show', :id => membership.project %>
+    (<%= membership.role.name %>, <%= format_date(membership.created_on) %>)</li>
 <% end %>
-</p>
+</ul>
+<% end %>
 
 <h3><%=l(:label_activity)%></h3>
 <p>
-<%=l(:label_reported_issues)%>: <%= Issue.count(["author_id=?", @user.id]) %>
+<%=l(:label_reported_issues)%>: <%= Issue.count(:conditions => ["author_id=?", @user.id]) %>
 </p>

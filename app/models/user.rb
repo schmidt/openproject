@@ -18,11 +18,17 @@
 require "digest/sha1"
 
 class User < ActiveRecord::Base
-  has_many :memberships, :class_name => 'Member', :include => [ :project, :role ], :dependent => :delete_all
+  # Account statuses
+  STATUS_ACTIVE     = 1
+  STATUS_REGISTERED = 2
+  STATUS_LOCKED     = 3
+
+  has_many :memberships, :class_name => 'Member', :include => [ :project, :role ], :conditions => "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}", :order => "#{Project.table_name}.name", :dependent => :delete_all
   has_many :projects, :through => :memberships
   has_many :custom_values, :dependent => :delete_all, :as => :customized
+  has_many :issue_categories, :foreign_key => 'assigned_to_id', :dependent => :nullify
   has_one :preference, :dependent => :destroy, :class_name => 'UserPreference'
-  has_one :rss_key, :dependent => :destroy, :class_name => 'Token', :conditions => "action='feeds'"
+  has_one :rss_token, :dependent => :destroy, :class_name => 'Token', :conditions => "action='feeds'"
   belongs_to :auth_source
   
   attr_accessor :password, :password_confirmation
@@ -44,11 +50,11 @@ class User < ActiveRecord::Base
   validates_confirmation_of :password, :allow_nil => true
   validates_associated :custom_values, :on => :update
 
-  # Account statuses
-  STATUS_ACTIVE     = 1
-  STATUS_REGISTERED = 2
-  STATUS_LOCKED     = 3
-
+  def before_create
+    self.mail_notification = false
+    true
+  end
+  
   def before_save
     # update hashed_password if password was set
     self.hashed_password = User.hash_password(self.password) if self.password
@@ -100,12 +106,8 @@ class User < ActiveRecord::Base
   end
 	
   # Return user's full name for display
-  def display_name
-    firstname + " " + lastname
-  end
-  
   def name
-    display_name
+    "#{firstname} #{lastname}"
   end
   
   def active?
@@ -124,31 +126,113 @@ class User < ActiveRecord::Base
     User.hash_password(clear_password) == self.hashed_password
   end
   
-  def role_for_project(project)
-    member = memberships.detect {|m| m.project_id == project.id}
-    member ? member.role : nil 
-  end
-  
   def pref
     self.preference ||= UserPreference.new(:user => self)
   end
   
-  def get_or_create_rss_key
-    self.rss_key || Token.create(:user => self, :action => 'feeds')
+  # Return user's RSS key (a 40 chars long string), used to access feeds
+  def rss_key
+    token = self.rss_token || Token.create(:user => self, :action => 'feeds')
+    token.value
+  end
+  
+  # Return an array of project ids for which the user has explicitly turned mail notifications on
+  def notified_projects_ids
+    @notified_projects_ids ||= memberships.select {|m| m.mail_notification?}.collect(&:project_id)
+  end
+  
+  def notified_project_ids=(ids)
+    Member.update_all("mail_notification = #{connection.quoted_false}", ['user_id = ?', id])
+    Member.update_all("mail_notification = #{connection.quoted_true}", ['user_id = ? AND project_id IN (?)', id, ids]) if ids && !ids.empty?
+    @notified_projects_ids = nil
+    notified_projects_ids
   end
   
   def self.find_by_rss_key(key)
     token = Token.find_by_value(key)
     token && token.user.active? ? token.user : nil
   end
+  
+  def self.find_by_autologin_key(key)
+    token = Token.find_by_action_and_value('autologin', key)
+    token && (token.created_on > Setting.autologin.to_i.day.ago) && token.user.active? ? token.user : nil
+  end
 
   def <=>(user)
-    lastname <=> user.lastname
+    lastname == user.lastname ? firstname <=> user.firstname : lastname <=> user.lastname
+  end
+  
+  def to_s
+    name
+  end
+  
+  def logged?
+    true
+  end
+  
+  # Return user's role for project
+  def role_for_project(project)
+    # No role on archived projects
+    return nil unless project && project.active?
+    # Find project membership
+    membership = memberships.detect {|m| m.project_id == project.id}
+    if membership
+      membership.role
+    elsif logged?
+      Role.non_member
+    else
+      Role.anonymous
+    end
+  end
+  
+  # Return true if the user is a member of project
+  def member_of?(project)
+    role_for_project(project).member?
+  end
+  
+  # Return true if the user is allowed to do the specified action on project
+  # action can be:
+  # * a parameter-like Hash (eg. :controller => 'projects', :action => 'edit')
+  # * a permission Symbol (eg. :edit_project)
+  def allowed_to?(action, project)
+    # No action allowed on archived projects
+    return false unless project.active?
+    # No action allowed on disabled modules
+    return false unless project.allows_to?(action)
+    # Admin users are authorized for anything else
+    return true if admin?
+    
+    role = role_for_project(project)
+    return false unless role
+    role.allowed_to?(action) && (project.is_public? || role.member?)
+  end
+  
+  def self.current=(user)
+    @current_user = user
+  end
+  
+  def self.current
+    @current_user ||= AnonymousUser.new
+  end
+  
+  def self.anonymous
+    AnonymousUser.new
   end
   
 private
   # Return password digest
   def self.hash_password(clear_password)
     Digest::SHA1.hexdigest(clear_password || "")
+  end
+end
+
+class AnonymousUser < User
+  def logged?
+    false
+  end
+  
+  # Anonymous user has no RSS key
+  def rss_key
+    nil
   end
 end

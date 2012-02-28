@@ -52,11 +52,16 @@ module IfpdfHelper
       
     def Cell(w,h=0,txt='',border=0,ln=0,align='',fill=0,link='')
       @ic ||= Iconv.new(l(:general_pdf_encoding), 'UTF-8')
+      # these quotation marks are not correctly rendered in the pdf
+      txt = txt.gsub(/[“”]/, '"') if txt
       txt = begin
-        @ic.iconv(txt)
+        # 0x5c char handling
+        txtar = txt.split('\\')
+        txtar << '' if txt[-1] == ?\\
+        txtar.collect {|x| @ic.iconv(x)}.join('\\').gsub(/\\/, "\\\\\\\\")
       rescue
         txt
-      end
+      end || ''
       super w,h,txt,border,ln,align,fill,link
     end
     
