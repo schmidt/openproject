@@ -4,7 +4,7 @@ class StubController < ApplicationController
   attr_accessor :request, :url
 end
 
-class HelperTestCase < Test::Unit::TestCase
+class HelperTestCase < ActiveSupport::TestCase
 
   # Add other helpers here if you need them
   include ActionView::Helpers::ActiveRecordHelper
@@ -25,7 +25,7 @@ class HelperTestCase < Test::Unit::TestCase
 
     # Fake url rewriter so we can test url_for
     @controller.url = ActionController::UrlRewriter.new @request, {}
-    
+
     ActionView::Helpers::AssetTagHelper::reset_javascript_include_default
   end
 

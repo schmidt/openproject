@@ -1,35 +1,63 @@
-== Redmine upgrade procedure
+== Redmine upgrade
 
 Redmine - project management software
-Copyright (C) 2006-2007  Jean-Philippe Lang
+Copyright (C) 2006-2011  Jean-Philippe Lang
 http://www.redmine.org/
 
 
-== Upgrading from 0.3.0 and above
+== Upgrading
 
 1. Uncompress the program archive in a new directory
-   
-3. Copy your database settings (RAILS_ROOT/config/database.yml)
+
+2. Copy your database settings (RAILS_ROOT/config/database.yml)
+   and your configuration file (RAILS_ROOT/config/configuration.yml)
    into the new config directory
+   Note: before Redmine 1.2, SMTP configuration was stored in
+   config/email.yml. It should now be stored in config/configuration.yml. 
+
+3. Copy the RAILS_ROOT/files directory content into your new installation
+   This directory contains all the attached files.
+
+4. Copy the folders of the installed plugins and themes into new installation
+
+5. Generate a session store secret
    
-4. Enter your SMTP settings in config/environment.rb
-   Do not replace this file with the old one
+   Redmine stores session data in cookies by default, which requires
+   a secret to be generated. Under the new application directory run:
+     rake generate_session_store
    
-5. Migrate your database (please make a backup before doing this):
-   rake db:migrate RAILS_ENV="production"
+   DO NOT REPLACE OR EDIT ANY OTHER FILES.
 
-6. Copy the RAILS_ROOT/files directory content into your new installation
+6. Migrate your database
 
-Note 1: Rails 1.2.2 or higher is required for version 0.4.2 and later.
-
-Note 2: when upgrading your code with svn update, don't forget to clear
-the application cache (RAILS_ROOT/tmp/cache) before restarting.
-
-Note 3: settings previously defined in custom_config.rb are now stored
-in database, as of version 0.4.2. Go to "Admin -> Settings" to edit them.
-
+   If you are upgrading to Rails 2.3.14 as part of this migration, you
+   need to upgrade the plugin migrations before running the plugin migrations
+   using:
+     rake db:migrate:upgrade_plugin_migrations RAILS_ENV="production"
    
-== From 0.2.x and below
+   Please make a backup before doing this! Under the new application
+   directory run:
+     rake db:migrate RAILS_ENV="production"
+   
+   If you have installed any plugins, you should also run their database
+   migrations using:
+     rake db:migrate_plugins RAILS_ENV="production"
+   
+7. Clean up
+   
+   Clear the cache and the existing sessions by running:
+     rake tmp:cache:clear
+     rake tmp:sessions:clear
 
-Due to major database changes since 0.2.x, there is no migration support
-from 0.2.x and previous versions.
+8. Restart the application server (e.g. mongrel, thin, passenger)
+
+9. Finally go to "Administration -> Roles & permissions" to check/set permissions
+   for new features, if any
+
+== Notes
+
+* Rails 2.3.14 is required for versions 1.3.x.
+
+== References
+
+* http://www.redmine.org/wiki/redmine/RedmineUpgrade
