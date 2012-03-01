@@ -18,12 +18,15 @@
 module ProjectsHelper
   def link_to_version(version, options = {})
     return '' unless version && version.is_a?(Version)
-    link_to version.name, {:controller => 'projects',
-                           :action => 'roadmap',
-                           :id => version.project_id,
-                           :completed => (version.completed? ? 1 : nil),
-                           :anchor => version.name
-                          }, options
+    link_to h(version.name), { :controller => 'versions', :action => 'show', :id => version }, options
+  end
+  
+  def format_activity_day(date)
+    date == Date.today ? l(:label_today).titleize : format_date(date)
+  end
+  
+  def format_activity_description(text)
+    h(truncate(text, 250))
   end
   
   def project_settings_tabs
@@ -188,12 +191,4 @@ module ProjectsHelper
     gc.draw(imgl)
     imgl
   end if Object.const_defined?(:Magick)
-  
-  def new_issue_selector
-    trackers = @project.trackers
-    # can't use form tag inside helper
-    content_tag('form',
-      select_tag('tracker_id', '<option></option>' + options_from_collection_for_select(trackers, 'id', 'name'), :onchange => "if (this.value != '') {this.form.submit()}"),
-      :action => url_for(:controller => 'projects', :action => 'add_issue', :id => @project), :method => 'get')
-  end
 end

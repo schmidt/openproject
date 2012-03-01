@@ -76,6 +76,14 @@ class UserTest < Test::Unit::TestCase
     assert_equal User.hash_password("hello"), user.hashed_password    
   end
   
+  def test_name_format
+    assert_equal 'Smith, John', @jsmith.name(:lastname_coma_firstname)
+    Setting.user_format = :firstname_lastname
+    assert_equal 'John Smith', @jsmith.name
+    Setting.user_format = :username
+    assert_equal 'jsmith', @jsmith.name
+  end
+  
   def test_lock
     user = User.try_to_login("jsmith", "jsmith")
     assert_equal @jsmith, user
@@ -135,5 +143,13 @@ class UserTest < Test::Unit::TestCase
     @jsmith.save
     @jsmith.reload
     assert !@jsmith.projects.first.recipients.include?(@jsmith.mail)
+  end
+  
+  def test_comments_sorting_preference
+    assert !@jsmith.wants_comments_in_reverse_order?
+    @jsmith.pref.comments_sorting = 'asc'
+    assert !@jsmith.wants_comments_in_reverse_order?
+    @jsmith.pref.comments_sorting = 'desc'
+    assert @jsmith.wants_comments_in_reverse_order?
   end
 end

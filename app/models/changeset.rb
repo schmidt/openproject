@@ -32,7 +32,6 @@ class Changeset < ActiveRecord::Base
                      :date_column => 'committed_on'
   
   validates_presence_of :repository_id, :revision, :committed_on, :commit_date
-  validates_numericality_of :revision, :only_integer => true
   validates_uniqueness_of :revision, :scope => :repository_id
   validates_uniqueness_of :scmid, :scope => :repository_id, :allow_nil => true
   
@@ -45,9 +44,14 @@ class Changeset < ActiveRecord::Base
     super
   end
   
+  def project
+    repository.project
+  end
+  
   def after_create
     scan_comment_for_issue_ids
   end
+  require 'pp'
   
   def scan_comment_for_issue_ids
     return if comments.blank?
@@ -79,11 +83,20 @@ class Changeset < ActiveRecord::Base
         # update status of issues
         logger.debug "Issues fixed by changeset #{self.revision}: #{issue_ids.join(', ')}." if logger && logger.debug?
         target_issues.each do |issue|
-          # don't change the status is the issue is already closed
+          # the issue may have been updated by the closure of another one (eg. duplicate)
+          issue.reload
+          # don't change the status is the issue is closed
           next if issue.status.is_closed?
+          user = committer_user || User.anonymous
+          csettext = "r#{self.revision}"
+          if self.scmid && (! (csettext =~ /^r[0-9]+$/))
+            csettext = "commit:\"#{self.scmid}\""
+          end
+          journal = issue.init_journal(user, l(:text_status_changed_by_changeset, csettext))
           issue.status = fix_status
           issue.done_ratio = done_ratio if done_ratio
           issue.save
+          Mailer.deliver_issue_edit(journal) if Setting.notified_events.include?('issue_updated')
         end
       end
       referenced_issues += target_issues
@@ -92,13 +105,23 @@ class Changeset < ActiveRecord::Base
     self.issues = referenced_issues.uniq
   end
 
+  # Returns the Redmine User corresponding to the committer
+  def committer_user
+    if committer && committer.strip =~ /^([^<]+)(<(.*)>)?$/
+      username, email = $1.strip, $3
+      u = User.find_by_login(username)
+      u ||= User.find_by_mail(email) unless email.blank?
+      u
+    end
+  end
+  
   # Returns the previous changeset
   def previous
-    @previous ||= Changeset.find(:first, :conditions => ['revision < ? AND repository_id = ?', self.revision, self.repository_id], :order => 'revision DESC')
+    @previous ||= Changeset.find(:first, :conditions => ['id < ? AND repository_id = ?', self.id, self.repository_id], :order => 'id DESC')
   end
 
   # Returns the next changeset
   def next
-    @next ||= Changeset.find(:first, :conditions => ['revision > ? AND repository_id = ?', self.revision, self.repository_id], :order => 'revision ASC')
+    @next ||= Changeset.find(:first, :conditions => ['id > ? AND repository_id = ?', self.id, self.repository_id], :order => 'id ASC')
   end
 end

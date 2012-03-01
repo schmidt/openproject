@@ -26,7 +26,6 @@ class Attachment < ActiveRecord::Base
   validates_length_of :disk_filename, :maximum => 255
 
   acts_as_event :title => :filename,
-                :description => :filename,
                 :url => Proc.new {|o| {:controller => 'attachments', :action => 'download', :id => o.id}}
 
   cattr_accessor :storage_path
@@ -42,7 +41,7 @@ class Attachment < ActiveRecord::Base
 			if @temp_file.size > 0
 				self.filename = sanitize_filename(@temp_file.original_filename)
 				self.disk_filename = DateTime.now.strftime("%y%m%d%H%M%S") + "_" + self.filename
-				self.content_type = @temp_file.content_type.chomp
+				self.content_type = @temp_file.content_type.to_s.chomp
 				self.filesize = @temp_file.size
 			end
 		end

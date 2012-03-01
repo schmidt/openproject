@@ -1,3 +1,6 @@
+/* redMine - project management software
+   Copyright (C) 2006-2008  Jean-Philippe Lang */
+
 function checkAll (id, checked) {
 	var el = document.getElementById(id);
 	for (var i = 0; i < el.elements.length; i++) {
@@ -7,15 +10,24 @@ function checkAll (id, checked) {
 	}
 }
 
+var fileFieldCount = 1;
+
 function addFileField() {
+    if (fileFieldCount >= 10) return false
+    fileFieldCount++;
     var f = document.createElement("input");
     f.type = "file";
-    f.name = "attachments[]";
+    f.name = "attachments[" + fileFieldCount + "][file]";
     f.size = 30;
-        
-    p = document.getElementById("attachments_p");
+    var d = document.createElement("input");
+    d.type = "text";
+    d.name = "attachments[" + fileFieldCount + "][description]";
+    d.size = 60;
+    
+    p = document.getElementById("attachments_fields");
     p.appendChild(document.createElement("br"));
     p.appendChild(f);
+    p.appendChild(d);
 }
 
 function showTab(name) {
@@ -47,16 +59,6 @@ function promptToRemote(text, param, url) {
         new Ajax.Request(url + '?' + param + '=' + value, {asynchronous:true, evalScripts:true});
         return false;
     }
-}
-
-/* checks that at least one checkbox is checked (used when submitting bulk edit form) */
-function checkBulkEdit(form) {
-	for (var i = 0; i < form.elements.length; i++) {
-        if (form.elements[i].checked) {
-            return true;
-        }
-    }
-    return false;
 }
 
 function collapseScmEntry(id) {

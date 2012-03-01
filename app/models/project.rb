@@ -52,12 +52,11 @@ class Project < ActiveRecord::Base
 
   attr_protected :status, :enabled_module_names
   
-  validates_presence_of :name, :description, :identifier
+  validates_presence_of :name, :identifier
   validates_uniqueness_of :name, :identifier
   validates_associated :custom_values, :on => :update
   validates_associated :repository, :wiki
   validates_length_of :name, :maximum => 30
-  validates_length_of :description, :maximum => 255
   validates_length_of :homepage, :maximum => 60
   validates_length_of :identifier, :in => 3..20
   validates_format_of :identifier, :with => /^[a-z0-9\-]*$/
@@ -85,16 +84,6 @@ class Project < ActiveRecord::Base
     end 
   end
 
-  # Return all issues status changes for the project between the 2 given dates
-  def issues_status_changes(from, to)
-    Journal.find(:all, :include => [:issue, :details, :user],
-                       :conditions => ["#{Journal.table_name}.journalized_type = 'Issue'" +
-                                       " AND #{Issue.table_name}.project_id = ?" +
-                                       " AND #{JournalDetail.table_name}.prop_key = 'status_id'" +
-                                       " AND #{Journal.table_name}.created_on BETWEEN ? AND ?",
-                                       id, from, to+1])
-  end
-
   # returns latest created projects
   # non public projects will be returned only if user is a member of those
   def self.latest(user=nil, count=5)
@@ -109,6 +98,50 @@ class Project < ActiveRecord::Base
     else
       return "#{Project.table_name}.status=#{Project::STATUS_ACTIVE} AND #{Project.table_name}.is_public = #{connection.quoted_true}"
     end
+  end
+  
+  def self.allowed_to_condition(user, permission, options={})
+    statements = []
+    base_statement = "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"
+    if options[:project]
+      project_statement = "#{Project.table_name}.id = #{options[:project].id}"
+      project_statement << " OR #{Project.table_name}.parent_id = #{options[:project].id}" if options[:with_subprojects]
+      base_statement = "(#{project_statement}) AND (#{base_statement})"
+    end
+    if user.admin?
+      # no restriction
+    elsif user.logged?
+      statements << "#{Project.table_name}.is_public = #{connection.quoted_true}" if Role.non_member.allowed_to?(permission)
+      allowed_project_ids = user.memberships.select {|m| m.role.allowed_to?(permission)}.collect {|m| m.project_id}
+      statements << "#{Project.table_name}.id IN (#{allowed_project_ids.join(',')})" if allowed_project_ids.any?
+    elsif Role.anonymous.allowed_to?(permission)
+      # anonymous user allowed on public project
+      statements << "#{Project.table_name}.is_public = #{connection.quoted_true}" 
+    else
+      # anonymous user is not authorized
+      statements << "1=0"
+    end
+    statements.empty? ? base_statement : "((#{base_statement}) AND (#{statements.join(' OR ')}))"
+  end
+  
+  def project_condition(with_subprojects)
+    cond = "#{Project.table_name}.id = #{id}"
+    cond = "(#{cond} OR #{Project.table_name}.parent_id = #{id})" if with_subprojects
+    cond
+  end
+  
+  def self.find(*args)
+    if args.first && args.first.is_a?(String) && !args.first.match(/^\d*$/)
+      project = find_by_identifier(*args)
+      raise ActiveRecord::RecordNotFound, "Couldn't find Project with identifier=#{args.first}" if project.nil?
+      project
+    else
+      super
+    end
+  end
+ 
+  def to_param
+    identifier
   end
   
   def active?
@@ -130,6 +163,15 @@ class Project < ActiveRecord::Base
   
   def active_children
     children.select {|child| child.active?}
+  end
+  
+  # Returns an array of the trackers used by the project and its sub projects
+  def rolled_up_trackers
+    @rolled_up_trackers ||=
+      Tracker.find(:all, :include => :projects,
+                         :select => "DISTINCT #{Tracker.table_name}.*",
+                         :conditions => ["#{Project.table_name}.id = ? OR #{Project.table_name}.parent_id = ?", id, id],
+                         :order => "#{Tracker.table_name}.position")
   end
   
   # Deletes all project's members
@@ -161,6 +203,15 @@ class Project < ActiveRecord::Base
     name.downcase <=> project.name.downcase
   end
   
+  def to_s
+    name
+  end
+  
+  # Returns a short description of the projects (first lines)
+  def short_description(length = 255)
+    description.gsub(/^(.{#{length}}[^\n]*).*$/m, '\1').strip if description
+  end
+  
   def allows_to?(action)
     if action.is_a? Hash
       allowed_actions.include? "#{action[:controller]}/#{action[:action]}"
@@ -186,6 +237,7 @@ protected
   def validate
     errors.add(parent_id, " must be a root project") if parent and parent.parent
     errors.add_to_base("A project with subprojects can't be a subproject") if parent and children.size > 0
+    errors.add(:identifier, :activerecord_error_invalid) if !identifier.blank? && identifier.match(/^\d*$/)
   end
   
 private

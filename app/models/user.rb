@@ -23,6 +23,14 @@ class User < ActiveRecord::Base
   STATUS_ACTIVE     = 1
   STATUS_REGISTERED = 2
   STATUS_LOCKED     = 3
+  
+  USER_FORMATS = {
+    :firstname_lastname => '#{firstname} #{lastname}',
+    :firstname => '#{firstname}',
+    :lastname_firstname => '#{lastname} #{firstname}',
+    :lastname_coma_firstname => '#{lastname}, #{firstname}',
+    :username => '#{login}'
+  }
 
   has_many :memberships, :class_name => 'Member', :include => [ :project, :role ], :conditions => "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}", :order => "#{Project.table_name}.name", :dependent => :delete_all
   has_many :projects, :through => :memberships
@@ -38,7 +46,8 @@ class User < ActiveRecord::Base
   attr_protected :login, :admin, :password, :password_confirmation, :hashed_password
 	
   validates_presence_of :login, :firstname, :lastname, :mail, :if => Proc.new { |user| !user.is_a?(AnonymousUser) }
-  validates_uniqueness_of :login, :mail	
+  validates_uniqueness_of :login, :if => Proc.new { |user| !user.login.blank? }
+  validates_uniqueness_of :mail, :if => Proc.new { |user| !user.mail.blank? }
   # Login must contain lettres, numbers, underscores only
   validates_format_of :login, :with => /^[a-z0-9_\-@\.]*$/i
   validates_length_of :login, :maximum => 30
@@ -74,6 +83,8 @@ class User < ActiveRecord::Base
   
   # Returns the user that matches provided login and password, or nil
   def self.try_to_login(login, password)
+    # Make sure no one can sign in with an empty password
+    return nil if password.to_s.empty?
     user = find(:first, :conditions => ["login=?", login])
     if user
       # user is already in local database
@@ -106,8 +117,9 @@ class User < ActiveRecord::Base
   end
 	
   # Return user's full name for display
-  def name
-    "#{firstname} #{lastname}"
+  def name(formatter = nil)
+    f = USER_FORMATS[formatter || Setting.user_format] || USER_FORMATS[:firstname_lastname]
+    eval '"' + f + '"'
   end
   
   def active?
@@ -132,6 +144,10 @@ class User < ActiveRecord::Base
   
   def time_zone
     self.pref.time_zone.nil? ? nil : TimeZone[self.pref.time_zone]
+  end
+  
+  def wants_comments_in_reverse_order?
+    self.pref[:comments_sorting] == 'desc'
   end
   
   # Return user's RSS key (a 40 chars long string), used to access feeds
@@ -163,7 +179,13 @@ class User < ActiveRecord::Base
   end
 
   def <=>(user)
-    user.nil? ? -1 : (lastname == user.lastname ? firstname <=> user.firstname : lastname <=> user.lastname)
+    if user.nil?
+      -1
+    elsif lastname.to_s.downcase == user.lastname.to_s.downcase
+      firstname.to_s.downcase <=> user.firstname.to_s.downcase
+    else
+      lastname.to_s.downcase <=> user.lastname.to_s.downcase
+    end
   end
   
   def to_s

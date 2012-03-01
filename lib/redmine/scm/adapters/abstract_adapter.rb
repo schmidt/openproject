@@ -101,9 +101,9 @@ module Redmine
         end
         
         def target(path)
-          path ||= ""
-          base = path.match(/^\//) ? root_url : url    
-          " \"" << "#{base}/#{path}".gsub(/["?<>\*]/, '') << "\""
+          path ||= ''
+          base = path.match(/^\//) ? root_url : url
+          shell_quote("#{base}/#{path}".gsub(/[?<>\*]/, ''))
         end
             
         def logger
@@ -119,8 +119,8 @@ module Redmine
             end
           rescue Errno::ENOENT => e
             # The command failed, log it and re-raise
-            log.error("SCM command failed: #{cmd}\n  with: #{e.message}")
-            raise CommandFailed
+            logger.error("SCM command failed: #{cmd}\n  with: #{e.message}")
+            raise CommandFailed.new(e.message)
           end
         end  
       end
@@ -237,7 +237,8 @@ module Redmine
                 end
                 a = diff_table.add_line line
             end
-            self << diff_table
+            self << diff_table unless diff_table.empty?
+            self
         end
       end
     

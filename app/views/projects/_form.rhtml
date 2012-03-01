@@ -8,8 +8,11 @@
     <p><%= f.select :parent_id, (@root_projects.collect {|p| [p.name, p.id]}), { :include_blank => true } %></p>
 <% end %>
 
-<p><%= f.text_area :description, :required => true, :cols => 60, :rows => 5 %><em><%= l(:text_caracters_maximum, 255) %></em></p>
-<p><%= f.text_field :identifier, :required => true, :disabled => @project.identifier_frozen? %><br /><em><%= l(:text_length_between, 3, 20) %> <%= l(:text_project_identifier_info) unless @project.identifier_frozen? %></em></p>
+<p><%= f.text_area :description, :rows => 5, :class => 'wiki-edit' %></p>
+<p><%= f.text_field :identifier, :required => true, :disabled => @project.identifier_frozen? %>
+<% unless @project.identifier_frozen? %>
+<br /><em><%= l(:text_length_between, 3, 20) %> <%= l(:text_project_identifier_info) %></em>
+<% end %></p>
 <p><%= f.text_field :homepage, :size => 40 %></p>
 <p><%= f.check_box :is_public %></p>
 <%= wikitoolbar_for 'project_description' %>
@@ -35,10 +38,11 @@
 <fieldset class="box"><legend><%=l(:label_custom_field_plural)%></legend>
 <% for custom_field in @custom_fields %>
     <label class="floating">
-	<%= check_box_tag "custom_field_ids[]", custom_field.id, ((@project.custom_fields.include? custom_field) or custom_field.is_for_all?), (custom_field.is_for_all? ? {:disabled => "disabled"} : {}) %>
+	<%= check_box_tag 'project[custom_field_ids][]', custom_field.id, ((@project.custom_fields.include? custom_field) or custom_field.is_for_all?), (custom_field.is_for_all? ? {:disabled => "disabled"} : {}) %>
 	<%= custom_field.name %>
 	</label>
 <% end %>
+<%= hidden_field_tag 'project[custom_field_ids][]', '' %>
 </fieldset>
 <% end %>
 <!--[eoform:project]-->

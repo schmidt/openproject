@@ -1,3 +1,5 @@
+<%= breadcrumb link_to(l(:label_board_plural), {:controller => 'boards', :action => 'index', :project_id => @project}) %>
+
 <div class="contextual">
 <%= link_to_if_authorized l(:label_message_new),
                           {:controller => 'messages', :action => 'new', :board_id => @board},
@@ -8,11 +10,19 @@
 
 <div id="add-message" style="display:none;">
 <h2><%= link_to h(@board.name), :controller => 'boards', :action => 'show', :project_id => @project, :id => @board %> &#187; <%= l(:label_message_new) %></h2>
-<% form_for :message, @message, :url => {:controller => 'messages', :action => 'new', :board_id => @board}, :html => {:multipart => true} do |f| %>
+<% form_for :message, @message, :url => {:controller => 'messages', :action => 'new', :board_id => @board}, :html => {:multipart => true, :id => 'message-form'} do |f| %>
   <%= render :partial => 'messages/form', :locals => {:f => f} %>
   <p><%= submit_tag l(:button_create) %>
+  <%= link_to_remote l(:label_preview), 
+                     { :url => { :controller => 'messages', :action => 'preview', :board_id => @board },
+                       :method => 'post',
+                       :update => 'preview',
+                       :with => "Form.serialize('message-form')",
+                       :complete => "Element.scrollTo('preview')"
+                     }, :accesskey => accesskey(:preview) %> |
   <%= link_to l(:button_cancel), "#", :onclick => 'Element.hide("add-message")' %></p>
 <% end %>
+<div id="preview" class="wiki"></div>
 </div>
 
 <h2><%=h @board.name %></h2>
@@ -43,8 +53,7 @@
   <% end %>
   </tbody>
 </table>
-<p><%= pagination_links_full @topic_pages %>
-[ <%= @topic_pages.current.first_item %> - <%= @topic_pages.current.last_item %> / <%= @topic_count %> ]</p>
+<p class="pagination"><%= pagination_links_full @topic_pages, @topic_count %></p>
 <% else %>
 <p class="nodata"><%= l(:label_no_data) %></p>
 <% end %>

@@ -31,6 +31,7 @@ class RepositoriesSubversionControllerTest < Test::Unit::TestCase
     @controller = RepositoriesController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
+    Setting.default_language = 'en'
     User.current = nil
   end
 
@@ -66,6 +67,12 @@ class RepositoriesSubversionControllerTest < Test::Unit::TestCase
       get :entry, :id => 1, :path => ['subversion_test', 'helloworld.c']
       assert_response :success
       assert_template 'entry'
+    end
+    
+    def test_entry_not_found
+      get :entry, :id => 1, :path => ['subversion_test', 'zzz.c']
+      assert_tag :tag => 'div', :attributes => { :class => /error/ },
+                                :content => /The entry or revision was not found in the repository/
     end
   
     def test_entry_download

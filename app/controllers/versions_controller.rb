@@ -17,10 +17,9 @@
 
 class VersionsController < ApplicationController
   layout 'base'
+  menu_item :roadmap
   before_filter :find_project, :authorize
 
-  cache_sweeper :version_sweeper, :only => [ :edit, :destroy ]
-  
   def show
   end
   
@@ -42,7 +41,8 @@ class VersionsController < ApplicationController
   def download
     @attachment = @version.attachments.find(params[:attachment_id])
     @attachment.increment_download
-    send_file @attachment.diskfile, :filename => @attachment.filename, :type => @attachment.content_type
+    send_file @attachment.diskfile, :filename => filename_for_content_disposition(@attachment.filename),
+                                    :type => @attachment.content_type
   rescue
     render_404
   end 

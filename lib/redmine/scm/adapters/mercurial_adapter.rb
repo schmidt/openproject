@@ -43,12 +43,12 @@ module Redmine
         def entries(path=nil, identifier=nil)
           path ||= ''
           entries = Entries.new
-          cmd = "#{HG_BIN} -R #{target('')} --cwd #{target(path)} locate -X */*/*"
+          cmd = "#{HG_BIN} -R #{target('')} --cwd #{target(path)} locate"
           cmd << " -r #{identifier.to_i}" if identifier
-          cmd << " * */*"
+          cmd << " " + shell_quote('glob:**')
           shellout(cmd) do |io|
             io.each_line do |line|
-              e = line.chomp.split('\\')
+              e = line.chomp.split(%r{[\/\\]})
               entries << Entry.new({:name => e.first,
                                     :path => (path.empty? ? e.first : "#{path}/#{e.first}"),
                                     :kind => (e.size > 1 ? 'dir' : 'file'),
@@ -70,8 +70,12 @@ module Redmine
           
         def revisions(path=nil, identifier_from=nil, identifier_to=nil, options={})
           revisions = Revisions.new
-          cmd = "#{HG_BIN} -v -R #{target('')} log"
-          cmd << " -r #{identifier_from.to_i}:" if identifier_from
+          cmd = "#{HG_BIN} -v --encoding utf8 -R #{target('')} log"
+          if identifier_from && identifier_to
+            cmd << " -r #{identifier_from.to_i}:#{identifier_to.to_i}"
+          elsif identifier_from
+            cmd << " -r #{identifier_from.to_i}:"
+          end
           cmd << " --limit #{options[:limit].to_i}" if options[:limit]
           shellout(cmd) do |io|
             changeset = {}
@@ -112,7 +116,7 @@ module Redmine
                                        :author => changeset[:user],
                                        :time => Time.parse(changeset[:date]),
                                        :message => changeset[:description],
-                                       :paths => changeset[:files].split.collect{|path| {:action => 'X', :path => "/#{path}"}}
+                                       :paths => changeset[:files].to_s.split.collect{|path| {:action => 'X', :path => "/#{path}"}}
             })
           end
           return nil if $? && $?.exitstatus != 0
@@ -139,7 +143,9 @@ module Redmine
         end
         
         def cat(path, identifier=nil)
-          cmd = "#{HG_BIN} -R #{target('')} cat #{target(path)}"
+          cmd = "#{HG_BIN} -R #{target('')} cat"
+          cmd << " -r #{identifier.to_i}" if identifier
+          cmd << " #{target(path)}"
           cat = nil
           shellout(cmd) do |io|
             io.binmode

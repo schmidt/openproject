@@ -16,12 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class QueryColumn  
-  attr_accessor :name, :sortable
+  attr_accessor :name, :sortable, :default_order
   include GLoc
   
   def initialize(name, options={})
     self.name = name
     self.sortable = options[:sortable]
+    self.default_order = options[:default_order]
   end
   
   def caption
@@ -53,7 +54,7 @@ class Query < ActiveRecord::Base
   serialize :filters
   serialize :column_names
   
-  attr_protected :project, :user
+  attr_protected :project_id, :user_id
   
   validates_presence_of :name, :on => :save
   validates_length_of :name, :maximum => 255
@@ -82,7 +83,7 @@ class Query < ActiveRecord::Base
   @@operators_by_filter_type = { :list => [ "=", "!" ],
                                  :list_status => [ "o", "=", "!", "c", "*" ],
                                  :list_optional => [ "=", "!", "!*", "*" ],
-                                 :list_one_or_more => [ "*", "=" ],
+                                 :list_subprojects => [ "*", "!*", "=" ],
                                  :date => [ "<t+", ">t+", "t+", "t", "w", ">t-", "<t-", "t-" ],
                                  :date_past => [ ">t-", "<t-", "t-", "t", "w" ],
                                  :string => [ "=", "~", "!", "!~" ],
@@ -94,17 +95,18 @@ class Query < ActiveRecord::Base
   @@available_columns = [
     QueryColumn.new(:tracker, :sortable => "#{Tracker.table_name}.position"),
     QueryColumn.new(:status, :sortable => "#{IssueStatus.table_name}.position"),
-    QueryColumn.new(:priority, :sortable => "#{Enumeration.table_name}.position"),
-    QueryColumn.new(:subject),
+    QueryColumn.new(:priority, :sortable => "#{Enumeration.table_name}.position", :default_order => 'desc'),
+    QueryColumn.new(:subject, :sortable => "#{Issue.table_name}.subject"),
+    QueryColumn.new(:author),
     QueryColumn.new(:assigned_to, :sortable => "#{User.table_name}.lastname"),
-    QueryColumn.new(:updated_on, :sortable => "#{Issue.table_name}.updated_on"),
+    QueryColumn.new(:updated_on, :sortable => "#{Issue.table_name}.updated_on", :default_order => 'desc'),
     QueryColumn.new(:category, :sortable => "#{IssueCategory.table_name}.name"),
-    QueryColumn.new(:fixed_version),
+    QueryColumn.new(:fixed_version, :sortable => "#{Version.table_name}.effective_date", :default_order => 'desc'),
     QueryColumn.new(:start_date, :sortable => "#{Issue.table_name}.start_date"),
     QueryColumn.new(:due_date, :sortable => "#{Issue.table_name}.due_date"),
     QueryColumn.new(:estimated_hours, :sortable => "#{Issue.table_name}.estimated_hours"),
     QueryColumn.new(:done_ratio, :sortable => "#{Issue.table_name}.done_ratio"),
-    QueryColumn.new(:created_on, :sortable => "#{Issue.table_name}.created_on"),
+    QueryColumn.new(:created_on, :sortable => "#{Issue.table_name}.created_on", :default_order => 'desc'),
   ]
   cattr_reader :available_columns
   
@@ -132,8 +134,11 @@ class Query < ActiveRecord::Base
   
   def available_filters
     return @available_filters if @available_filters
+    
+    trackers = project.nil? ? Tracker.find(:all, :order => 'position') : project.rolled_up_trackers
+    
     @available_filters = { "status_id" => { :type => :list_status, :order => 1, :values => IssueStatus.find(:all, :order => 'position').collect{|s| [s.name, s.id.to_s] } },       
-                           "tracker_id" => { :type => :list, :order => 2, :values => Tracker.find(:all, :order => 'position').collect{|s| [s.name, s.id.to_s] } },                                                                                                                
+                           "tracker_id" => { :type => :list, :order => 2, :values => trackers.collect{|s| [s.name, s.id.to_s] } },                                                                                                                
                            "priority_id" => { :type => :list, :order => 3, :values => Enumeration.find(:all, :conditions => ['opt=?','IPRI']).collect{|s| [s.name, s.id.to_s] } },
                            "subject" => { :type => :text, :order => 8 },  
                            "created_on" => { :type => :date_past, :order => 9 },                        
@@ -158,7 +163,7 @@ class Query < ActiveRecord::Base
       @available_filters["category_id"] = { :type => :list_optional, :order => 6, :values => @project.issue_categories.collect{|s| [s.name, s.id.to_s] } }
       @available_filters["fixed_version_id"] = { :type => :list_optional, :order => 7, :values => @project.versions.sort.collect{|s| [s.name, s.id.to_s] } }
       unless @project.active_children.empty?
-        @available_filters["subproject_id"] = { :type => :list_one_or_more, :order => 13, :values => @project.active_children.collect{|s| [s.name, s.id.to_s] } }
+        @available_filters["subproject_id"] = { :type => :list_subprojects, :order => 13, :values => @project.active_children.collect{|s| [s.name, s.id.to_s] } }
       end
       @project.all_custom_fields.select(&:is_filter?).each do |field|
         case field.field_format
@@ -223,7 +228,7 @@ class Query < ActiveRecord::Base
     return @available_columns if @available_columns
     @available_columns = Query.available_columns
     @available_columns += (project ? 
-                            project.custom_fields :
+                            project.all_custom_fields :
                             IssueCustomField.find(:all, :conditions => {:is_for_all => true})
                            ).collect {|cf| QueryCustomFieldColumn.new(cf) }      
   end
@@ -254,16 +259,25 @@ class Query < ActiveRecord::Base
   def statement
     # project/subprojects clause
     clause = ''
-    if project && has_filter?("subproject_id")
-      subproject_ids = []
-      if operator_for("subproject_id") == "="
-        subproject_ids = values_for("subproject_id").each(&:to_i)
-      else
-        subproject_ids = project.active_children.collect{|p| p.id}
+    if project && !@project.active_children.empty?
+      ids = [project.id]
+      if has_filter?("subproject_id")
+        case operator_for("subproject_id")
+        when '='
+          # include the selected subprojects
+          ids += values_for("subproject_id").each(&:to_i)
+        when '!*'
+          # main project only
+        else
+          # all subprojects
+          ids += project.active_children.collect{|p| p.id}
+        end
+      elsif Setting.display_subprojects_issues?
+        ids += project.active_children.collect{|p| p.id}
       end
-      clause << "#{Issue.table_name}.project_id IN (%d,%s)" % [project.id, subproject_ids.join(",")] if project
+      clause << "#{Issue.table_name}.project_id IN (%s)" % ids.join(',')
     elsif project
-      clause << "#{Issue.table_name}.project_id=%d" % project.id
+      clause << "#{Issue.table_name}.project_id = %d" % project.id
     else
       clause << Project.visible_by(User.current)
     end
@@ -297,7 +311,7 @@ class Query < ActiveRecord::Base
       when "="
         sql = sql + "#{db_table}.#{db_field} IN (" + v.collect{|val| "'#{connection.quote_string(val)}'"}.join(",") + ")"
       when "!"
-        sql = sql + "#{db_table}.#{db_field} NOT IN (" + v.collect{|val| "'#{connection.quote_string(val)}'"}.join(",") + ")"
+        sql = sql + "(#{db_table}.#{db_field} IS NULL OR #{db_table}.#{db_field} NOT IN (" + v.collect{|val| "'#{connection.quote_string(val)}'"}.join(",") + "))"
       when "!*"
         sql = sql + "#{db_table}.#{db_field} IS NULL"
       when "*"
@@ -325,7 +339,12 @@ class Query < ActiveRecord::Base
       when "t"
         sql = sql + "#{db_table}.#{db_field} BETWEEN '%s' AND '%s'" % [connection.quoted_date(Date.today.to_time), connection.quoted_date((Date.today+1).to_time)]
       when "w"
-        sql = sql + "#{db_table}.#{db_field} BETWEEN '%s' AND '%s'" % [connection.quoted_date(Time.now.at_beginning_of_week), connection.quoted_date(Time.now.next_week.yesterday)]
+        from = l(:general_first_day_of_week) == '7' ?
+          # week starts on sunday
+          ((Date.today.cwday == 7) ? Time.now.at_beginning_of_day : Time.now.at_beginning_of_week - 1.day) :
+          # week starts on monday (Rails default)
+          Time.now.at_beginning_of_week
+        sql = sql + "#{db_table}.#{db_field} BETWEEN '%s' AND '%s'" % [connection.quoted_date(from), connection.quoted_date(from + 7.days)]
       when "~"
         sql = sql + "#{db_table}.#{db_field} LIKE '%#{connection.quote_string(v.first)}%'"
       when "!~"

@@ -56,17 +56,12 @@
 </div>
 
 <% content_for :sidebar do %>
-    <% if authorize_for('projects', 'add_issue') && @project.trackers.any? %>
-    <h3><%= l(:label_issue_new) %></h3>
-    <%= l(:label_tracker) %>: <%= new_issue_selector %>
-    <% end %>
-    
     <% planning_links = []
       planning_links << link_to_if_authorized(l(:label_calendar), :action => 'calendar', :id => @project)
       planning_links << link_to_if_authorized(l(:label_gantt), :action => 'gantt', :id => @project)
       planning_links.compact!
       unless planning_links.empty? %>
-    <h3>Planning</h3>
+    <h3><%= l(:label_planning) %></h3>
     <p><%= planning_links.join(' | ') %></p>
     <% end %>
     
@@ -82,4 +77,4 @@
 <%= auto_discovery_link_tag(:atom, {:action => 'activity', :id => @project, :format => 'atom', :key => User.current.rss_key}) %>
 <% end %>
 
-<% set_html_title l(:label_overview) -%>
+<% html_title(l(:label_overview)) -%>

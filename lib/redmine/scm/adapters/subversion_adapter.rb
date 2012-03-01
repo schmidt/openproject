@@ -66,7 +66,6 @@ module Redmine
           entries = Entries.new
           cmd = "#{SVN_BIN} list --xml #{target(path)}@#{identifier}"
           cmd << credentials_string
-          cmd << " 2>&1"
           shellout(cmd) do |io|
             output = io.read
             begin
@@ -101,7 +100,7 @@ module Redmine
           cmd = "#{SVN_BIN} log --xml -r #{identifier_from}:#{identifier_to}"
           cmd << credentials_string
           cmd << " --verbose " if  options[:with_paths]
-          cmd << target(path)
+          cmd << ' ' + target(path)
           shellout(cmd) do |io|
             begin
               doc = REXML::Document.new(io)
@@ -140,7 +139,7 @@ module Redmine
           cmd = "#{SVN_BIN} diff -r "
           cmd << "#{identifier_to}:"
           cmd << "#{identifier_from}"
-          cmd << "#{target(path)}@#{identifier_from}"
+          cmd << " #{target(path)}@#{identifier_from}"
           cmd << credentials_string
           diff = []
           shellout(cmd) do |io|

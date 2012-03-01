@@ -18,7 +18,7 @@
 require File.dirname(__FILE__) + '/../test_helper'
 
 class ProjectTest < Test::Unit::TestCase
-  fixtures :projects, :issues, :issue_statuses, :journals, :journal_details, :users, :members, :roles
+  fixtures :projects, :issues, :issue_statuses, :journals, :journal_details, :users, :members, :roles, :projects_trackers, :trackers
 
   def setup
     @ecookbook = Project.find(1)
@@ -112,13 +112,18 @@ class ProjectTest < Test::Unit::TestCase
     sub.parent = Project.find(2)
     assert !sub.save
   end
-
-  def test_issues_status_changes
-    journals = @ecookbook.issues_status_changes 3.days.ago.to_date, Date.today
-    assert_equal 1, journals.size
-    assert_kind_of Journal, journals.first
+  
+  def test_rolled_up_trackers
+    parent = Project.find(1)
+    child = parent.children.find(3)
+  
+    assert_equal [1, 2], parent.tracker_ids
+    assert_equal [2, 3], child.tracker_ids
     
-    journals = @ecookbook.issues_status_changes 30.days.ago.to_date, 10.days.ago.to_date
-    assert_equal 0, journals.size
+    assert_kind_of Tracker, parent.rolled_up_trackers.first
+    assert_equal Tracker.find(1), parent.rolled_up_trackers.first
+    
+    assert_equal [1, 2, 3], parent.rolled_up_trackers.collect(&:id)
+    assert_equal [2, 3], child.rolled_up_trackers.collect(&:id)
   end
 end

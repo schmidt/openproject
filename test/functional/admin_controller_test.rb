@@ -22,7 +22,7 @@ require 'admin_controller'
 class AdminController; def rescue_action(e) raise e end; end
 
 class AdminControllerTest < Test::Unit::TestCase
-  fixtures :projects, :users
+  fixtures :projects, :users, :roles
   
   def setup
     @controller = AdminController.new
@@ -32,21 +32,28 @@ class AdminControllerTest < Test::Unit::TestCase
     @request.session[:user_id] = 1 # admin
   end
   
-  def test_get_mail_options
-    get :mail_options
-    assert_response :success
-    assert_template 'mail_options'
+  def test_index
+    get :index
+    assert_no_tag :tag => 'div',
+                  :attributes => { :class => /nodata/ }
   end
   
-  def test_post_mail_options
-    post :mail_options, :settings => {'mail_from' => 'functional@test.foo'}
-    assert_redirected_to 'admin/mail_options'
-    assert_equal 'functional@test.foo', Setting.mail_from
+  def test_index_with_no_configuration_data
+    delete_configuration_data
+    get :index
+    assert_tag :tag => 'div',
+               :attributes => { :class => /nodata/ }
+  end
+  
+  def test_load_default_configuration_data
+    delete_configuration_data
+    post :default_configuration, :lang => 'fr'
+    assert IssueStatus.find_by_name('Nouveau')
   end
   
   def test_test_email
     get :test_email
-    assert_redirected_to 'admin/mail_options'
+    assert_redirected_to 'settings/edit'
     mail = ActionMailer::Base.deliveries.last
     assert_kind_of TMail::Mail, mail
     user = User.find(1)
@@ -57,5 +64,12 @@ class AdminControllerTest < Test::Unit::TestCase
     get :info
     assert_response :success
     assert_template 'info'
+  end
+  
+  def delete_configuration_data
+    Role.delete_all('builtin = 0')
+    Tracker.delete_all
+    IssueStatus.delete_all
+    Enumeration.delete_all
   end
 end

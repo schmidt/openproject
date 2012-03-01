@@ -25,10 +25,20 @@ class SettingsController < ApplicationController
   end
 
   def edit
-    if request.post? and params[:settings] and params[:settings].is_a? Hash
-      params[:settings].each { |name, value| Setting[name] = value }
-      redirect_to :action => 'edit' and return
+    @notifiables = %w(issue_added issue_updated news_added document_added file_added message_posted)
+    if request.post? && params[:settings] && params[:settings].is_a?(Hash)
+      settings = (params[:settings] || {}).dup.symbolize_keys
+      settings.each do |name, value|
+        # remove blank values in array settings
+        value.delete_if {|v| v.blank? } if value.is_a?(Array)
+        Setting[name] = value
+      end
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to :action => 'edit', :tab => params[:tab]
+      return
     end
+    @options = {}
+    @options[:user_format] = User::USER_FORMATS.keys.collect {|f| [User.current.name(f), f.to_s] }
   end
   
   def plugin

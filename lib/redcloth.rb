@@ -272,7 +272,7 @@ class RedCloth < String
         @shelf = []
         textile_rules = [:refs_textile, :block_textile_table, :block_textile_lists,
                          :block_textile_prefix, :inline_textile_image, :inline_textile_link,
-                         :inline_textile_code, :inline_textile_span, :glyphs_textile]
+                         :inline_textile_code, :inline_textile_span]
         markdown_rules = [:refs_markdown, :block_markdown_setext, :block_markdown_atx, :block_markdown_rule,
                           :block_markdown_bq, :block_markdown_lists, 
                           :inline_markdown_reflink, :inline_markdown_link]
@@ -295,6 +295,7 @@ class RedCloth < String
         @pre_list = []
         rip_offtags text
         no_textile text
+        escape_html_tags text
         hard_break text 
         unless @lite_mode
             refs text
@@ -375,18 +376,18 @@ class RedCloth < String
         re =
             case rtype
             when :limit
-                /(\W)
+                /(^|[>\s])
                 (#{rcq})
                 (#{C})
                 (?::(\S+?))?
-                (\S.*?\S|\S)
+                ([^\s\-].*?[^\s\-]|\w)
                 #{rcq}
-                (?=\W)/x
+                (?=[[:punct:]]|\s|$)/x
             else
                 /(#{rcq})
                 (#{C})
                 (?::(\S+))?
-                (\S.*?\S|\S)
+                ([^\s\-].*?[^\s\-]|\w)
                 #{rcq}/xm 
             end
         [rc, ht, re, rtype]
@@ -395,15 +396,15 @@ class RedCloth < String
     # Elements to handle
     GLYPHS = [
     #   [ /([^\s\[{(>])?\'([dmst]\b|ll\b|ve\b|\s|:|$)/, '\1&#8217;\2' ], # single closing
-        [ /([^\s\[{(>#{PUNCT_Q}][#{PUNCT_Q}]*)\'/, '\1&#8217;' ], # single closing
-        [ /\'(?=[#{PUNCT_Q}]*(s\b|[\s#{PUNCT_NOQ}]))/, '&#8217;' ], # single closing
-        [ /\'/, '&#8216;' ], # single opening
+    #   [ /([^\s\[{(>#{PUNCT_Q}][#{PUNCT_Q}]*)\'/, '\1&#8217;' ], # single closing
+    #   [ /\'(?=[#{PUNCT_Q}]*(s\b|[\s#{PUNCT_NOQ}]))/, '&#8217;' ], # single closing
+    #   [ /\'/, '&#8216;' ], # single opening
         [ /</, '&lt;' ], # less-than
         [ />/, '&gt;' ], # greater-than
     #   [ /([^\s\[{(])?"(\s|:|$)/, '\1&#8221;\2' ], # double closing
-        [ /([^\s\[{(>#{PUNCT_Q}][#{PUNCT_Q}]*)"/, '\1&#8221;' ], # double closing
-        [ /"(?=[#{PUNCT_Q}]*[\s#{PUNCT_NOQ}])/, '&#8221;' ], # double closing
-        [ /"/, '&#8220;' ], # double opening
+    #   [ /([^\s\[{(>#{PUNCT_Q}][#{PUNCT_Q}]*)"/, '\1&#8221;' ], # double closing
+    #   [ /"(?=[#{PUNCT_Q}]*[\s#{PUNCT_NOQ}])/, '&#8221;' ], # double closing
+    #   [ /"/, '&#8220;' ], # double opening
         [ /\b( )?\.{3}/, '\1&#8230;' ], # ellipsis
         [ /\b([A-Z][A-Z0-9]{2,})\b(?:[(]([^)]*)[)])/, '<acronym title="\2">\1</acronym>' ], # 3+ uppercase acronym
         [ /(^|[^"][>\s])([A-Z][A-Z0-9 ]+[A-Z0-9])([^<A-Za-z0-9]|$)/, '\1<span class="caps">\2</span>\3', :no_span_caps ], # 3+ uppercase caps
@@ -509,7 +510,8 @@ class RedCloth < String
                 ratts, row = pba( $1, 'tr' ), $2 if row =~ /^(#{A}#{C}\. )(.*)/m
                 
                 cells = []
-                row.split( '|' ).each do |cell|
+                #row.split( /\(?!\[\[[^\]])|(?![^\[]\]\])/ ).each do |cell|
+                row.split( /\|(?![^\[\|]*\]\])/ ).each do |cell|
                     ctyp = 'd'
                     ctyp = 'h' if cell =~ /^_/
 
@@ -784,7 +786,7 @@ class RedCloth < String
             atts << " title=\"#{ title }\"" if title
             atts = shelve( atts ) if atts
             
-            external = (url =~ /^http:\/\//) ? ' class="external"' : ''
+            external = (url =~ /^https?:\/\//) ? ' class="external"' : ''
             
             "#{ pre }<a#{ atts }#{ external }>#{ text }</a>#{ post }"
         end
@@ -1127,6 +1129,12 @@ class RedCloth < String
                 " "
             end
         end
+    end
+    
+    ALLOWED_TAGS = %w(redpre pre code)
+    
+    def escape_html_tags(text)
+      text.gsub!(%r{<((\/?)(\w+))}) {|m| ALLOWED_TAGS.include?($3) ? "<#{$1}" : "&lt;#{$1}" }
     end
 end
 
