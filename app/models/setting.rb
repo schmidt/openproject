@@ -75,7 +75,7 @@ class Setting < ActiveRecord::Base
                   TIS-620)
 
   cattr_accessor :available_settings
-  @@available_settings = YAML::load(File.open("#{RAILS_ROOT}/config/settings.yml"))
+  @@available_settings = YAML::load(File.open("#{Rails.root}/config/settings.yml"))
   Redmine::Plugin.all.each do |plugin|
     next unless plugin.settings
     @@available_settings["plugin_#{plugin.id}"] = {'default' => plugin.settings[:default], 'serialized' => true}
@@ -151,10 +151,15 @@ class Setting < ActiveRecord::Base
   def self.check_cache
     settings_updated_on = Setting.maximum(:updated_on)
     if settings_updated_on && @cached_cleared_on <= settings_updated_on
-      @cached_settings.clear
-      @cached_cleared_on = Time.now
-      logger.info "Settings cache cleared." if logger
+      clear_cache
     end
+  end
+  
+  # Clears the settings cache
+  def self.clear_cache
+    @cached_settings.clear
+    @cached_cleared_on = Time.now
+    logger.info "Settings cache cleared." if logger
   end
 
 private

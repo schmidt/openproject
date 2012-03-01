@@ -53,6 +53,10 @@ class Repository::Git < Repository
     true
   end
 
+  def supports_revision_graph?
+    true
+  end
+
   def repo_log_encoding
     'UTF-8'
   end
@@ -77,6 +81,9 @@ class Repository::Git < Repository
 
   def default_branch
     scm.default_branch
+  rescue Exception => e
+    logger.error "git: error during get default branch: #{e.message}"
+    nil
   end
 
   def find_changeset_by_name(name)
@@ -137,7 +144,8 @@ class Repository::Git < Repository
       merge_extra_info(h)
       self.save
     end
-    scm_brs.each do |br|
+    scm_brs.each do |br1|
+      br = br1.to_s
       from_scmid = nil
       from_scmid = h["branches"][br]["last_scmid"] if h["branches"][br]
       h["branches"][br] ||= {}
@@ -145,7 +153,12 @@ class Repository::Git < Repository
         db_rev = find_changeset_by_name(rev.revision)
         transaction do
           if db_rev.nil?
-            save_revision(rev)
+            db_saved_rev = save_revision(rev)
+            parents = {}
+            parents[db_saved_rev] = rev.parents unless rev.parents.nil?
+            parents.each do |ch, chparents|
+              ch.parents = chparents.collect{|rp| find_changeset_by_name(rp)}.compact
+            end
           end
           h["branches"][br]["last_scmid"] = rev.scmid
           merge_extra_info(h)
@@ -172,6 +185,7 @@ class Repository::Git < Repository
                   :path      => file[:path])
       end
     end
+    changeset
   end
   private :save_revision
 

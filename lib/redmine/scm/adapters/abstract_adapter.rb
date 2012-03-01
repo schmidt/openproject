@@ -24,6 +24,10 @@ module Redmine
       end
 
       class AbstractAdapter #:nodoc:
+
+        # raised if scm command exited with error, e.g. unknown revision.
+        class ScmCommandAborted < CommandFailed; end
+
         class << self
           def client_command
             ""
@@ -188,10 +192,14 @@ module Redmine
           info ? info.root_url : nil
         end
 
-        def target(path)
+        def target(path, sq=true)
           path ||= ''
           base = path.match(/^\//) ? root_url : url
-          shell_quote("#{base}/#{path}".gsub(/[?<>\*]/, ''))
+          str = "#{base}/#{path}".gsub(/[?<>\*]/, '')
+          if sq
+            str = shell_quote(str)
+          end
+          str
         end
 
         def logger
@@ -203,7 +211,7 @@ module Redmine
         end
 
         def self.logger
-          RAILS_DEFAULT_LOGGER
+          Rails.logger
         end
 
         def self.shellout(cmd, &block)
@@ -212,7 +220,7 @@ module Redmine
           end
           if Rails.env == 'development'
             # Capture stderr when running in dev environment
-            cmd = "#{cmd} 2>>#{RAILS_ROOT}/log/scm.stderr.log"
+            cmd = "#{cmd} 2>>#{Rails.root}/log/scm.stderr.log"
           end
           begin
             if RUBY_VERSION < '1.9'
@@ -325,7 +333,8 @@ module Redmine
 
       class Revision
         attr_accessor :scmid, :name, :author, :time, :message,
-                      :paths, :revision, :branch, :identifier
+                      :paths, :revision, :branch, :identifier,
+                      :parents
 
         def initialize(attributes={})
           self.identifier = attributes[:identifier]
@@ -337,6 +346,7 @@ module Redmine
           self.paths      = attributes[:paths]
           self.revision   = attributes[:revision]
           self.branch     = attributes[:branch]
+          self.parents    = attributes[:parents]
         end
 
         # Returns the readable identifier.
@@ -365,6 +375,10 @@ module Redmine
         def empty?
           lines.empty?
         end
+      end
+
+      class Branch < String
+        attr_accessor :revision, :scmid
       end
     end
   end

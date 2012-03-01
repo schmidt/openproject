@@ -18,17 +18,16 @@
 require File.expand_path('../../../test_helper', __FILE__)
 
 class ApplicationHelperTest < ActionView::TestCase
-
   fixtures :projects, :roles, :enabled_modules, :users,
-                      :repositories, :changesets,
-                      :trackers, :issue_statuses, :issues, :versions, :documents,
-                      :wikis, :wiki_pages, :wiki_contents,
-                      :boards, :messages,
-                      :attachments,
-                      :enumerations
+           :repositories, :changesets,
+           :trackers, :issue_statuses, :issues, :versions, :documents,
+           :wikis, :wiki_pages, :wiki_contents,
+           :boards, :messages, :news,
+           :attachments, :enumerations
 
   def setup
     super
+    set_tmp_attachments_directory
   end
 
   context "#link_to_if_authorized" do
@@ -129,6 +128,84 @@ RAW
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text, :attachments => attachments) }
   end
 
+  def test_attached_images_filename_extension
+    set_tmp_attachments_directory
+    a1 = Attachment.new(
+            :container => Issue.find(1),
+            :file => mock_file_with_options({:original_filename => "testtest.JPG"}),
+            :author => User.find(1))
+    assert a1.save
+    assert_equal "testtest.JPG", a1.filename
+    assert_equal "image/jpeg", a1.content_type
+    assert a1.image?
+
+    a2 = Attachment.new(
+            :container => Issue.find(1),
+            :file => mock_file_with_options({:original_filename => "testtest.jpeg"}),
+            :author => User.find(1))
+    assert a2.save
+    assert_equal "testtest.jpeg", a2.filename
+    assert_equal "image/jpeg", a2.content_type
+    assert a2.image?
+
+    a3 = Attachment.new(
+            :container => Issue.find(1),
+            :file => mock_file_with_options({:original_filename => "testtest.JPE"}),
+            :author => User.find(1))
+    assert a3.save
+    assert_equal "testtest.JPE", a3.filename
+    assert_equal "image/jpeg", a3.content_type
+    assert a3.image?
+
+    a4 = Attachment.new(
+            :container => Issue.find(1),
+            :file => mock_file_with_options({:original_filename => "Testtest.BMP"}),
+            :author => User.find(1))
+    assert a4.save
+    assert_equal "Testtest.BMP", a4.filename
+    assert_equal "image/x-ms-bmp", a4.content_type
+    assert a4.image?
+
+    to_test = {
+      'Inline image: !testtest.jpg!' =>
+        'Inline image: <img src="/attachments/download/' + a1.id.to_s + '" alt="" />',
+      'Inline image: !testtest.jpeg!' =>
+        'Inline image: <img src="/attachments/download/' + a2.id.to_s + '" alt="" />',
+      'Inline image: !testtest.jpe!' =>
+        'Inline image: <img src="/attachments/download/' + a3.id.to_s + '" alt="" />',
+      'Inline image: !testtest.bmp!' =>
+        'Inline image: <img src="/attachments/download/' + a4.id.to_s + '" alt="" />',
+    }
+
+    attachments = [a1, a2, a3, a4]
+    to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text, :attachments => attachments) }
+  end
+
+  def test_attached_images_should_read_later
+    Attachment.storage_path = "#{Rails.root}/test/fixtures/files"
+    a1 = Attachment.find(16)
+    assert_equal "testfile.png", a1.filename
+    assert a1.readable?
+    assert (! a1.visible?(User.anonymous))
+    assert a1.visible?(User.find(2))
+    a2 = Attachment.find(17)
+    assert_equal "testfile.PNG", a2.filename
+    assert a2.readable?
+    assert (! a2.visible?(User.anonymous))
+    assert a2.visible?(User.find(2))
+    assert a1.created_on < a2.created_on
+
+    to_test = {
+      'Inline image: !testfile.png!' =>
+        'Inline image: <img src="/attachments/download/' + a2.id.to_s + '" alt="" />',
+      'Inline image: !Testfile.PNG!' =>
+        'Inline image: <img src="/attachments/download/' + a2.id.to_s + '" alt="" />',
+    }
+    attachments = [a1, a2]
+    to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text, :attachments => attachments) }
+    set_tmp_attachments_directory
+  end
+
   def test_textile_external_links
     to_test = {
       'This is a "link":http://foo.bar' => 'This is a <a href="http://foo.bar" class="external">link</a>',
@@ -163,7 +240,11 @@ RAW
     version_link = link_to('1.0', {:controller => 'versions', :action => 'show', :id => 2},
                                   :class => 'version')
 
+    board_url = {:controller => 'boards', :action => 'show', :id => 2, :project_id => 'ecookbook'}
+
     message_url = {:controller => 'messages', :action => 'show', :board_id => 1, :id => 4}
+    
+    news_url = {:controller => 'news', :action => 'show', :id => 1}
 
     project_url = {:controller => 'projects', :action => 'show', :id => 'subproject1'}
 
@@ -198,9 +279,15 @@ RAW
       'source:/some/file.ext#L110'  => link_to('source:/some/file.ext#L110', source_url_with_ext.merge(:anchor => 'L110'), :class => 'source'),
       'source:/some/file@52#L110'   => link_to('source:/some/file@52#L110', source_url.merge(:rev => 52, :anchor => 'L110'), :class => 'source'),
       'export:/some/file'           => link_to('export:/some/file', source_url.merge(:format => 'raw'), :class => 'source download'),
+      # forum
+      'forum#2'                     => link_to('Discussion', board_url, :class => 'board'),
+      'forum:Discussion'            => link_to('Discussion', board_url, :class => 'board'),
       # message
       'message#4'                   => link_to('Post 2', message_url, :class => 'message'),
       'message#5'                   => link_to('RE: post 2', message_url.merge(:anchor => 'message-5', :r => 5), :class => 'message'),
+      # news
+      'news#1'                      => link_to('eCookbook first release !', news_url, :class => 'news'),
+      'news:"eCookbook first release !"'        => link_to('eCookbook first release !', news_url, :class => 'news'),
       # project
       'project#3'                   => link_to('eCookbook Subproject 1', project_url, :class => 'project'),
       'project:subproject1'         => link_to('eCookbook Subproject 1', project_url, :class => 'project'),
@@ -239,7 +326,7 @@ RAW
       'invalid:document:"Test document"'      => 'invalid:document:"Test document"',
       # versions
       'version:"1.0"'                         => 'version:"1.0"',
-      'ecookbook:version:"1.0"'               => '<a href="/versions/show/2" class="version">1.0</a>',
+      'ecookbook:version:"1.0"'               => '<a href="/versions/2" class="version">1.0</a>',
       'invalid:version:"1.0"'                 => 'invalid:version:"1.0"',
       # changeset
       'r2'                                    => 'r2',
@@ -350,6 +437,9 @@ RAW
     to_test = {
       '[[CookBook documentation]]' => '<a href="/projects/ecookbook/wiki/CookBook_documentation" class="wiki-page">CookBook documentation</a>',
       '[[Another page|Page]]' => '<a href="/projects/ecookbook/wiki/Another_page" class="wiki-page">Page</a>',
+      # title content should be formatted
+      '[[Another page|With _styled_ *title*]]' => '<a href="/projects/ecookbook/wiki/Another_page" class="wiki-page">With <em>styled</em> <strong>title</strong></a>',
+      '[[Another page|With title containing <strong>HTML entities &amp; markups</strong>]]' => '<a href="/projects/ecookbook/wiki/Another_page" class="wiki-page">With title containing &lt;strong&gt;HTML entities &amp; markups&lt;/strong&gt;</a>',
       # link with anchor
       '[[CookBook documentation#One-section]]' => '<a href="/projects/ecookbook/wiki/CookBook_documentation#One-section" class="wiki-page">CookBook documentation</a>',
       '[[Another page#anchor|Page]]' => '<a href="/projects/ecookbook/wiki/Another_page#anchor" class="wiki-page">Page</a>',
@@ -371,6 +461,7 @@ RAW
       '[[unknowproject:Start]]' => '[[unknowproject:Start]]',
       '[[unknowproject:Start|Page title]]' => '[[unknowproject:Start|Page title]]',
     }
+
     @project = Project.find(1)
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
   end
@@ -499,7 +590,7 @@ EXPECTED
 RAW
 
     expected = <<-EXPECTED
-<pre><code class="ruby syntaxhl"><span class=\"CodeRay\"><span class="no">1</span> <span class="c"># Some ruby code here</span></span>
+<pre><code class="ruby syntaxhl"><span class=\"CodeRay\"><span class="line-numbers">1</span><span class="comment"># Some ruby code here</span></span>
 </code></pre>
 EXPECTED
 
@@ -588,6 +679,35 @@ EXPECTED
     @project = Project.find(1)
 
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(WikiContent.generate!( :text => text, :page => page ), :text) }
+  end
+
+  def test_wiki_links_anchor_option_should_prepend_page_title_to_href
+
+    to_test = {
+      # link to a page
+      '[[CookBook documentation]]' => '<a href="#CookBook_documentation" class="wiki-page">CookBook documentation</a>',
+      '[[CookBook documentation|documentation]]' => '<a href="#CookBook_documentation" class="wiki-page">documentation</a>',
+      '[[CookBook documentation#One-section]]' => '<a href="#CookBook_documentation_One-section" class="wiki-page">CookBook documentation</a>',
+      '[[CookBook documentation#One-section|documentation]]' => '<a href="#CookBook_documentation_One-section" class="wiki-page">documentation</a>',
+      # page that doesn't exist
+      '[[Unknown page]]' => '<a href="#Unknown_page" class="wiki-page new">Unknown page</a>',
+      '[[Unknown page|404]]' => '<a href="#Unknown_page" class="wiki-page new">404</a>',
+      '[[Unknown page#anchor]]' => '<a href="#Unknown_page_anchor" class="wiki-page new">Unknown page</a>',
+      '[[Unknown page#anchor|404]]' => '<a href="#Unknown_page_anchor" class="wiki-page new">404</a>',
+    }
+
+    @project = Project.find(1)
+
+    to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text, :wiki_links => :anchor) }
+  end
+
+  def test_headings_in_wiki_single_page_export_should_be_prepended_with_page_title
+    page = WikiPage.generate!( :title => 'Page Title' )
+    content = WikiContent.generate!( :text => 'h1. Some heading', :page => page )
+
+    expected = %|<a name="Page_Title_Some-heading"></a>\n<h1 >Some heading<a href="#Page_Title_Some-heading" class="wiki-anchor">&para;</a></h1>|
+
+    assert_equal expected, textilizable(content, :text, :wiki_links => :anchor )
   end
 
   def test_table_of_content
@@ -731,5 +851,28 @@ RAW
                  link_to_project(project, {:only_path => false, :jump => 'blah'})
     assert_equal %(<a href="/projects/ecookbook/settings" class="project">eCookbook</a>),
                  link_to_project(project, {:action => 'settings'}, :class => "project")
+  end
+
+  def test_principals_options_for_select_with_users
+    users = [User.find(2), User.find(4)]
+    assert_equal %(<option value="2">John Smith</option><option value="4">Robert Hill</option>),
+      principals_options_for_select(users)
+  end
+
+  def test_principals_options_for_select_with_selected
+    users = [User.find(2), User.find(4)]
+    assert_equal %(<option value="2">John Smith</option><option value="4" selected="selected">Robert Hill</option>),
+      principals_options_for_select(users, User.find(4))
+  end
+
+  def test_principals_options_for_select_with_users_and_groups
+    users = [User.find(2), Group.find(11), User.find(4), Group.find(10)]
+    assert_equal %(<option value="2">John Smith</option><option value="4">Robert Hill</option>) +
+      %(<optgroup label="Groups"><option value="10">A Team</option><option value="11">B Team</option></optgroup>),
+      principals_options_for_select(users)
+  end
+
+  def test_principals_options_for_select_with_empty_collection
+    assert_equal '', principals_options_for_select([])
   end
 end

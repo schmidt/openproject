@@ -1,4 +1,5 @@
 sl:
+  # Text direction: Left-to-Right (ltr) or Right-to-Left (rtl)
   direction: ltr
   date:
     formats:
@@ -8,10 +9,10 @@ sl:
       default: "%Y-%m-%d"
       short: "%b %d"
       long: "%B %d, %Y"
-      
+
     day_names: [Nedelja, Ponedeljek, Torek, Sreda, Četrtek, Petek, Sobota]
     abbr_day_names: [Ned, Pon, To, Sr, Čet, Pet, Sob]
-      
+
     # Don't forget the nil at the beginning; there's no such thing as a 0th month
     month_names: [~, Januar, Februar, Marec, April, Maj, Junij, Julij, Avgust, September, Oktober, November, December]
     abbr_month_names: [~, Jan, Feb, Mar, Apr, Maj, Jun, Jul, Aug, Sep, Okt, Nov, Dec]
@@ -29,7 +30,7 @@ sl:
       long: "%B %d, %Y %H:%M"
     am: "am"
     pm: "pm"
-      
+
   datetime:
     distance_in_words:
       half_a_minute: "pol minute"
@@ -72,27 +73,27 @@ sl:
       separator: ","
       delimiter: "."
       precision: 3
-    human: 
-      format: 
+    human:
+      format:
         precision: 1
         delimiter: ""
-      storage_units: 
+      storage_units:
         format: "%n %u"
-        units: 
+        units:
           kb: KB
           tb: TB
           gb: GB
-          byte: 
+          byte:
             one: Byte
             other: Bytes
           mb: MB
-        
+
 # Used in array.to_sentence.
   support:
     array:
       sentence_connector: "in"
       skip_last_comma: false
-      
+
   activerecord:
     errors:
       template:
@@ -126,7 +127,7 @@ sl:
         cant_link_an_issue_with_a_descendant: "Zahtevek ne more biti povezan s svojo podnalogo"
 
   actionview_instancetag_blank_option: Prosimo izberite
-  
+
   general_text_No: 'Ne'
   general_text_Yes: 'Da'
   general_text_no: 'ne'
@@ -137,7 +138,7 @@ sl:
   general_csv_encoding: UTF-8
   general_pdf_encoding: UTF-8
   general_first_day_of_week: '1'
-  
+
   notice_account_updated: Račun je bil uspešno posodobljen.
   notice_account_invalid_creditentials: Napačno uporabniško ime ali geslo
   notice_account_password_updated: Geslo je bilo uspešno posodobljeno.
@@ -162,13 +163,13 @@ sl:
   notice_account_pending: "Vaš račun je bil ustvarjen in čaka na potrditev s strani administratorja."
   notice_default_data_loaded: Privzete nastavitve so bile uspešno naložene.
   notice_unable_delete_version: Verzije ni bilo mogoče izbrisati.
-  
+
   error_can_t_load_default_data: "Privzetih nastavitev ni bilo mogoče naložiti: %{value}"
   error_scm_not_found: "Vnos ali revizija v shrambi ni bila najdena ."
   error_scm_command_failed: "Med vzpostavljem povezave s shrambo je prišlo do napake: %{value}"
   error_scm_annotate: "Vnos ne obstaja ali pa ga ni mogoče komentirati."
   error_issue_not_found_in_project: 'Zahtevek ni bil najden ali pa ne pripada temu projektu'
-  
+
   mail_subject_lost_password: "Vaše %{value} geslo"
   mail_body_lost_password: 'Za spremembo glesla kliknite na naslednjo povezavo:'
   mail_subject_register: "Aktivacija %{value} vašega računa"
@@ -179,10 +180,10 @@ sl:
   mail_body_account_activation_request: "Registriral se je nov uporabnik (%{value}). Račun čaka na vašo odobritev:"
   mail_subject_reminder: "%{count} zahtevek(zahtevki) zapadejo v naslednjih %{days} dneh"
   mail_body_reminder: "%{count} zahtevek(zahtevki), ki so vam dodeljeni bodo zapadli v naslednjih %{days} dneh:"
-  
+
   gui_validation_error: 1 napaka
   gui_validation_error_plural: "%{count} napak"
-  
+
   field_name: Ime
   field_description: Opis
   field_summary: Povzetek
@@ -267,7 +268,7 @@ sl:
   field_default_value: Privzeta vrednost
   field_comments_sorting: Prikaži komentarje
   field_parent_title: Matična stran
-  
+
   setting_app_title: Naslov aplikacije
   setting_app_subtitle: Podnaslov aplikacije
   setting_welcome_text: Pozdravno besedilo
@@ -293,7 +294,6 @@ sl:
   setting_time_format: Oblika časa
   setting_cross_project_issue_relations: Dovoli povezave zahtevkov med različnimi projekti
   setting_issue_list_default_columns: Privzeti stolpci prikazani na seznamu zahtevkov
-  setting_repositories_encodings: Kodiranje shrambe
   setting_emails_footer: Noga e-sporočil
   setting_protocol: Protokol
   setting_per_page_options: Število elementov na stran
@@ -306,7 +306,7 @@ sl:
   setting_sequential_project_identifiers: Generiraj projektne identifikatorje sekvenčno
   setting_gravatar_enabled: Uporabljaj Gravatar ikone
   setting_diff_max_lines_displayed: Maksimalno število prikazanih vrstic različnosti
-  
+
   permission_edit_project: Uredi projekt
   permission_select_project_modules: Izberi module projekta
   permission_manage_members: Uredi člane
@@ -355,7 +355,7 @@ sl:
   permission_edit_own_messages: Uredi lastna sporočila
   permission_delete_messages: Izbriši sporočila
   permission_delete_own_messages: Izbriši lastna sporočila
-  
+
   project_module_issue_tracking: Sledenje zahtevkom
   project_module_time_tracking: Sledenje časa
   project_module_news: Novice
@@ -364,7 +364,7 @@ sl:
   project_module_wiki: Wiki
   project_module_repository: Shramba
   project_module_boards: Table
-  
+
   label_user: Uporabnik
   label_user_plural: Uporabniki
   label_user_new: Nov uporabnik
@@ -679,7 +679,7 @@ sl:
   label_generate_key: Ustvari ključ
   label_issue_watchers: Spremljevalci
   label_example: Vzorec
-  
+
   button_login: Prijavi se
   button_submit: Pošlji
   button_save: Shrani
@@ -718,11 +718,11 @@ sl:
   button_update: Posodobi
   button_configure: Konfiguriraj
   button_quote: Citiraj
-  
+
   status_active: aktivni
   status_registered: registriran
   status_locked: zaklenjen
-  
+
   text_select_mail_notifications: Izberi dejanja za katera naj bodo poslana oznanila preko e-pošto.
   text_regexp_info: npr. ^[A-Z0-9]+$
   text_min_max_length_info: 0 pomeni brez omejitev
@@ -766,7 +766,7 @@ sl:
   text_email_delivery_not_configured: "E-poštna dostava ni nastavljena in oznanila so onemogočena.\nNastavite vaš SMTP strežnik v config/configuration.yml in ponovno zaženite aplikacijo da ga omogočite.\n"
   text_repository_usernames_mapping: "Izberite ali posodobite Redmine uporabnika dodeljenega vsakemu uporabniškemu imenu najdenemu v zapisniku shrambe.\n Uporabniki z enakim Redmine ali shrambinem uporabniškem imenu ali e-poštnem naslovu so samodejno dodeljeni."
   text_diff_truncated: '... Ta sprememba je bila odsekana ker presega največjo velikost ki je lahko prikazana.'
-  
+
   default_role_manager: Upravnik
   default_role_developer: Razvijalec
   default_role_reporter: Poročevalec
@@ -788,7 +788,7 @@ sl:
   default_priority_immediate: Takojšnje ukrepanje
   default_activity_design: Oblikovanje
   default_activity_development: Razvoj
-  
+
   enumeration_issue_priorities: Prioritete zahtevkov
   enumeration_doc_categories: Kategorije dokumentov
   enumeration_activities: Aktivnosti (sledenje časa)
@@ -820,9 +820,9 @@ sl:
   mail_subject_wiki_content_updated: "'%{id}' wiki stran je bila posodobljena"
   label_wiki_content_added: Wiki stran dodana
   mail_subject_wiki_content_added: "'%{id}' wiki stran je bila dodana"
-  mail_body_wiki_content_added: %{author} je dodal '%{id}' wiki stran
+  mail_body_wiki_content_added: "%{author} je dodal '%{id}' wiki stran"
   label_wiki_content_updated: Wiki stran posodobljena
-  mail_body_wiki_content_updated: %{author} je posodobil '%{id}' wiki stran.
+  mail_body_wiki_content_updated: "%{author} je posodobil '%{id}' wiki stran."
   permission_add_project: Ustvari projekt
   setting_new_project_user_role_id: Vloga, dodeljena neadministratorskemu uporabniku, ki je ustvaril projekt
   label_view_all_revisions: Poglej vse revizije
@@ -974,3 +974,35 @@ sl:
 
   text_git_repository_note: Shramba je prazna in lokalna (npr. /gitrepo, c:\gitrepo)
 
+  notice_issue_successful_create: Ustvarjen zahtevek %{id}.
+  label_between: med
+  setting_issue_group_assignment: Dovoli dodeljevanje zahtevka skupinam
+  label_diff: diff
+
+  description_query_sort_criteria_direction: Sort direction
+  description_project_scope: Search scope
+  description_filter: Filter
+  description_user_mail_notification: Mail notification settings
+  description_date_from: Enter start date
+  description_message_content: Message content
+  description_available_columns: Available Columns
+  description_date_range_interval: Choose range by selecting start and end date
+  description_issue_category_reassign: Choose issue category
+  description_search: Searchfield
+  description_notes: Notes
+  description_date_range_list: Choose range from list
+  description_choose_project: Projects
+  description_date_to: Enter end date
+  description_query_sort_criteria_attribute: Sort attribute
+  description_wiki_subpages_reassign: Choose new parent page
+  description_selected_columns: Selected Columns
+  label_parent_revision: Parent
+  label_child_revision: Child
+  error_scm_annotate_big_text_file: The entry cannot be annotated, as it exceeds the maximum text file size.
+  setting_default_issue_start_date_to_creation_date: Use current date as start date for new issues
+  button_edit_section: Edit this section
+  setting_repositories_encodings: Attachments and repositories encodings
+  description_all_columns: All Columns
+  button_export: Export
+  label_export_options: "%{export_format} export options"
+  error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})

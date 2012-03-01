@@ -5,6 +5,7 @@
 # Environment specific configuration options override the default ones.
 #
 # Note that this file needs to be a valid YAML file.
+# DO NOT USE TABS! Use 2 spaces instead of tabs for identation.
 #
 # == Outgoing email settings (email_delivery setting)
 #
@@ -61,6 +62,7 @@
 #     delivery_method: :smtp
 #     smtp_settings:
 #       tls: true
+#       enable_starttls_auto: true
 #       address: "smtp.gmail.com"
 #       port: 587
 #       domain: "smtp.gmail.com" # 'your.domain.com' for GoogleApps

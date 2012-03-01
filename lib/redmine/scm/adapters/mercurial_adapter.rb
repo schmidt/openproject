@@ -109,7 +109,14 @@ module Redmine
         end
 
         def branches
-          as_ary(summary['repository']['branch']).map { |e| e['name'] }
+          brs = []
+          as_ary(summary['repository']['branch']).each do |e|
+            br = Branch.new(e['name'])
+            br.revision =  e['revision']
+            br.scmid    =  e['node']
+            brs << br
+          end
+          brs
         end
 
         # Returns map of {'branch' => 'nodeid', ...}
@@ -210,12 +217,17 @@ module Redmine
                :from_path     => (cpmap.member?(p) ? with_leading_slash(cpmap[p]) : nil),
                :from_revision => (cpmap.member?(p) ? le['node'] : nil)}
             end.sort { |a, b| a[:path] <=> b[:path] }
+            parents_ary = []
+            as_ary(le['parents']['parent']).map do |par|
+              parents_ary << par['__content__'] if par['__content__'] != "000000000000"
+            end
             yield Revision.new(:revision => le['revision'],
                                :scmid    => le['node'],
                                :author   => (le['author']['__content__'] rescue ''),
                                :time     => Time.parse(le['date']['__content__']),
                                :message  => le['msg']['__content__'],
-                               :paths    => paths)
+                               :paths    => paths,
+                               :parents  => parents_ary)
           end
           self
         end

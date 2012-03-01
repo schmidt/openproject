@@ -22,6 +22,14 @@ class Changeset < ActiveRecord::Base
   belongs_to :user
   has_many :changes, :dependent => :delete_all
   has_and_belongs_to_many :issues
+  has_and_belongs_to_many :parents,
+                          :class_name => "Changeset",
+                          :join_table => "#{table_name_prefix}changeset_parents#{table_name_suffix}",
+                          :association_foreign_key => 'parent_id', :foreign_key => 'changeset_id'
+  has_and_belongs_to_many :children,
+                          :class_name => "Changeset",
+                          :join_table => "#{table_name_prefix}changeset_parents#{table_name_suffix}",
+                          :association_foreign_key => 'changeset_id', :foreign_key => 'parent_id'
 
   acts_as_event :title => Proc.new {|o| "#{l(:label_revision)} #{o.format_identifier}" + (o.short_comments.blank? ? '' : (': ' + o.short_comments))},
                 :description => :long_comments,
@@ -43,6 +51,9 @@ class Changeset < ActiveRecord::Base
 
   named_scope :visible, lambda {|*args| { :include => {:repository => :project},
                                           :conditions => Project.allowed_to_condition(args.shift || User.current, :view_changesets, *args) } }
+
+  after_create :scan_for_issues
+  before_create :before_create_cs
 
   def revision=(r)
     write_attribute :revision, (r.nil? ? nil : r.to_s)
@@ -79,14 +90,14 @@ class Changeset < ActiveRecord::Base
     user || committer.to_s.split('<').first
   end
 
-  def before_create
+  def before_create_cs
     self.committer = self.class.to_utf8(self.committer, repository.repo_log_encoding)
     self.comments  = self.class.normalize_comments(
                        self.comments, repository.repo_log_encoding)
     self.user = repository.find_committer_user(self.committer)
   end
 
-  def after_create
+  def scan_for_issues
     scan_comment_for_issue_ids
   end
 
@@ -253,39 +264,6 @@ class Changeset < ActiveRecord::Base
   end
 
   def self.to_utf8(str, encoding)
-    return str if str.nil?
-    str.force_encoding("ASCII-8BIT") if str.respond_to?(:force_encoding)
-    if str.empty?
-      str.force_encoding("UTF-8") if str.respond_to?(:force_encoding)
-      return str
-    end
-    enc = encoding.blank? ? "UTF-8" : encoding
-    if str.respond_to?(:force_encoding)
-      if enc.upcase != "UTF-8"
-        str.force_encoding(enc)
-        str = str.encode("UTF-8", :invalid => :replace,
-              :undef => :replace, :replace => '?')
-      else
-        str.force_encoding("UTF-8")
-        if ! str.valid_encoding?
-          str = str.encode("US-ASCII", :invalid => :replace,
-                :undef => :replace, :replace => '?').encode("UTF-8")
-        end
-      end
-    else
-      ic = Iconv.new('UTF-8', enc)
-      txtar = ""
-      begin
-        txtar += ic.iconv(str)
-      rescue Iconv::IllegalSequence
-        txtar += $!.success
-        str = '?' + $!.failed[1,$!.failed.length]
-        retry
-      rescue
-        txtar += $!.success
-      end
-      str = txtar
-    end
-    str
+    Redmine::CodesetUtil.to_utf8(str, encoding)
   end
 end

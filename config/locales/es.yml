@@ -245,6 +245,7 @@ es:
   error_can_t_load_default_data: "No se ha podido cargar la configuración por defecto: %{value}"
   error_issue_not_found_in_project: 'La petición no se encuentra o no está asociada a este proyecto'
   error_scm_annotate: "No existe la entrada o no ha podido ser anotada"
+  error_scm_annotate_big_text_file: "La entrada no puede anotarse, al superar el tamaño máximo para ficheros de texto."
   error_scm_command_failed: "Se produjo un error al acceder al repositorio: %{value}"
   error_scm_not_found: "La entrada y/o la revisión no existe en el repositorio."
   field_account: Cuenta
@@ -776,7 +777,6 @@ es:
   setting_per_page_options: Objetos por página
   setting_plain_text_mail: sólo texto plano (no HTML)
   setting_protocol: Protocolo
-  setting_repositories_encodings: Codificaciones del repositorio
   setting_self_registration: Registro permitido
   setting_sequential_project_identifiers: Generar identificadores de proyecto
   setting_sys_api_enabled: Habilitar SW para la gestión del repositorio
@@ -1006,10 +1006,40 @@ es:
   field_root_directory: Directorio raíz
   field_cvs_module: Módulo
   field_cvsroot: CVSROOT
-  text_git_repository_note: Repositorio local (bare repository) (e.g. /gitrepo, c:\gitrepo)
   text_mercurial_repository_note: Repositorio local (e.g. /hgrepo, c:\hgrepo)
   text_scm_command: Orden
   text_scm_command_version: Versión
   label_git_report_last_commit: Informar del último commit para ficheros y directorios
   text_scm_config: Puede configurar las órdenes de cada scm en configuration/configuration.yml. Por favor, reinicie la aplicación después de editarlo
   text_scm_command_not_available: La orden para el Scm no está disponible. Por favor, compruebe la configuración en el panel de administración.
+  notice_issue_successful_create: Issue %{id} created.
+  label_between: between
+  setting_issue_group_assignment: Allow issue assignment to groups
+  label_diff: diff
+  text_git_repository_note: Repository is bare and local (e.g. /gitrepo, c:\gitrepo)
+  description_query_sort_criteria_direction: Sort direction
+  description_project_scope: Search scope
+  description_filter: Filter
+  description_user_mail_notification: Mail notification settings
+  description_date_from: Enter start date
+  description_message_content: Message content
+  description_available_columns: Available Columns
+  description_date_range_interval: Choose range by selecting start and end date
+  description_issue_category_reassign: Choose issue category
+  description_search: Searchfield
+  description_notes: Notes
+  description_date_range_list: Choose range from list
+  description_choose_project: Projects
+  description_date_to: Enter end date
+  description_query_sort_criteria_attribute: Sort attribute
+  description_wiki_subpages_reassign: Choose new parent page
+  description_selected_columns: Selected Columns
+  label_parent_revision: Parent
+  label_child_revision: Child
+  setting_default_issue_start_date_to_creation_date: Use current date as start date for new issues
+  button_edit_section: Edit this section
+  setting_repositories_encodings: Attachments and repositories encodings
+  description_all_columns: All Columns
+  button_export: Export
+  label_export_options: "%{export_format} export options"
+  error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})
