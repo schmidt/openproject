@@ -25,7 +25,7 @@ class RepositoriesCvsControllerTest < Test::Unit::TestCase
 
   # No '..' in the repository path
   REPOSITORY_PATH = RAILS_ROOT.gsub(%r{config\/\.\.}, '') + '/tmp/test/cvs_repository'
-  REPOSITORY_PATH.gsub!(/\//, "\\") if RUBY_PLATFORM =~ /mswin/
+  REPOSITORY_PATH.gsub!(/\//, "\\") if Redmine::Platform.mswin?
   # CVS module
   MODULE_NAME = 'test'
   
@@ -65,19 +65,43 @@ class RepositoriesCvsControllerTest < Test::Unit::TestCase
     end
     
     def test_browse_directory
-      get :browse, :id => 1, :path => ['sources']
+      get :browse, :id => 1, :path => ['images']
       assert_response :success
       assert_template 'browse'
       assert_not_nil assigns(:entries)
-      entry = assigns(:entries).detect {|e| e.name == 'watchers_controller.rb'}
+      assert_equal ['add.png', 'delete.png', 'edit.png'], assigns(:entries).collect(&:name)
+      entry = assigns(:entries).detect {|e| e.name == 'edit.png'}
+      assert_not_nil entry
       assert_equal 'file', entry.kind
-      assert_equal 'sources/watchers_controller.rb', entry.path
+      assert_equal 'images/edit.png', entry.path
+    end
+    
+    def test_browse_at_given_revision
+      Project.find(1).repository.fetch_changesets
+      get :browse, :id => 1, :path => ['images'], :rev => 1
+      assert_response :success
+      assert_template 'browse'
+      assert_not_nil assigns(:entries)
+      assert_equal ['delete.png', 'edit.png'], assigns(:entries).collect(&:name)
     end
   
     def test_entry
       get :entry, :id => 1, :path => ['sources', 'watchers_controller.rb']
       assert_response :success
       assert_template 'entry'
+      assert_no_tag :tag => 'td', :attributes => { :class => /line-code/},
+                                  :content => /before_filter/
+    end
+    
+    def test_entry_at_given_revision
+      # changesets must be loaded
+      Project.find(1).repository.fetch_changesets
+      get :entry, :id => 1, :path => ['sources', 'watchers_controller.rb'], :rev => 2
+      assert_response :success
+      assert_template 'entry'
+      # this line was removed in r3
+      assert_tag :tag => 'td', :attributes => { :class => /line-code/},
+                               :content => /before_filter/
     end
     
     def test_entry_not_found
@@ -89,6 +113,14 @@ class RepositoriesCvsControllerTest < Test::Unit::TestCase
     def test_entry_download
       get :entry, :id => 1, :path => ['sources', 'watchers_controller.rb'], :format => 'raw'
       assert_response :success
+    end
+
+    def test_directory_entry
+      get :entry, :id => 1, :path => ['sources']
+      assert_response :success
+      assert_template 'browse'
+      assert_not_nil assigns(:entry)
+      assert_equal 'sources', assigns(:entry).name
     end
     
     def test_diff

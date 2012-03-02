@@ -17,9 +17,16 @@
 
 class Repository < ActiveRecord::Base
   belongs_to :project
-  has_many :changesets, :dependent => :destroy, :order => "#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC"
+  has_many :changesets, :order => "#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC"
   has_many :changes, :through => :changesets
-    
+  
+  # Raw SQL to delete changesets and changes in the database
+  # has_many :changesets, :dependent => :destroy is too slow for big repositories
+  before_destroy :clear_changesets
+  
+  # Checks if the SCM is enabled when creating a repository
+  validate_on_create { |r| r.errors.add(:type, :activerecord_error_invalid) unless Setting.enabled_scm.include?(r.class.name.demodulize) }
+  
   # Removes leading and trailing whitespace
   def url=(arg)
     write_attribute(:url, arg ? arg.to_s.strip : nil)
@@ -48,20 +55,37 @@ class Repository < ActiveRecord::Base
     scm.supports_annotate?
   end
   
+  def entry(path=nil, identifier=nil)
+    scm.entry(path, identifier)
+  end
+  
   def entries(path=nil, identifier=nil)
     scm.entries(path, identifier)
   end
   
-  def diff(path, rev, rev_to, type)
-    scm.diff(path, rev, rev_to, type)
+  def properties(path, identifier=nil)
+    scm.properties(path, identifier)
+  end
+  
+  def cat(path, identifier=nil)
+    scm.cat(path, identifier)
+  end
+  
+  def diff(path, rev, rev_to)
+    scm.diff(path, rev, rev_to)
   end
   
   # Default behaviour: we search in cached changesets
   def changesets_for_path(path)
     path = "/#{path}" unless path.starts_with?('/')
-    Change.find(:all, :include => :changeset, 
+    Change.find(:all, :include => {:changeset => :user}, 
       :conditions => ["repository_id = ? AND path = ?", id, path],
       :order => "committed_on DESC, #{Changeset.table_name}.id DESC").collect(&:changeset)
+  end
+  
+  # Returns a path relative to the url of the repository
+  def relative_path(path)
+    path
   end
   
   def latest_changeset
@@ -70,6 +94,45 @@ class Repository < ActiveRecord::Base
     
   def scan_changesets_for_issue_ids
     self.changesets.each(&:scan_comment_for_issue_ids)
+  end
+  
+  # Returns an array of committers usernames and associated user_id
+  def committers
+    @committers ||= Changeset.connection.select_rows("SELECT DISTINCT committer, user_id FROM #{Changeset.table_name} WHERE repository_id = #{id}")
+  end
+  
+  # Maps committers username to a user ids
+  def committer_ids=(h)
+    if h.is_a?(Hash)
+      committers.each do |committer, user_id|
+        new_user_id = h[committer]
+        if new_user_id && (new_user_id.to_i != user_id.to_i)
+          new_user_id = (new_user_id.to_i > 0 ? new_user_id.to_i : nil)
+          Changeset.update_all("user_id = #{ new_user_id.nil? ? 'NULL' : new_user_id }", ["repository_id = ? AND committer = ?", id, committer])
+        end
+      end
+      @committers = nil
+      true
+    else
+      false
+    end
+  end
+  
+  # Returns the Redmine User corresponding to the given +committer+
+  # It will return nil if the committer is not yet mapped and if no User
+  # with the same username or email was found
+  def find_committer_user(committer)
+    if committer
+      c = changesets.find(:first, :conditions => {:committer => committer}, :include => :user)
+      if c && c.user
+        c.user
+      elsif committer.strip =~ /^([^<]+)(<(.*)>)?$/
+        username, email = $1.strip, $3
+        u = User.find_by_login(username)
+        u ||= User.find_by_mail(email) unless email.blank?
+        u
+      end
+    end
   end
   
   # fetch new changesets for all repositories
@@ -106,5 +169,11 @@ class Repository < ActiveRecord::Base
     url.strip!
     root_url.strip!
     true
+  end
+  
+  def clear_changesets
+    connection.delete("DELETE FROM changes WHERE changes.changeset_id IN (SELECT changesets.id FROM changesets WHERE changesets.repository_id = #{id})")
+    connection.delete("DELETE FROM changesets_issues WHERE changesets_issues.changeset_id IN (SELECT changesets.id FROM changesets WHERE changesets.repository_id = #{id})")
+    connection.delete("DELETE FROM changesets WHERE changesets.repository_id = #{id}")
   end
 end

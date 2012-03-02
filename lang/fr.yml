@@ -48,6 +48,7 @@ general_text_no: 'non'
 general_text_yes: 'oui'
 general_lang_name: 'Français'
 general_csv_separator: ';'
+general_csv_decimal_separator: ','
 general_csv_encoding: ISO-8859-1
 general_pdf_encoding: ISO-8859-1
 general_day_names: Lundi,Mardi,Mercredi,Jeudi,Vendredi,Samedi,Dimanche
@@ -76,6 +77,7 @@ notice_failed_to_save_issues: "%d demande(s) sur les %d sélectionnées n'ont pa
 notice_no_issue_selected: "Aucune demande sélectionnée ! Cochez les demandes que vous voulez mettre à jour."
 notice_account_pending: "Votre compte a été créé et attend l'approbation de l'administrateur."
 notice_default_data_loaded: Paramétrage par défaut chargé avec succès.
+notice_unable_delete_version: Impossible de supprimer cette version.
 
 error_can_t_load_default_data: "Une erreur s'est produite lors du chargement du paramétrage: %s"
 error_scm_not_found: "L'entrée et/ou la révision demandée n'existe pas dans le dépôt."
@@ -91,6 +93,8 @@ mail_body_account_information_external: Vous pouvez utiliser votre compte "%s" p
 mail_body_account_information: Paramètres de connexion de votre compte
 mail_subject_account_activation_request: "Demande d'activation d'un compte %s"
 mail_body_account_activation_request: "Un nouvel utilisateur (%s) s'est inscrit. Son compte nécessite votre approbation:"
+mail_subject_reminder: "%d demande(s) arrivent à échéance"
+mail_body_reminder: "%d demande(s) qui vous sont assignées arrivent à échéance dans les %d prochains jours:"
 
 gui_validation_error: 1 erreur
 gui_validation_error_plural: %d erreurs
@@ -166,7 +170,6 @@ field_start_page: Page de démarrage
 field_subproject: Sous-projet
 field_hours: Heures
 field_activity: Activité
-label_overall_activity: Activité globale
 field_spent_on: Date
 field_identifier: Identifiant
 field_is_filter: Utilisé comme filtre
@@ -180,6 +183,7 @@ field_time_zone: Fuseau horaire
 field_searchable: Utilisé pour les recherches
 field_default_value: Valeur par défaut
 field_comments_sorting: Afficher les commentaires
+field_parent_title: Page parent
 
 setting_app_title: Titre de l'application
 setting_app_subtitle: Sous-titre de l'application
@@ -191,7 +195,8 @@ setting_attachment_max_size: Taille max des fichiers
 setting_issues_export_limit: Limite export demandes
 setting_mail_from: Adresse d'émission
 setting_bcc_recipients: Destinataires en copie cachée (cci)
-setting_host_name: Nom d'hôte
+setting_plain_text_mail: Mail texte brut (non HTML)
+setting_host_name: Nom d'hôte et chemin
 setting_text_formatting: Formatage du texte
 setting_wiki_compression: Compression historique wiki
 setting_feeds_limit: Limite du contenu des flux RSS
@@ -206,12 +211,67 @@ setting_time_format: Format d'heure
 setting_cross_project_issue_relations: Autoriser les relations entre demandes de différents projets
 setting_issue_list_default_columns: Colonnes affichées par défaut sur la liste des demandes
 setting_repositories_encodings: Encodages des dépôts
+setting_commit_logs_encoding: Encodage des messages de commit
 setting_emails_footer: Pied-de-page des emails
 setting_protocol: Protocole
 setting_per_page_options: Options d'objets affichés par page
 setting_user_format: Format d'affichage des utilisateurs
 setting_activity_days_default: Nombre de jours affichés sur l'activité des projets
 setting_display_subprojects_issues: Afficher par défaut les demandes des sous-projets sur les projets principaux
+setting_enabled_scm: SCM activés
+setting_mail_handler_api_enabled: "Activer le WS pour la réception d'emails"
+setting_mail_handler_api_key: Clé de protection de l'API
+setting_sequential_project_identifiers: Générer des identifiants de projet séquentiels
+setting_gravatar_enabled: Afficher les Gravatar des utilisateurs
+
+permission_edit_project: Modifier le projet
+permission_select_project_modules: Choisir les modules
+permission_manage_members: Gérer les members
+permission_manage_versions: Gérer les versions
+permission_manage_categories: Gérer les catégories de demandes
+permission_add_issues: Créer des demandes
+permission_edit_issues: Modifier les demandes
+permission_manage_issue_relations: Gérer les relations
+permission_add_issue_notes: Ajouter des notes
+permission_edit_issue_notes: Modifier les notes
+permission_edit_own_issue_notes: Modifier ses propres notes
+permission_move_issues: Déplacer les demandes
+permission_delete_issues: Supprimer les demandes
+permission_manage_public_queries: Gérer les requêtes publiques
+permission_save_queries: Sauvegarder les requêtes
+permission_view_gantt: Voir le gantt
+permission_view_calendar: Voir le calendrier
+permission_view_issue_watchers: Voir la liste des observateurs
+permission_add_issue_watchers: Ajouter des observateurs
+permission_log_time: Saisir le temps passé
+permission_view_time_entries: Voir le temps passé
+permission_edit_time_entries: Modifier les temps passés
+permission_edit_own_time_entries: Modifier son propre temps passé
+permission_manage_news: Gérer les annonces
+permission_comment_news: Commenter les annonces
+permission_manage_documents: Gérer les documents
+permission_view_documents: Voir les documents
+permission_manage_files: Gérer les fichiers
+permission_view_files: Voir les fichiers
+permission_manage_wiki: Gérer le wiki
+permission_rename_wiki_pages: Renommer les pages
+permission_delete_wiki_pages: Supprimer les pages
+permission_view_wiki_pages: Voir le wiki
+permission_view_wiki_edits: "Voir l'historique des modifications"
+permission_edit_wiki_pages: Modifier les pages
+permission_delete_wiki_pages_attachments: Supprimer les fichiers joints
+permission_protect_wiki_pages: Protéger les pages
+permission_manage_repository: Gérer le dépôt de sources
+permission_browse_repository: Parcourir les sources
+permission_view_changesets: Voir les révisions
+permission_commit_access: Droit de commit
+permission_manage_boards: Gérer les forums
+permission_view_messages: Voir les messages
+permission_add_messages: Poster un message
+permission_edit_messages: Modifier les messages
+permission_edit_own_messages: Modifier ses propres messages
+permission_delete_messages: Supprimer les messages
+permission_delete_own_messages: Supprimer ses propres messages
 
 project_module_issue_tracking: Suivi des demandes
 project_module_time_tracking: Suivi du temps passé
@@ -283,6 +343,8 @@ label_last_updates: Dernière mise à jour
 label_last_updates_plural: %d dernières mises à jour
 label_registered_on: Inscrit le
 label_activity: Activité
+label_overall_activity: Activité globale
+label_user_activity: "Activité de %s"
 label_new: Nouveau
 label_logged_as: Connecté en tant que
 label_environment: Environnement
@@ -291,6 +353,7 @@ label_auth_source: Mode d'authentification
 label_auth_source_new: Nouveau mode d'authentification
 label_auth_source_plural: Modes d'authentification
 label_subproject_plural: Sous-projets
+label_and_its_subprojects: %s et ses sous-projets
 label_min_max_length: Longueurs mini - maxi
 label_list: Liste
 label_date: Date
@@ -394,6 +457,8 @@ label_revision_plural: Révisions
 label_associated_revisions: Révisions associées
 label_added: ajouté
 label_modified: modifié
+label_copied: copié
+label_renamed: renommé
 label_deleted: supprimé
 label_latest_revision: Dernière révision
 label_latest_revision_plural: Dernières révisions
@@ -405,7 +470,7 @@ label_sort_higher: Remonter
 label_sort_lower: Descendre
 label_sort_lowest: Descendre en dernier
 label_roadmap: Roadmap
-label_roadmap_due_in: Echéance dans
+label_roadmap_due_in: Echéance dans %s
 label_roadmap_overdue: En retard de %s
 label_roadmap_no_issues: Aucune demande pour cette version
 label_search: Recherche
@@ -444,7 +509,8 @@ label_loading: Chargement...
 label_relation_new: Nouvelle relation
 label_relation_delete: Supprimer la relation
 label_relates_to: lié à
-label_duplicates: doublon de
+label_duplicates: duplique
+label_duplicated_by: dupliqué par
 label_blocks: bloque
 label_blocked_by: bloqué par
 label_precedes: précède
@@ -478,6 +544,7 @@ label_send_test_email: Envoyer un email de test
 label_feeds_access_key_created_on: Clé d'accès RSS créée il y a %s
 label_module_plural: Modules
 label_added_time_by: Ajouté par %s il y a %s
+label_updated_time_by: Mis à jour par %s il y a %s
 label_updated_time: Mis à jour il y a %s
 label_jump_to_a_project: Aller à un projet...
 label_file_plural: Fichiers
@@ -510,6 +577,10 @@ label_preferences: Préférences
 label_chronological_order: Dans l'ordre chronologique
 label_reverse_chronological_order: Dans l'ordre chronologique inverse
 label_planning: Planning
+label_incoming_emails: Emails entrants
+label_generate_key: Générer une clé
+label_issue_watchers: Utilisateurs surveillant cette demande
+label_example: Exemple
 
 button_login: Connexion
 button_submit: Soumettre
@@ -548,6 +619,7 @@ button_copy: Copier
 button_annotate: Annoter
 button_update: Mettre à jour
 button_configure: Configurer
+button_quote: Citer
 
 status_active: actif
 status_registered: enregistré
@@ -556,7 +628,8 @@ status_locked: vérouillé
 text_select_mail_notifications: Actions pour lesquelles une notification par e-mail est envoyée
 text_regexp_info: ex. ^[A-Z0-9]+$
 text_min_max_length_info: 0 pour aucune restriction
-text_project_destroy_confirmation: Etes-vous sûr de vouloir supprimer ce projet et tout ce qui lui est rattaché ?
+text_project_destroy_confirmation: Etes-vous sûr de vouloir supprimer ce projet et toutes ses données ?
+text_subprojects_destroy_warning: 'Ses sous-projets: %s seront également supprimés.'
 text_workflow_edit: Sélectionner un tracker et un rôle pour éditer le workflow
 text_are_you_sure: Etes-vous sûr ?
 text_journal_changed: changé de %s à %s
@@ -565,7 +638,7 @@ text_journal_deleted: supprimé
 text_tip_task_begin_day: tâche commençant ce jour
 text_tip_task_end_day: tâche finissant ce jour
 text_tip_task_begin_end_day: tâche commençant et finissant ce jour
-text_project_identifier_info: 'Lettres minuscules (a-z), chiffres et tirets autorisés.<br />Un fois sauvegardé, l''identifiant ne pourra plus être modifié.'
+text_project_identifier_info: 'Seuls les lettres minuscules (a-z), chiffres et tirets sont autorisés.<br />Un fois sauvegardé, l''identifiant ne pourra plus être modifié.'
 text_caracters_maximum: %d caractères maximum.
 text_caracters_minimum: %d caractères minimum.
 text_length_between: Longueur comprise entre %d et %d caractères.
@@ -592,6 +665,11 @@ text_destroy_time_entries_question: %.02f heures ont été enregistrées sur les
 text_destroy_time_entries: Supprimer les heures
 text_assign_time_entries_to_project: Reporter les heures sur le projet
 text_reassign_time_entries: 'Reporter les heures sur cette demande:'
+text_user_wrote: '%s a écrit:'
+text_enumeration_destroy_question: 'Cette valeur est affectée à %d objets.'
+text_enumeration_category_reassign_to: 'Réaffecter les objets à cette valeur:'
+text_email_delivery_not_configured: "L'envoi de mail n'est pas configuré, les notifications sont désactivées.\nConfigurez votre serveur SMTP dans config/email.yml et redémarrez l'application pour les activer."
+text_repository_usernames_mapping: "Vous pouvez sélectionner ou modifier l'utilisateur Redmine associé à chaque nom d'utilisateur figurant dans l'historique du dépôt.\nLes utilisateurs avec le même identifiant ou la même adresse mail seront automatiquement associés."
 
 default_role_manager: Manager
 default_role_developper: Développeur

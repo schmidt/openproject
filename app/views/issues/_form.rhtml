@@ -42,17 +42,12 @@
 </div>
 
 <div style="clear:both;"> </div>
-<%= render :partial => 'form_custom_fields', :locals => {:values => @custom_values} %>
+<%= render :partial => 'form_custom_fields' %>
 
 <% if @issue.new_record? %>
 <p><label><%=l(:label_attachment_plural)%></label><%= render :partial => 'attachments/form' %></p>
 <% end %>
 
-<%= wikitoolbar_for 'issue_description' %>
+<%= call_hook(:view_issues_form_details_bottom, { :issue => @issue, :form => f }) %>
 
-<% content_for :header_tags do %>
-    <%= javascript_include_tag 'calendar/calendar' %>
-    <%= javascript_include_tag "calendar/lang/calendar-#{current_language}.js" %>
-    <%= javascript_include_tag 'calendar/calendar-setup' %>
-    <%= stylesheet_link_tag 'calendar' %>
-<% end %>
+<%= wikitoolbar_for 'issue_description' %>

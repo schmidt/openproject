@@ -90,13 +90,26 @@ namespace :redmine do
   
       class TracMilestone < ActiveRecord::Base
         set_table_name :milestone
-        
+        # If this attribute is set a milestone has a defined target timepoint        
         def due
-          if read_attribute(:due) > 0
+          if read_attribute(:due) && read_attribute(:due) > 0
             Time.at(read_attribute(:due)).to_date
           else
             nil
           end
+        end
+        # This is the real timepoint at which the milestone has finished.
+        def completed
+          if read_attribute(:completed) && read_attribute(:completed) > 0
+            Time.at(read_attribute(:completed)).to_date
+          else
+            nil
+          end
+        end
+
+        def description
+          # Attribute is named descr in Trac v0.8.x
+          has_attribute?(:descr) ? read_attribute(:descr) : read_attribute(:description)
         end
       end
       
@@ -126,6 +139,10 @@ namespace :redmine do
           File.open("#{trac_fullpath}", 'rb').read
         end
         
+        def description
+          read_attribute(:description).to_s.slice(0,255)
+        end
+        
       private
         def trac_fullpath
           attachment_type = read_attribute(:type)
@@ -140,7 +157,10 @@ namespace :redmine do
         
         # ticket changes: only migrate status changes and comments
         has_many :changes, :class_name => "TracTicketChange", :foreign_key => :ticket
-        has_many :attachments, :class_name => "TracAttachment", :foreign_key => :id, :conditions => "#{TracMigrate::TracAttachment.table_name}.type = 'ticket'"
+        has_many :attachments, :class_name => "TracAttachment",
+                               :finder_sql => "SELECT DISTINCT attachment.* FROM #{TracMigrate::TracAttachment.table_name}" +
+                                              " WHERE #{TracMigrate::TracAttachment.table_name}.type = 'ticket'" +
+                                              ' AND #{TracMigrate::TracAttachment.table_name}.id = \'#{id}\''
         has_many :customs, :class_name => "TracTicketCustom", :foreign_key => :ticket
         
         def ticket_type
@@ -177,7 +197,10 @@ namespace :redmine do
         set_table_name :wiki
         set_primary_key :name
         
-        has_many :attachments, :class_name => "TracAttachment", :foreign_key => :id, :conditions => "#{TracMigrate::TracAttachment.table_name}.type = 'wiki'"
+        has_many :attachments, :class_name => "TracAttachment",
+                               :finder_sql => "SELECT DISTINCT attachment.* FROM #{TracMigrate::TracAttachment.table_name}" +
+                                      " WHERE #{TracMigrate::TracAttachment.table_name}.type = 'wiki'" +
+                                      ' AND #{TracMigrate::TracAttachment.table_name}.id = \'#{id}\''
         
         def self.columns
           # Hides readonly Trac field to prevent clash with AR readonly? method (Rails 2.0)
@@ -191,6 +214,10 @@ namespace :redmine do
         set_table_name :permission  
       end
       
+      class TracSessionAttribute < ActiveRecord::Base
+        set_table_name :session_attribute
+      end
+       
       def self.find_or_create_user(username, project_member = false)
         return User.anonymous if username.blank?
         
@@ -198,10 +225,23 @@ namespace :redmine do
         if !u
           # Create a new user if not found
           mail = username[0,limit_for(User, 'mail')]
+          if mail_attr = TracSessionAttribute.find_by_sid_and_name(username, 'email')
+            mail = mail_attr.value
+          end
           mail = "#{mail}@foo.bar" unless mail.include?("@")
-          u = User.new :firstname => username[0,limit_for(User, 'firstname')].gsub(/[^\w\s\'\-]/i, '-'),
-                       :lastname => '-',
-                       :mail => mail.gsub(/[^-@a-z0-9\.]/i, '-')
+          
+          name = username
+          if name_attr = TracSessionAttribute.find_by_sid_and_name(username, 'name')
+            name = name_attr.value
+          end
+          name =~ (/(.*)(\s+\w+)?/)
+          fn = $1.strip
+          ln = ($2 || '-').strip
+          
+          u = User.new :mail => mail.gsub(/[^-@a-z0-9\.]/i, '-'),
+                       :firstname => fn[0, limit_for(User, 'firstname')].gsub(/[^\w\s\'\-]/i, '-'),
+                       :lastname => ln[0, limit_for(User, 'lastname')].gsub(/[^\w\s\'\-]/i, '-')
+
           u.login = username[0,limit_for(User, 'login')].gsub(/[^a-z0-9_\-@\.]/i, '-')
           u.password = 'trac'
           u.admin = true if TracPermission.find_by_username_and_action(username, 'admin')
@@ -228,12 +268,30 @@ namespace :redmine do
         text = text.gsub(/^(\=+)\s(.+)\s(\=+)/) {|s| "\nh#{$1.length}. #{$2}\n"}
         # External Links
         text = text.gsub(/\[(http[^\s]+)\s+([^\]]+)\]/) {|s| "\"#{$2}\":#{$1}"}
+        # Ticket links:
+        #      [ticket:234 Text],[ticket:234 This is a test]
+        text = text.gsub(/\[ticket\:([^\ ]+)\ (.+?)\]/, '"\2":/issues/show/\1')
+        #      ticket:1234
+        #      #1 is working cause Redmine uses the same syntax.
+        text = text.gsub(/ticket\:([^\ ]+)/, '#\1')
+        # Milestone links:
+        #      [milestone:"0.1.0 Mercury" Milestone 0.1.0 (Mercury)]
+        #      The text "Milestone 0.1.0 (Mercury)" is not converted,
+        #      cause Redmine's wiki does not support this.
+        text = text.gsub(/\[milestone\:\"([^\"]+)\"\ (.+?)\]/, 'version:"\1"')
+        #      [milestone:"0.1.0 Mercury"]
+        text = text.gsub(/\[milestone\:\"([^\"]+)\"\]/, 'version:"\1"')
+        text = text.gsub(/milestone\:\"([^\"]+)\"/, 'version:"\1"')
+        #      milestone:0.1.0 
+        text = text.gsub(/\[milestone\:([^\ ]+)\]/, 'version:\1')
+        text = text.gsub(/milestone\:([^\ ]+)/, 'version:\1')
         # Internal Links
         text = text.gsub(/\[\[BR\]\]/, "\n") # This has to go before the rules below
         text = text.gsub(/\[\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
         text = text.gsub(/\[wiki:\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
         text = text.gsub(/\[wiki:\"(.+)\".*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
-        text = text.gsub(/\[wiki:([^\s\]]+).*\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:([^\s\]]+)\]/) {|s| "[[#{$1.delete(',./?;|:')}]]"}
+        text = text.gsub(/\[wiki:([^\s\]]+)\s(.*)\]/) {|s| "[[#{$1.delete(',./?;|:')}|#{$2.delete(',./?;|:')}]]"}
 
 	# Links to pages UsingJustWikiCaps
 	text = text.gsub(/([^!]|^)(^| )([A-Z][a-z]+[A-Z][a-zA-Z]+)/, '\\1\\2[[\3]]')
@@ -251,9 +309,38 @@ namespace :redmine do
             s
           end
         end
-        # Preformatted blocks
-        text = text.gsub(/\{\{\{/, '<pre>')
-        text = text.gsub(/\}\}\}/, '</pre>')          
+        # We would like to convert the Code highlighting too
+        # This will go into the next line.
+        shebang_line = false
+        # Reguar expression for start of code
+        pre_re = /\{\{\{/
+        # Code hightlighing...
+        shebang_re = /^\#\!([a-z]+)/
+        # Regular expression for end of code
+        pre_end_re = /\}\}\}/
+        
+        # Go through the whole text..extract it line by line
+        text = text.gsub(/^(.*)$/) do |line|
+          m_pre = pre_re.match(line)
+          if m_pre
+            line = '<pre>'
+          else
+            m_sl = shebang_re.match(line)
+            if m_sl
+              shebang_line = true
+              line = '<code class="' + m_sl[1] + '">'
+            end
+            m_pre_end = pre_end_re.match(line)
+            if m_pre_end
+              line = '</pre>'
+              if shebang_line
+                line = '</code>' + line
+              end
+            end
+          end
+          line        
+        end
+
         # Highlighting
         text = text.gsub(/'''''([^\s])/, '_*\1')
         text = text.gsub(/([^\s])'''''/, '\1*_')
@@ -282,6 +369,12 @@ namespace :redmine do
         migrated_ticket_attachments = 0
         migrated_wiki_edits = 0      
         migrated_wiki_attachments = 0
+
+        #Wiki system initializing...
+        @target_project.wiki.destroy if @target_project.wiki
+        @target_project.reload
+        wiki = Wiki.new(:project => @target_project, :start_page => 'WikiStart')
+        wiki_edit_count = 0
   
         # Components
         print "Migrating components"
@@ -303,10 +396,20 @@ namespace :redmine do
         TracMilestone.find(:all).each do |milestone|
           print '.'
           STDOUT.flush
+          # First we try to find the wiki page...
+          p = wiki.find_or_new_page(milestone.name.to_s)
+          p.content = WikiContent.new(:page => p) if p.new_record?
+          p.content.text = milestone.description.to_s
+          p.content.author = find_or_create_user('trac')
+          p.content.comments = 'Milestone'
+          p.save
+
           v = Version.new :project => @target_project,
                           :name => encode(milestone.name[0, limit_for(Version, 'name')]),
-                          :description => encode(milestone.description.to_s[0, limit_for(Version, 'description')]),
-                          :effective_date => milestone.due
+                          :description => nil,
+                          :wiki_page_title => milestone.name.to_s,
+                          :effective_date => milestone.completed
+
           next unless v.save
           version_map[milestone.name] = v
           migrated_milestones += 1
@@ -408,6 +511,7 @@ namespace :redmine do
               a.file = attachment
               a.author = find_or_create_user(attachment.author)
               a.container = i
+              a.description = attachment.description
               migrated_ticket_attachments += 1 if a.save
         	end
         	
@@ -428,10 +532,6 @@ namespace :redmine do
         
         # Wiki      
         print "Migrating wiki"
-        @target_project.wiki.destroy if @target_project.wiki
-        @target_project.reload
-        wiki = Wiki.new(:project => @target_project, :start_page => 'WikiStart')
-        wiki_edit_count = 0
         if wiki.save
           TracWikiPage.find(:all, :order => 'name, version').each do |page|
             # Do not migrate Trac manual wiki pages
@@ -456,6 +556,7 @@ namespace :redmine do
               a = Attachment.new :created_on => attachment.time
               a.file = attachment
               a.author = find_or_create_user(attachment.author)
+              a.description = attachment.description
               a.container = p
               migrated_wiki_attachments += 1 if a.save
             end
@@ -643,3 +744,4 @@ namespace :redmine do
     TracMigrate.migrate
   end
 end
+

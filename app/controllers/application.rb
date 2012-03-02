@@ -15,7 +15,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'uri'
+require 'cgi'
+
 class ApplicationController < ActionController::Base
+  layout 'base'
+  
   before_filter :user_setup, :check_if_login_required, :set_localization
   filter_parameter_logging :password
   
@@ -41,7 +46,7 @@ class ApplicationController < ActionController::Base
   def find_current_user
     if session[:user_id]
       # existing session
-      (User.find_active(session[:user_id]) rescue nil)
+      (User.active.find(session[:user_id]) rescue nil)
     elsif cookies[:autologin] && Setting.autologin?
       # auto-login feature
       User.find_by_autologin_key(cookies[:autologin])
@@ -61,11 +66,11 @@ class ApplicationController < ActionController::Base
   def set_localization
     User.current.language = nil unless User.current.logged?
     lang = begin
-      if !User.current.language.blank? and GLoc.valid_languages.include? User.current.language.to_sym
+      if !User.current.language.blank? && GLoc.valid_language?(User.current.language)
         User.current.language
       elsif request.env['HTTP_ACCEPT_LANGUAGE']
-        accept_lang = parse_qvalues(request.env['HTTP_ACCEPT_LANGUAGE']).first.split('-').first
-        if accept_lang and !accept_lang.empty? and GLoc.valid_languages.include? accept_lang.to_sym
+        accept_lang = parse_qvalues(request.env['HTTP_ACCEPT_LANGUAGE']).first.downcase
+        if !accept_lang.blank? && (GLoc.valid_language?(accept_lang) || GLoc.valid_language?(accept_lang = accept_lang.split('-').first))
           User.current.language = accept_lang
         end
       end
@@ -77,8 +82,7 @@ class ApplicationController < ActionController::Base
   
   def require_login
     if !User.current.logged?
-      store_location
-      redirect_to :controller => "account", :action => "login"
+      redirect_to :controller => "account", :action => "login", :back_url => url_for(params)
       return false
     end
     true
@@ -92,11 +96,15 @@ class ApplicationController < ActionController::Base
     end
     true
   end
+  
+  def deny_access
+    User.current.logged? ? render_403 : require_login
+  end
 
   # Authorize the user for the requested action
   def authorize(ctrl = params[:controller], action = params[:action])
     allowed = User.current.allowed_to?({:controller => ctrl, :action => action}, @project)
-    allowed ? true : (User.current.logged? ? render_403 : require_login)
+    allowed ? true : deny_access
   end
   
   # make sure that the user is a member of the project (or admin) if project is private
@@ -115,20 +123,16 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  # store current uri in session.
-  # return to this location by calling redirect_back_or_default
-  def store_location
-    session[:return_to_params] = params
-  end
-
-  # move to the last store_location call or to the passed default one
   def redirect_back_or_default(default)
-    if session[:return_to_params].nil?
-      redirect_to default
-    else
-      redirect_to session[:return_to_params]
-      session[:return_to_params] = nil
+    back_url = CGI.unescape(params[:back_url].to_s)
+    if !back_url.blank?
+      uri = URI.parse(back_url)
+      # do not redirect user to another host or to the login or register page
+      if (uri.relative? || (uri.host == request.host)) && !uri.path.match(%r{/(login|account/register)})
+        redirect_to(back_url) and return
+      end
     end
+    redirect_to default
   end
   
   def render_403
@@ -150,6 +154,7 @@ class ApplicationController < ActionController::Base
   def render_feed(items, options={})    
     @items = items || []
     @items.sort! {|x,y| y.event_datetime <=> x.event_datetime }
+    @items = @items.slice(0, Setting.feeds_limit.to_i)
     @title = options[:title] || Setting.app_title
     render :template => "common/feed.atom.rxml", :layout => false, :content_type => 'application/atom+xml'
   end

@@ -40,6 +40,15 @@ class MessagesControllerTest < Test::Unit::TestCase
     assert_not_nil assigns(:topic)
   end
   
+  def test_show_with_reply_permission
+    @request.session[:user_id] = 2
+    get :show, :board_id => 1, :id => 1
+    assert_response :success
+    assert_template 'show'
+    assert_tag :div, :attributes => { :id => 'reply' },
+                     :descendant => { :tag => 'textarea', :attributes => { :id => 'message_content' } }
+  end
+  
   def test_show_message_not_found
     get :show, :board_id => 1, :id => 99999
     assert_response 404
@@ -54,6 +63,9 @@ class MessagesControllerTest < Test::Unit::TestCase
   
   def test_post_new
     @request.session[:user_id] = 2
+    ActionMailer::Base.deliveries.clear
+    Setting.notified_events << 'message_posted'
+    
     post :new, :board_id => 1,
                :message => { :subject => 'Test created message',
                              :content => 'Message body'}
@@ -63,6 +75,15 @@ class MessagesControllerTest < Test::Unit::TestCase
     assert_equal 'Message body', message.content
     assert_equal 2, message.author_id
     assert_equal 1, message.board_id
+
+    mail = ActionMailer::Base.deliveries.last
+    assert_kind_of TMail::Mail, mail
+    assert_equal "[#{message.board.project.name} - #{message.board.name}] Test created message", mail.subject
+    assert mail.body.include?('Message body')
+    # author
+    assert mail.bcc.include?('jsmith@somenet.foo')
+    # project member
+    assert mail.bcc.include?('dlopper@somenet.foo')
   end
   
   def test_get_edit
@@ -95,5 +116,12 @@ class MessagesControllerTest < Test::Unit::TestCase
     post :destroy, :board_id => 1, :id => 1
     assert_redirected_to 'boards/show'
     assert_nil Message.find_by_id(1)
+  end
+  
+  def test_quote
+    @request.session[:user_id] = 2
+    xhr :get, :quote, :board_id => 1, :id => 3
+    assert_response :success
+    assert_select_rjs :show, 'reply'
   end
 end

@@ -23,6 +23,15 @@ module Redmine
           method_name = "macro_#{name}"
           send(method_name, obj, args) if respond_to?(method_name)
         end
+        
+        def extract_macro_options(args, *keys)
+          options = {}
+          while args.last.to_s.strip =~ %r{^(.+)\=(.+)$} && keys.include?($1.downcase.to_sym)
+            options[$1.downcase.to_sym] = $2
+            args.pop
+          end
+          return [args, options]
+        end
       end
       
       @@available_macros = {}
@@ -77,21 +86,35 @@ module Redmine
         content_tag('dl', out)
       end
       
-      desc "Include a wiki page. Example:\n\n  !{{include(Foo)}}"
-      macro :include do |obj, args|
-        if @project && !@project.wiki.nil?
-          page = @project.wiki.find_page(args.first)
-          if page && page.content
-            @included_wiki_pages ||= []
-            raise 'Circular inclusion detected' if @included_wiki_pages.include?(page.title)
-            @included_wiki_pages << page.title
-            out = textilizable(page.content, :text)
-            @included_wiki_pages.pop
-            out
-          else
-            raise "Page #{args.first} doesn't exist"
-          end
+      desc "Displays a list of child pages. With no argument, it displays the child pages of the current wiki page. Examples:\n\n" +
+             "  !{{child_pages}} -- can be used from a wiki page only\n" +
+             "  !{{child_pages(Foo)}} -- lists all children of page Foo\n" +
+             "  !{{child_pages(Foo, parent=1)}} -- same as above with a link to page Foo"
+      macro :child_pages do |obj, args|
+        args, options = extract_macro_options(args, :parent)
+        page = nil
+        if args.size > 0
+          page = Wiki.find_page(args.first.to_s, :project => @project)
+        elsif obj.is_a?(WikiContent)
+          page = obj.page
+        else
+          raise 'With no argument, this macro can be called from wiki pages only.'
         end
+        raise 'Page not found' if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
+        pages = ([page] + page.descendants).group_by(&:parent_id)
+        render_page_hierarchy(pages, options[:parent] ? page.parent_id : page.id)
+      end
+      
+      desc "Include a wiki page. Example:\n\n  !{{include(Foo)}}\n\nor to include a page of a specific project wiki:\n\n  !{{include(projectname:Foo)}}"
+      macro :include do |obj, args|
+        page = Wiki.find_page(args.first.to_s, :project => @project)
+        raise 'Page not found' if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
+        @included_wiki_pages ||= []
+        raise 'Circular inclusion detected' if @included_wiki_pages.include?(page.title)
+        @included_wiki_pages << page.title
+        out = textilizable(page.content, :text, :attachments => page.attachments)
+        @included_wiki_pages.pop
+        out
       end
     end
   end

@@ -38,11 +38,13 @@
 <fieldset class="related-issues"><legend><%= l(:label_related_issues) %></legend>
 <ul>
 <% issues.each do |issue| -%>
-    <li class="issue <%= 'closed' if issue.closed? %>"><%= link_to_issue(issue) %>: <%=h issue.subject %></li>
+    <li><%= link_to_issue(issue) %>: <%=h issue.subject %></li>
 <% end -%>
 </ul>
 </fieldset>
 <% end %>
 </div>
+
+<%= call_hook :view_versions_show_bottom, :version => @version %>
 
 <% html_title @version.name %>

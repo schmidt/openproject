@@ -35,19 +35,39 @@ class RepositoryMercurialTest < Test::Unit::TestCase
       
       assert_equal 6, @repository.changesets.count
       assert_equal 11, @repository.changes.count
-      assert_equal "Initial import.\nThe repository contains 3 files.", @repository.changesets.find_by_revision(0).comments
+      assert_equal "Initial import.\nThe repository contains 3 files.", @repository.changesets.find_by_revision('0').comments
     end
     
     def test_fetch_changesets_incremental
       @repository.fetch_changesets
       # Remove changesets with revision > 2
-      @repository.changesets.find(:all, :conditions => 'revision > 2').each(&:destroy)
+      @repository.changesets.find(:all).each {|c| c.destroy if c.revision.to_i > 2}
       @repository.reload
       assert_equal 3, @repository.changesets.count
       
       @repository.fetch_changesets
       assert_equal 6, @repository.changesets.count
     end
+    
+    def test_entries
+      assert_equal 2, @repository.entries("sources", 2).size
+      assert_equal 1, @repository.entries("sources", 3).size
+    end
+
+    def test_locate_on_outdated_repository
+      # Change the working dir state
+      %x{hg -R #{REPOSITORY_PATH} up -r 0}
+      assert_equal 1, @repository.entries("images", 0).size
+      assert_equal 2, @repository.entries("images").size
+      assert_equal 2, @repository.entries("images", 2).size
+    end
+
+
+    def test_cat
+      assert @repository.scm.cat("sources/welcome_controller.rb", 2)
+      assert_nil @repository.scm.cat("sources/welcome_controller.rb")
+    end
+
   else
     puts "Mercurial test repository NOT FOUND. Skipping unit tests !!!"
     def test_fake; assert true end

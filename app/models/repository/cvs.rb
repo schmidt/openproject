@@ -29,13 +29,14 @@ class Repository::Cvs < Repository
     'CVS'
   end
   
-  def entry(path, identifier)
-    e = entries(path, identifier)
-    e ? e.first : nil
+  def entry(path=nil, identifier=nil)
+    rev = identifier.nil? ? nil : changesets.find_by_revision(identifier)
+    scm.entry(path, rev.nil? ? nil : rev.committed_on)
   end
   
   def entries(path=nil, identifier=nil)
-    entries=scm.entries(path, identifier)
+    rev = identifier.nil? ? nil : changesets.find_by_revision(identifier)
+    entries = scm.entries(path, rev.nil? ? nil : rev.committed_on)
     if entries
       entries.each() do |entry|
         unless entry.lastrev.nil? || entry.lastrev.identifier
@@ -52,7 +53,12 @@ class Repository::Cvs < Repository
     entries
   end
   
-  def diff(path, rev, rev_to, type)
+  def cat(path, identifier=nil)
+    rev = identifier.nil? ? nil : changesets.find_by_revision(identifier)
+    scm.cat(path, rev.nil? ? nil : rev.committed_on)
+  end
+  
+  def diff(path, rev, rev_to)
     #convert rev to revision. CVS can't handle changesets here
     diff=[]
     changeset_from=changesets.find_by_revision(rev)
@@ -75,7 +81,8 @@ class Repository::Cvs < Repository
         unless revision_to
           revision_to=scm.get_previous_revision(revision_from)
         end
-        diff=diff+scm.diff(change_from.path, revision_from, revision_to, type)
+        file_diff = scm.diff(change_from.path, revision_from, revision_to)
+        diff = diff + file_diff unless file_diff.nil?
       end
     end
     return diff
@@ -102,7 +109,7 @@ class Repository::Cvs < Repository
           cs = changesets.find(:first, :conditions=>{
             :committed_on=>revision.time-time_delta..revision.time+time_delta,
             :committer=>revision.author,
-            :comments=>revision.message
+            :comments=>Changeset.normalize_comments(revision.message)
           })
         
           # create a new changeset.... 
@@ -137,12 +144,18 @@ class Repository::Cvs < Repository
       end
       
       # Renumber new changesets in chronological order
-      c = changesets.find(:first, :order => 'committed_on DESC, id DESC', :conditions => "revision NOT LIKE '_%'")
-      next_rev = c.nil? ? 1 : (c.revision.to_i + 1)
       changesets.find(:all, :order => 'committed_on ASC, id ASC', :conditions => "revision LIKE '_%'").each do |changeset|
-        changeset.update_attribute :revision, next_rev
-        next_rev += 1
+        changeset.update_attribute :revision, next_revision_number
       end
     end # transaction
+  end
+  
+  private
+  
+  # Returns the next revision number to assign to a CVS changeset
+  def next_revision_number
+    # Need to retrieve existing revision numbers to sort them as integers
+    @current_revision_number ||= (connection.select_values("SELECT revision FROM #{Changeset.table_name} WHERE repository_id = #{id} AND revision NOT LIKE '_%'").collect(&:to_i).max || 0)
+    @current_revision_number += 1
   end
 end

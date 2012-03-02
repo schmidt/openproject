@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class UsersController < ApplicationController
-  layout 'base'	
   before_filter :require_admin
 
   helper :sort
@@ -34,15 +33,19 @@ class UsersController < ApplicationController
     sort_update
     
     @status = params[:status] ? params[:status].to_i : 1
-    conditions = "status <> 0"
-    conditions = ["status=?", @status] unless @status == 0
+    c = ARCondition.new(@status == 0 ? "status <> 0" : ["status = ?", @status])
+
+    unless params[:name].blank?
+      name = "%#{params[:name].strip.downcase}%"
+      c << ["LOWER(login) LIKE ? OR LOWER(firstname) LIKE ? OR LOWER(lastname) LIKE ?", name, name, name]
+    end
     
-    @user_count = User.count(:conditions => conditions)
+    @user_count = User.count(:conditions => c.conditions)
     @user_pages = Paginator.new self, @user_count,
 								per_page_option,
 								params['page']								
     @users =  User.find :all,:order => sort_clause,
-                        :conditions => conditions,
+                        :conditions => c.conditions,
 						:limit  =>  @user_pages.items_per_page,
 						:offset =>  @user_pages.current.offset
 
@@ -52,14 +55,11 @@ class UsersController < ApplicationController
   def add
     if request.get?
       @user = User.new(:language => Setting.default_language)
-      @custom_values = UserCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| CustomValue.new(:custom_field => x, :customized => @user) }
     else
       @user = User.new(params[:user])
       @user.admin = params[:user][:admin] || false
       @user.login = params[:user][:login]
       @user.password, @user.password_confirmation = params[:password], params[:password_confirmation] unless @user.auth_source_id
-      @custom_values = UserCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| CustomValue.new(:custom_field => x, :customized => @user, :value => (params[:custom_fields] ? params["custom_fields"][x.id.to_s] : nil)) }
-      @user.custom_values = @custom_values			
       if @user.save
         Mailer.deliver_account_information(@user, params[:password]) if params[:send_information]
         flash[:notice] = l(:notice_successful_create)
@@ -71,42 +71,34 @@ class UsersController < ApplicationController
 
   def edit
     @user = User.find(params[:id])
-    if request.get?
-      @custom_values = UserCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| @user.custom_values.find_by_custom_field_id(x.id) || CustomValue.new(:custom_field => x) }
-    else
+    if request.post?
       @user.admin = params[:user][:admin] if params[:user][:admin]
       @user.login = params[:user][:login] if params[:user][:login]
       @user.password, @user.password_confirmation = params[:password], params[:password_confirmation] unless params[:password].nil? or params[:password].empty? or @user.auth_source_id
-      if params[:custom_fields]
-        @custom_values = UserCustomField.find(:all, :order => "#{CustomField.table_name}.position").collect { |x| CustomValue.new(:custom_field => x, :customized => @user, :value => params["custom_fields"][x.id.to_s]) }
-        @user.custom_values = @custom_values
-      end
       if @user.update_attributes(params[:user])
         flash[:notice] = l(:notice_successful_update)
-        redirect_to :action => 'list'
+        # Give a string to redirect_to otherwise it would use status param as the response code
+        redirect_to(url_for(:action => 'list', :status => params[:status], :page => params[:page]))
       end
     end
     @auth_sources = AuthSource.find(:all)
     @roles = Role.find_all_givable
     @projects = Project.find(:all, :order => 'name', :conditions => "status=#{Project::STATUS_ACTIVE}") - @user.projects
     @membership ||= Member.new
+    @memberships = @user.memberships
   end
   
   def edit_membership
     @user = User.find(params[:id])
     @membership = params[:membership_id] ? Member.find(params[:membership_id]) : Member.new(:user => @user)
     @membership.attributes = params[:membership]
-    if request.post? and @membership.save
-      flash[:notice] = l(:notice_successful_update)
-    end
-    redirect_to :action => 'edit', :id => @user and return
+    @membership.save if request.post?
+    redirect_to :action => 'edit', :id => @user, :tab => 'memberships'
   end
   
   def destroy_membership
     @user = User.find(params[:id])
-    if request.post? and Member.find(params[:membership_id]).destroy
-      flash[:notice] = l(:notice_successful_update)
-    end
-    redirect_to :action => 'edit', :id => @user and return
+    Member.find(params[:membership_id]).destroy if request.post?
+    redirect_to :action => 'edit', :id => @user, :tab => 'memberships'
   end
 end

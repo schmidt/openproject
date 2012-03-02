@@ -44,25 +44,14 @@ module Redmine
           return nil
         end
         
-        # Returns the entry identified by path and revision identifier
-        # or nil if entry doesn't exist in the repository
-        def entry(path=nil, identifier=nil)
-          path ||= ''
-          parts = path.split(%r{[\/\\]}).select {|p| !p.blank?}
-          if parts.size > 0
-            parent = parts[0..-2].join('/')
-            entries = entries(parent, identifier)
-            entries ? entries.detect {|e| e.name == parts.last} : nil
-          end
-        end
-        
         # Returns an Entries collection
         # or nil if the given path doesn't exist in the repository
         def entries(path=nil, identifier=nil)
           path ||= ''
           entries = Entries.new
           cmd = "#{BZR_BIN} ls -v --show-ids"
-          cmd << " -r#{identifier.to_i}" if identifier && identifier.to_i > 0
+          identifier = -1 unless identifier && identifier.to_i > 0 
+          cmd << " -r#{identifier.to_i}" 
           cmd << " #{target(path)}"
           shellout(cmd) do |io|
             prefix = "#{url}/#{path}".gsub('\\', '/')
@@ -144,7 +133,7 @@ module Redmine
           revisions
         end
         
-        def diff(path, identifier_from, identifier_to=nil, type="inline")
+        def diff(path, identifier_from, identifier_to=nil)
           path ||= ''
           if identifier_to
             identifier_to = identifier_to.to_i 
@@ -159,7 +148,7 @@ module Redmine
             end
           end
           #return nil if $? && $?.exitstatus != 0
-          DiffTableList.new diff, type   
+          diff
         end
         
         def cat(path, identifier=nil)

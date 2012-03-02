@@ -35,18 +35,25 @@ class RepositoryDarcsTest < Test::Unit::TestCase
       
       assert_equal 6, @repository.changesets.count
       assert_equal 13, @repository.changes.count
-      assert_equal "Initial commit.", @repository.changesets.find_by_revision(1).comments
+      assert_equal "Initial commit.", @repository.changesets.find_by_revision('1').comments
     end
     
     def test_fetch_changesets_incremental
       @repository.fetch_changesets
       # Remove changesets with revision > 3
-      @repository.changesets.find(:all, :conditions => 'revision > 3').each(&:destroy)
+      @repository.changesets.find(:all).each {|c| c.destroy if c.revision.to_i > 3}
       @repository.reload
       assert_equal 3, @repository.changesets.count
       
       @repository.fetch_changesets
       assert_equal 6, @repository.changesets.count
+    end
+    
+    def test_cat
+      @repository.fetch_changesets
+      cat = @repository.cat("sources/welcome_controller.rb", 2)
+      assert_not_nil cat
+      assert cat.include?('class WelcomeController < ApplicationController')
     end
   else
     puts "Darcs test repository NOT FOUND. Skipping unit tests !!!"

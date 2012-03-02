@@ -1,5 +1,5 @@
-# redMine - project management software
-# Copyright (C) 2006-2007  Jean-Philippe Lang
+# Redmine - project management software
+# Copyright (C) 2006-2008  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,23 +29,27 @@ class ProjectsControllerTest < Test::Unit::TestCase
     @controller = ProjectsController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
+    @request.session[:user_id] = nil
+    Setting.default_language = 'en'
   end
 
   def test_index
     get :index
     assert_response :success
-    assert_template 'list'
-  end
-
-  def test_list
-    get :list
-    assert_response :success
-    assert_template 'list'
+    assert_template 'index'
     assert_not_nil assigns(:project_tree)
     # Root project as hash key
-    assert assigns(:project_tree).has_key?(Project.find(1))
+    assert assigns(:project_tree).keys.include?(Project.find(1))
     # Subproject in corresponding value
     assert assigns(:project_tree)[Project.find(1)].include?(Project.find(3))
+  end
+  
+  def test_index_atom
+    get :index, :format => 'atom'
+    assert_response :success
+    assert_template 'common/feed.atom.rxml'
+    assert_select 'feed>title', :text => 'Redmine: Latest projects'
+    assert_select 'feed>entry', :count => Project.count(:conditions => Project.visible_by(User.current))
   end
   
   def test_show_by_id
@@ -63,6 +67,21 @@ class ProjectsControllerTest < Test::Unit::TestCase
     assert_equal Project.find_by_identifier('ecookbook'), assigns(:project)
   end
   
+  def test_private_subprojects_hidden
+    get :show, :id => 'ecookbook'
+    assert_response :success
+    assert_template 'show'
+    assert_no_tag :tag => 'a', :content => /Private child/
+  end
+
+  def test_private_subprojects_visible
+    @request.session[:user_id] = 2 # manager who is a member of the private subproject
+    get :show, :id => 'ecookbook'
+    assert_response :success
+    assert_template 'show'
+    assert_tag :tag => 'a', :content => /Private child/
+  end
+  
   def test_settings
     @request.session[:user_id] = 2 # manager
     get :settings, :id => 1
@@ -73,7 +92,7 @@ class ProjectsControllerTest < Test::Unit::TestCase
   def test_edit
     @request.session[:user_id] = 2 # manager
     post :edit, :id => 1, :project => {:name => 'Test changed name',
-                                       :custom_field_ids => ['']}
+                                       :issue_custom_field_ids => ['']}
     assert_redirected_to 'projects/settings/ecookbook'
     project = Project.find(1)
     assert_equal 'Test changed name', project.name
@@ -135,22 +154,20 @@ class ProjectsControllerTest < Test::Unit::TestCase
     assert_response :success
     assert_template 'activity'
     assert_not_nil assigns(:events_by_day)
-    assert_not_nil assigns(:events)
-
-    # subproject issue not included by default
-    assert !assigns(:events).include?(Issue.find(5))
     
     assert_tag :tag => "h3", 
                :content => /#{2.days.ago.to_date.day}/,
                :sibling => { :tag => "dl",
                  :child => { :tag => "dt",
-                   :attributes => { :class => 'journal' },
+                   :attributes => { :class => /issue-edit/ },
                    :child => { :tag => "a",
                      :content => /(#{IssueStatus.find(2).name})/,
                    }
                  }
                }
-               
+  end
+  
+  def test_previous_project_activity
     get :activity, :id => 1, :from => 3.days.ago.to_date
     assert_response :success
     assert_template 'activity'
@@ -160,7 +177,7 @@ class ProjectsControllerTest < Test::Unit::TestCase
                :content => /#{3.day.ago.to_date.day}/,
                :sibling => { :tag => "dl",
                  :child => { :tag => "dt",
-                   :attributes => { :class => 'issue' },
+                   :attributes => { :class => /issue/ },
                    :child => { :tag => "a",
                      :content => /#{Issue.find(1).subject}/,
                    }
@@ -168,87 +185,46 @@ class ProjectsControllerTest < Test::Unit::TestCase
                }
   end
   
-  def test_activity_with_subprojects
-    get :activity, :id => 1, :with_subprojects => 1
-    assert_response :success
-    assert_template 'activity'
-    assert_not_nil assigns(:events)
-    
-    assert assigns(:events).include?(Issue.find(1))
-    assert !assigns(:events).include?(Issue.find(4))
-    # subproject issue
-    assert assigns(:events).include?(Issue.find(5))
-  end
-  
-  def test_global_activity_anonymous
+  def test_global_activity
     get :activity
     assert_response :success
     assert_template 'activity'
-    assert_not_nil assigns(:events)
+    assert_not_nil assigns(:events_by_day)
     
-    assert assigns(:events).include?(Issue.find(1))
-    # Issue of a private project
-    assert !assigns(:events).include?(Issue.find(4))
+    assert_tag :tag => "h3", 
+               :content => /#{5.day.ago.to_date.day}/,
+               :sibling => { :tag => "dl",
+                 :child => { :tag => "dt",
+                   :attributes => { :class => /issue/ },
+                   :child => { :tag => "a",
+                     :content => /#{Issue.find(5).subject}/,
+                   }
+                 }
+               }
   end
   
-  def test_global_activity_logged_user
-    @request.session[:user_id] = 2 # manager
-    get :activity
+  def test_user_activity
+    get :activity, :user_id => 2
     assert_response :success
     assert_template 'activity'
-    assert_not_nil assigns(:events)
+    assert_not_nil assigns(:events_by_day)
     
-    assert assigns(:events).include?(Issue.find(1))
-    # Issue of a private project the user belongs to
-    assert assigns(:events).include?(Issue.find(4))
-  end
-
-  
-  def test_global_activity_with_all_types
-    get :activity, :show_issues => 1, :show_news => 1, :show_files => 1, :show_documents => 1, :show_changesets => 1, :show_wiki_pages => 1, :show_messages => 1
-    assert_response :success
-    assert_template 'activity'
-    assert_not_nil assigns(:events)
-    
-    assert assigns(:events).include?(Issue.find(1))
-    assert !assigns(:events).include?(Issue.find(4))
-    assert assigns(:events).include?(Message.find(5))
-  end
-
-  def test_calendar
-    get :calendar, :id => 1
-    assert_response :success
-    assert_template 'calendar'
-    assert_not_nil assigns(:calendar)
-  end
-
-  def test_calendar_with_subprojects
-    get :calendar, :id => 1, :with_subprojects => 1, :tracker_ids => [1, 2]
-    assert_response :success
-    assert_template 'calendar'
-    assert_not_nil assigns(:calendar)
-  end
-
-  def test_gantt
-    get :gantt, :id => 1
-    assert_response :success
-    assert_template 'gantt.rhtml'
-    assert_not_nil assigns(:events)
-  end
-
-  def test_gantt_with_subprojects
-    get :gantt, :id => 1, :with_subprojects => 1, :tracker_ids => [1, 2]
-    assert_response :success
-    assert_template 'gantt.rhtml'
-    assert_not_nil assigns(:events)
+    assert_tag :tag => "h3", 
+               :content => /#{3.day.ago.to_date.day}/,
+               :sibling => { :tag => "dl",
+                 :child => { :tag => "dt",
+                   :attributes => { :class => /issue/ },
+                   :child => { :tag => "a",
+                     :content => /#{Issue.find(1).subject}/,
+                   }
+                 }
+               }
   end
   
-  def test_gantt_export_to_pdf
-    get :gantt, :id => 1, :format => 'pdf'
+  def test_activity_atom_feed
+    get :activity, :format => 'atom'
     assert_response :success
-    assert_template 'gantt.rfpdf'
-    assert_equal 'application/pdf', @response.content_type
-    assert_not_nil assigns(:events)
+    assert_template 'common/feed.atom.rxml'
   end
   
   def test_archive    
@@ -264,5 +240,56 @@ class ProjectsControllerTest < Test::Unit::TestCase
     post :unarchive, :id => 1
     assert_redirected_to 'admin/projects'
     assert Project.find(1).active?
+  end
+  
+  def test_project_menu
+    assert_no_difference 'Redmine::MenuManager.items(:project_menu).size' do
+      Redmine::MenuManager.map :project_menu do |menu|
+        menu.push :foo, { :controller => 'projects', :action => 'show' }, :cation => 'Foo'
+        menu.push :bar, { :controller => 'projects', :action => 'show' }, :before => :activity
+        menu.push :hello, { :controller => 'projects', :action => 'show' }, :caption => Proc.new {|p| p.name.upcase }, :after => :bar
+      end
+      
+      get :show, :id => 1
+      assert_tag :div, :attributes => { :id => 'main-menu' },
+                       :descendant => { :tag => 'li', :child => { :tag => 'a', :content => 'Foo',
+                                                                               :attributes => { :class => 'foo' } } }
+  
+      assert_tag :div, :attributes => { :id => 'main-menu' },
+                       :descendant => { :tag => 'li', :child => { :tag => 'a', :content => 'Bar',
+                                                                               :attributes => { :class => 'bar' } },
+                                                      :before => { :tag => 'li', :child => { :tag => 'a', :content => 'ECOOKBOOK' } } }
+
+      assert_tag :div, :attributes => { :id => 'main-menu' },
+                       :descendant => { :tag => 'li', :child => { :tag => 'a', :content => 'ECOOKBOOK',
+                                                                               :attributes => { :class => 'hello' } },
+                                                      :before => { :tag => 'li', :child => { :tag => 'a', :content => 'Activity' } } }
+      
+      # Remove the menu items
+      Redmine::MenuManager.map :project_menu do |menu|
+        menu.delete :foo
+        menu.delete :bar
+        menu.delete :hello
+      end
+    end
+  end
+  
+  # A hook that is manually registered later
+  class ProjectBasedTemplate < Redmine::Hook::ViewListener
+    def view_layouts_base_html_head(context)
+      # Adds a project stylesheet
+      stylesheet_link_tag(context[:project].identifier) if context[:project]
+    end
+  end
+  # Don't use this hook now
+  Redmine::Hook.clear_listeners
+  
+  def test_hook_response
+    Redmine::Hook.add_listener(ProjectBasedTemplate)
+    get :show, :id => 1
+    assert_tag :tag => 'link', :attributes => {:href => '/stylesheets/ecookbook.css'},
+                               :parent => {:tag => 'head'}
+    
+    Redmine::Hook.clear_listeners
   end
 end

@@ -70,6 +70,15 @@ module Redmine
       
       def render_menu(menu, project=nil)
         links = []
+        menu_items_for(menu, project) do |item, caption, url, selected|
+          links << content_tag('li', 
+            link_to(h(caption), url, item.html_options(:selected => selected)))
+        end
+        links.empty? ? nil : content_tag('ul', links.join("\n"))
+      end
+
+      def menu_items_for(menu, project=nil)
+        items = []
         Redmine::MenuManager.allowed_items(menu, User.current, project).each do |item|
           unless item.condition && !item.condition.call(project)
             url = case item.url
@@ -80,22 +89,28 @@ module Redmine
             else
               item.url
             end
-            #url = (project && item.url.is_a?(Hash)) ? {item.param => project}.merge(item.url) : (item.url.is_a?(Symbol) ? send(item.url) : item.url)
-            links << content_tag('li', 
-              link_to(l(item.caption), url, (current_menu_item == item.name ? item.html_options.merge(:class => 'selected') : item.html_options)))
+            caption = item.caption(project)
+            caption = l(caption) if caption.is_a?(Symbol)
+            if block_given?
+              yield item, caption, url, (current_menu_item == item.name)
+            else
+              items << [item, caption, url, (current_menu_item == item.name)]
+            end
           end
         end
-        links.empty? ? nil : content_tag('ul', links.join("\n"))
+        return block_given? ? nil : items
       end
     end
     
     class << self
       def map(menu_name)
-        mapper = Mapper.new
-        yield mapper
         @items ||= {}
-        @items[menu_name.to_sym] ||= []
-        @items[menu_name.to_sym] += mapper.items
+        mapper = Mapper.new(menu_name.to_sym, @items)
+        if block_given?
+          yield mapper
+        else
+          mapper
+        end
       end
       
       def items(menu_name)
@@ -108,23 +123,52 @@ module Redmine
     end
     
     class Mapper
-      # Adds an item at the end of the menu. Available options:
-      # * param: the parameter name that is used for the project id (default is :id)
-      # * if: a proc that is called before rendering the item, the item is displayed only if it returns true
-      # * caption: the localized string key that is used as the item label
-      # * html_options: a hash of html options that are passed to link_to
-      def push(name, url, options={})
-        items << MenuItem.new(name, url, options)
+      def initialize(menu, items)
+        items[menu] ||= []
+        @menu = menu
+        @menu_items = items[menu]
       end
       
-      def items
-        @items ||= []
+      @@last_items_count = Hash.new {|h,k| h[k] = 0}
+      
+      # Adds an item at the end of the menu. Available options:
+      # * param: the parameter name that is used for the project id (default is :id)
+      # * if: a Proc that is called before rendering the item, the item is displayed only if it returns true
+      # * caption that can be:
+      #   * a localized string Symbol
+      #   * a String
+      #   * a Proc that can take the project as argument
+      # * before, after: specify where the menu item should be inserted (eg. :after => :activity)
+      # * last: menu item will stay at the end (eg. :last => true)
+      # * html_options: a hash of html options that are passed to link_to
+      def push(name, url, options={})
+        options = options.dup
+        
+        # menu item position
+        if before = options.delete(:before)
+          position = @menu_items.collect(&:name).index(before)
+        elsif after = options.delete(:after)
+          position = @menu_items.collect(&:name).index(after)
+          position += 1 unless position.nil?
+        elsif options.delete(:last)
+          position = @menu_items.size
+          @@last_items_count[@menu] += 1
+        end
+        # default position
+        position ||= @menu_items.size - @@last_items_count[@menu]
+        
+        @menu_items.insert(position, MenuItem.new(name, url, options))
+      end
+      
+      # Removes a menu item
+      def delete(name)
+        @menu_items.delete_if {|i| i.name == name}
       end
     end
     
     class MenuItem
       include GLoc
-      attr_reader :name, :url, :param, :condition, :html_options
+      attr_reader :name, :url, :param, :condition
       
       def initialize(name, url, options)
         raise "Invalid option :if for menu item '#{name}'" if options[:if] && !options[:if].respond_to?(:call)
@@ -133,13 +177,31 @@ module Redmine
         @url = url
         @condition = options[:if]
         @param = options[:param] || :id
-        @caption_key = options[:caption]
+        @caption = options[:caption]
         @html_options = options[:html] || {}
+        # Adds a unique class to each menu item based on its name
+        @html_options[:class] = [@html_options[:class], @name.to_s.dasherize].compact.join(' ')
       end
       
-      def caption
-        # check if localized string exists on first render (after GLoc strings are loaded)
-        @caption ||= (@caption_key || (l_has_string?("label_#{@name}".to_sym) ? "label_#{@name}".to_sym : @name.to_s.humanize))
+      def caption(project=nil)
+        if @caption.is_a?(Proc)
+          c = @caption.call(project).to_s
+          c = @name.to_s.humanize if c.blank?
+          c
+        else
+          # check if localized string exists on first render (after GLoc strings are loaded)
+          @caption_key ||= (@caption || (l_has_string?("label_#{@name}".to_sym) ? "label_#{@name}".to_sym : @name.to_s.humanize))
+        end
+      end
+      
+      def html_options(options={})
+        if options[:selected]
+          o = @html_options.dup
+          o[:class] += ' selected'
+          o
+        else
+          @html_options
+        end
       end
     end    
   end

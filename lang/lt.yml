@@ -48,6 +48,7 @@ general_text_no: 'ne'
 general_text_yes: 'taip'
 general_lang_name: 'Lithuanian (lietuvių)'
 general_csv_separator: ','
+general_csv_decimal_separator: '.'
 general_csv_encoding: UTF-8
 general_pdf_encoding: UTF-8
 general_day_names: pirmadienis,antradienis,trečiadienis,ketvirtadienis,penktadienis,šeštadienis,sekmadienis
@@ -198,7 +199,7 @@ setting_date_format: Datos formatas
 setting_time_format: Laiko formatas 
 setting_cross_project_issue_relations: Leisti tarprojektinius darbų ryšius
 setting_issue_list_default_columns: Numatytosios skiltys darbų sąraše
-setting_repositories_encodings: Saugyklos enkodingas
+setting_repositories_encodings: Saugyklos koduotė
 setting_emails_footer: elektroninio pašto puslapinė poraštė
 setting_protocol: Protokolas
  
@@ -370,7 +371,7 @@ label_sort_higher: Perkelti į viršų
 label_sort_lower: Perkelti žemyn 
 label_sort_lowest: Perkelti į apačią 
 label_roadmap: Veiklos grafikas 
-label_roadmap_due_in: Baigiasi po 
+label_roadmap_due_in: Baigiasi po %s
 label_roadmap_overdue: %s vėluojama 
 label_roadmap_no_issues: Jokio darbo šiai versijai nėra
 label_search: Ieškoti 
@@ -554,7 +555,7 @@ enumeration_issue_priorities: Darbo prioritetai
 enumeration_doc_categories: Dokumento kategorijos 
 enumeration_activities: Veiklos (laiko sekimas)
 label_display_per_page: '%s įrašų puslapyje'
-setting_per_page_options: Objects per page options
+setting_per_page_options: Įrašų puslapyje nustatimas
 notice_default_data_loaded: Numatytoji konfiguracija sėkmingai užkrauta.
 label_age: Amžius
 label_general: Bendri
@@ -578,43 +579,120 @@ label_document_added: Dokumentas pridėtas
 label_message_posted: Pranešimas pridėtas
 label_file_added: Byla pridėta
 label_news_added: Naujiena pridėta
-project_module_boards: Boards
-project_module_issue_tracking: Issue tracking
+project_module_boards: Forumai
+project_module_issue_tracking: Darbu pėdsekys
 project_module_wiki: Wiki
-project_module_files: Files
-project_module_documents: Documents
-project_module_repository: Repository
-project_module_news: News
-project_module_time_tracking: Time tracking
-text_file_repository_writable: File repository writable
-text_default_administrator_account_changed: Default administrator account changed
-text_rmagick_available: RMagick available (optional)
-button_configure: Configure
+project_module_files: Rinkmenos
+project_module_documents: Dokumentai
+project_module_repository: Saugykla
+project_module_news: Žinios
+project_module_time_tracking: Laiko pėdsekys
+text_file_repository_writable: Į rinkmenu saugyklą galima saugoti (RW)
+text_default_administrator_account_changed: Administratoriaus numatyta paskyra pakeista
+text_rmagick_available: RMagick pasiekiamas (pasirinktinai)
+button_configure: Konfiguruoti
 label_plugins: Plugins
-label_ldap_authentication: LDAP authentication
-label_downloads_abbr: D/L
-label_this_month: this month
-label_last_n_days: last %d days
-label_all_time: all time
-label_this_year: this year
-label_date_range: Date range
-label_last_week: last week
-label_yesterday: yesterday
-label_last_month: last month
-label_add_another_file: Add another file
-label_optional_description: Optional description
-text_destroy_time_entries_question: %.02f hours were reported on the issues you are about to delete. What do you want to do ?
-error_issue_not_found_in_project: 'The issue was not found or does not belong to this project'
-text_assign_time_entries_to_project: Assign reported hours to the project
-text_destroy_time_entries: Delete reported hours
-text_reassign_time_entries: 'Reassign reported hours to this issue:'
-setting_activity_days_default: Days displayed on project activity
-label_chronological_order: In chronological order
-field_comments_sorting: Display comments
-label_reverse_chronological_order: In reverse chronological order
-label_preferences: Preferences
-setting_display_subprojects_issues: Display subprojects issues on main projects by default
-label_overall_activity: Overall activity
-setting_default_projects_public: New projects are public by default
-error_scm_annotate: "The entry does not exist or can not be annotated."
-label_planning: Planning
+label_ldap_authentication: LDAP autentifikacija
+label_downloads_abbr: siunt.
+label_this_month: šis menuo
+label_last_n_days: paskutinių %d dienų
+label_all_time: visas laikas
+label_this_year: šiemet
+label_date_range: Dienų diapazonas
+label_last_week: paskutinė savaitė
+label_yesterday: vakar
+label_last_month: paskutinis menuo
+label_add_another_file: Pridėti kitą bylą
+label_optional_description: Apibūdinimas (laisvai pasirenkamas)
+text_destroy_time_entries_question: Naikinamam darbui paskelbta %.02f valandų. Ką jūs noryte su jomis daryti?
+error_issue_not_found_in_project: 'Darbas nerastas arba nesurištas su šiuo projektu'
+text_assign_time_entries_to_project: Priskirti valandas prie projekto
+text_destroy_time_entries: Ištrinti paskelbtas valandas
+text_reassign_time_entries: 'Priskirti paskelbtas valandas šiam darbui:'
+setting_activity_days_default: Atvaizduojamos dienos projekto veikloje
+label_chronological_order: Chronologine tvarka
+field_comments_sorting: rodyti komentarus
+label_reverse_chronological_order: Atbuline chronologine tvarka
+label_preferences: Savybės
+setting_display_subprojects_issues: Pagal nutylėjimą rodyti subprojektų darbus pagrindiniame projekte
+label_overall_activity: Visa veikla
+setting_default_projects_public: Naujas projektas viešas pagal nutylėjimą
+error_scm_annotate: "Įrašas neegzituoja arba negalima jo atvaizduoti."
+label_planning: Planavimas
+text_subprojects_destroy_warning: 'Šis(ie) subprojektas(ai): %s taip pat bus ištrintas(i).'
+label_and_its_subprojects: %s projektas ir jo subprojektai
+
+mail_body_reminder: "%d darbas(ai), kurie yra jums priskirti, baigiasi po %d dienų(os):"
+mail_subject_reminder: "%d darbas(ai) po kelių dienų"
+text_user_wrote: '%s parašė:'
+label_duplicated_by: susiejo
+setting_enabled_scm: Įgalintas SCM
+text_enumeration_category_reassign_to: 'Priskirti juos šiai reikšmei:'
+text_enumeration_destroy_question: '%d objektai priskirti šiai reikšmei.'
+label_incoming_emails: Įeinantys laiškai
+label_generate_key: Generuoti raktą
+setting_mail_handler_api_enabled: Įgalinti WS įeinantiems laiškams
+setting_mail_handler_api_key: API raktas
+text_email_delivery_not_configured: "Email pristatymas nesukonfigūruotas , ir perspėjimai neaktyvus.\nSukonfigūruokyte savo SMTP serverį byloje config/email.yml ir perleiskyte programą kad pritaikyti pakeitymus."
+field_parent_title: Aukštesnio lygio puslapis
+label_issue_watchers: Stebetojai
+setting_commit_logs_encoding: Commit pranėšimų koduotė
+setting_sequential_project_identifiers: Generate sequential project identifiers
+button_quote: Cituoti
+notice_unable_delete_version: Neimanoma panaikinti versiją
+label_renamed: pervardintas
+label_copied: nukopijuotas
+setting_plain_text_mail: plain text only (no HTML)
+permission_view_files: View files
+permission_edit_issues: Edit issues
+permission_edit_own_time_entries: Edit own time logs
+permission_manage_public_queries: Manage public queries
+permission_add_issues: Add issues
+permission_log_time: Log spent time
+permission_view_changesets: View changesets
+permission_view_time_entries: View spent time
+permission_manage_versions: Manage versions
+permission_manage_wiki: Manage wiki
+permission_manage_categories: Manage issue categories
+permission_protect_wiki_pages: Protect wiki pages
+permission_comment_news: Comment news
+permission_delete_messages: Delete messages
+permission_select_project_modules: Select project modules
+permission_manage_documents: Manage documents
+permission_edit_wiki_pages: Edit wiki pages
+permission_add_issue_watchers: Add watchers
+permission_view_gantt: View gantt chart
+permission_move_issues: Move issues
+permission_manage_issue_relations: Manage issue relations
+permission_delete_wiki_pages: Delete wiki pages
+permission_manage_boards: Manage boards
+permission_delete_wiki_pages_attachments: Delete attachments
+permission_view_wiki_edits: View wiki history
+permission_add_messages: Post messages
+permission_view_messages: View messages
+permission_manage_files: Manage files
+permission_edit_issue_notes: Edit notes
+permission_manage_news: Manage news
+permission_view_calendar: View calendrier
+permission_manage_members: Manage members
+permission_edit_messages: Edit messages
+permission_delete_issues: Delete issues
+permission_view_issue_watchers: View watchers list
+permission_manage_repository: Manage repository
+permission_commit_access: Commit access
+permission_browse_repository: Browse repository
+permission_view_documents: View documents
+permission_edit_project: Edit project
+permission_add_issue_notes: Add notes
+permission_save_queries: Save queries
+permission_view_wiki_pages: View wiki
+permission_rename_wiki_pages: Rename wiki pages
+permission_edit_time_entries: Edit time logs
+permission_edit_own_issue_notes: Edit own notes
+setting_gravatar_enabled: Use Gravatar user icons
+label_example: Example
+text_repository_usernames_mapping: "Select ou update the Redmine user mapped to each username found in the repository log.\nUsers with the same Redmine and repository username or email are automatically mapped."
+permission_edit_own_messages: Edit own messages
+permission_delete_own_messages: Delete own messages
+label_user_activity: "%s's activity"
+label_updated_time_by: Updated by %s %s ago

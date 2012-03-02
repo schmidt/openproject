@@ -22,7 +22,6 @@ class Project < ActiveRecord::Base
   
   has_many :members, :include => :user, :conditions => "#{User.table_name}.status=#{User::STATUS_ACTIVE}"
   has_many :users, :through => :members
-  has_many :custom_values, :dependent => :delete_all, :as => :customized
   has_many :enabled_modules, :dependent => :delete_all
   has_and_belongs_to_many :trackers, :order => "#{Tracker.table_name}.position"
   has_many :issues, :dependent => :destroy, :order => "#{Issue.table_name}.created_on DESC", :include => [:status, :tracker]
@@ -33,12 +32,12 @@ class Project < ActiveRecord::Base
   has_many :documents, :dependent => :destroy
   has_many :news, :dependent => :delete_all, :include => :author
   has_many :issue_categories, :dependent => :delete_all, :order => "#{IssueCategory.table_name}.name"
-  has_many :boards, :order => "position ASC"
+  has_many :boards, :dependent => :destroy, :order => "position ASC"
   has_one :repository, :dependent => :destroy
   has_many :changesets, :through => :repository
   has_one :wiki, :dependent => :destroy
   # Custom field for the project issues
-  has_and_belongs_to_many :custom_fields, 
+  has_and_belongs_to_many :issue_custom_fields, 
                           :class_name => 'IssueCustomField',
                           :order => "#{CustomField.table_name}.position",
                           :join_table => "#{table_name_prefix}custom_fields_projects#{table_name_suffix}",
@@ -46,22 +45,25 @@ class Project < ActiveRecord::Base
                           
   acts_as_tree :order => "name", :counter_cache => true
 
-  acts_as_searchable :columns => ['name', 'description'], :project_key => 'id'
+  acts_as_customizable
+  acts_as_searchable :columns => ['name', 'description'], :project_key => 'id', :permission => nil
   acts_as_event :title => Proc.new {|o| "#{l(:label_project)}: #{o.name}"},
-                :url => Proc.new {|o| {:controller => 'projects', :action => 'show', :id => o.id}}
+                :url => Proc.new {|o| {:controller => 'projects', :action => 'show', :id => o.id}},
+                :author => nil
 
   attr_protected :status, :enabled_module_names
   
   validates_presence_of :name, :identifier
   validates_uniqueness_of :name, :identifier
-  validates_associated :custom_values, :on => :update
   validates_associated :repository, :wiki
   validates_length_of :name, :maximum => 30
-  validates_length_of :homepage, :maximum => 60
+  validates_length_of :homepage, :maximum => 255
   validates_length_of :identifier, :in => 3..20
   validates_format_of :identifier, :with => /^[a-z0-9\-]*$/
   
   before_destroy :delete_all_members
+
+  named_scope :has_module, lambda { |mod| { :conditions => ["#{Project.table_name}.id IN (SELECT em.project_id FROM #{EnabledModule.table_name} em WHERE em.name=?)", mod.to_s] } }
   
   def identifier=(identifier)
     super unless identifier_frozen?
@@ -73,14 +75,16 @@ class Project < ActiveRecord::Base
   
   def issues_with_subprojects(include_subprojects=false)
     conditions = nil
-    if include_subprojects && !active_children.empty?
-      ids = [id] + active_children.collect {|c| c.id}
-      conditions = ["#{Issue.table_name}.project_id IN (#{ids.join(',')})"]
+    if include_subprojects
+      ids = [id] + child_ids
+      conditions = ["#{Project.table_name}.id IN (#{ids.join(',')}) AND #{Project.visible_by}"]
     end
-    conditions ||= ["#{Issue.table_name}.project_id = ?", id]
+    conditions ||= ["#{Project.table_name}.id = ?", id]
     # Quick and dirty fix for Rails 2 compatibility
     Issue.send(:with_scope, :find => { :conditions => conditions }) do 
-      yield
+      Version.send(:with_scope, :find => { :conditions => conditions }) do
+        yield
+      end
     end 
   end
 
@@ -91,6 +95,7 @@ class Project < ActiveRecord::Base
   end	
 
   def self.visible_by(user=nil)
+    user ||= User.current
     if user && user.admin?
       return "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"
     elsif user && user.memberships.any?
@@ -103,6 +108,12 @@ class Project < ActiveRecord::Base
   def self.allowed_to_condition(user, permission, options={})
     statements = []
     base_statement = "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"
+    if perm = Redmine::AccessControl.permission(permission)
+      unless perm.project_module.nil?
+        # If the permission belongs to a project module, make sure the module is enabled
+        base_statement << " AND EXISTS (SELECT em.id FROM #{EnabledModule.table_name} em WHERE em.name='#{perm.project_module}' AND em.project_id=#{Project.table_name}.id)"
+      end
+    end
     if options[:project]
       project_statement = "#{Project.table_name}.id = #{options[:project].id}"
       project_statement << " OR #{Project.table_name}.parent_id = #{options[:project].id}" if options[:with_subprojects]
@@ -110,16 +121,18 @@ class Project < ActiveRecord::Base
     end
     if user.admin?
       # no restriction
-    elsif user.logged?
-      statements << "#{Project.table_name}.is_public = #{connection.quoted_true}" if Role.non_member.allowed_to?(permission)
-      allowed_project_ids = user.memberships.select {|m| m.role.allowed_to?(permission)}.collect {|m| m.project_id}
-      statements << "#{Project.table_name}.id IN (#{allowed_project_ids.join(',')})" if allowed_project_ids.any?
-    elsif Role.anonymous.allowed_to?(permission)
-      # anonymous user allowed on public project
-      statements << "#{Project.table_name}.is_public = #{connection.quoted_true}" 
     else
-      # anonymous user is not authorized
       statements << "1=0"
+      if user.logged?
+        statements << "#{Project.table_name}.is_public = #{connection.quoted_true}" if Role.non_member.allowed_to?(permission)
+        allowed_project_ids = user.memberships.select {|m| m.role.allowed_to?(permission)}.collect {|m| m.project_id}
+        statements << "#{Project.table_name}.id IN (#{allowed_project_ids.join(',')})" if allowed_project_ids.any?
+      elsif Role.anonymous.allowed_to?(permission)
+        # anonymous user allowed on public project
+        statements << "#{Project.table_name}.is_public = #{connection.quoted_true}" 
+      else
+        # anonymous user is not authorized
+      end
     end
     statements.empty? ? base_statement : "((#{base_statement}) AND (#{statements.join(' OR ')}))"
   end
@@ -141,7 +154,8 @@ class Project < ActiveRecord::Base
   end
  
   def to_param
-    identifier
+    # id is used for projects with a numeric identifier (compatibility)
+    @to_param ||= (identifier.to_s =~ %r{^\d*$} ? id : identifier)
   end
   
   def active?
@@ -191,12 +205,12 @@ class Project < ActiveRecord::Base
   
   # Returns an array of all custom fields enabled for project issues
   # (explictly associated custom fields and custom fields enabled for all projects)
-  def custom_fields_for_issues(tracker)
-    all_custom_fields.select {|c| tracker.custom_fields.include? c }
+  def all_issue_custom_fields
+    @all_issue_custom_fields ||= (IssueCustomField.for_all + issue_custom_fields).uniq.sort
   end
   
-  def all_custom_fields
-    @all_custom_fields ||= (IssueCustomField.for_all + custom_fields).uniq
+  def project
+    self
   end
   
   def <=>(project)
@@ -231,6 +245,12 @@ class Project < ActiveRecord::Base
     module_names.each do |name|
       enabled_modules << EnabledModule.new(:name => name.to_s)
     end
+  end
+  
+  # Returns an auto-generated project identifier based on the last identifier used
+  def self.next_identifier
+    p = Project.find(:first, :order => 'created_on DESC')
+    p.nil? ? nil : p.identifier.to_s.succ
   end
 
 protected

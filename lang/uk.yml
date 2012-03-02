@@ -48,6 +48,7 @@ general_text_no: 'Ні'
 general_text_yes: 'Так'
 general_lang_name: 'Ukrainian (Українська)'
 general_csv_separator: ','
+general_csv_decimal_separator: '.'
 general_csv_encoding: UTF-8
 general_pdf_encoding: UTF-8
 general_day_names: Понеділок,Вівторок,Середа,Четвер,П'ятниця,Субота,Неділя
@@ -367,7 +368,7 @@ label_sort_higher: Вгору
 label_sort_lower: Вниз
 label_sort_lowest: У кінець
 label_roadmap: Оперативний план
-label_roadmap_due_in: Строк
+label_roadmap_due_in: Строк %s
 label_roadmap_overdue: %s запізнення
 label_roadmap_no_issues: Немає питань для даної версії
 label_search: Пошук
@@ -619,3 +620,79 @@ label_overall_activity: Overall activity
 setting_default_projects_public: New projects are public by default
 error_scm_annotate: "The entry does not exist or can not be annotated."
 label_planning: Planning
+text_subprojects_destroy_warning: 'Its subproject(s): %s will be also deleted.'
+label_and_its_subprojects: %s and its subprojects
+mail_body_reminder: "%d issue(s) that are assigned to you are due in the next %d days:"
+mail_subject_reminder: "%d issue(s) due in the next days"
+text_user_wrote: '%s wrote:'
+label_duplicated_by: duplicated by
+setting_enabled_scm: Enabled SCM
+text_enumeration_category_reassign_to: 'Reassign them to this value:'
+text_enumeration_destroy_question: '%d objects are assigned to this value.'
+label_incoming_emails: Incoming emails
+label_generate_key: Generate a key
+setting_mail_handler_api_enabled: Enable WS for incoming emails
+setting_mail_handler_api_key: API key
+text_email_delivery_not_configured: "Email delivery is not configured, and notifications are disabled.\nConfigure your SMTP server in config/email.yml and restart the application to enable them."
+field_parent_title: Parent page
+label_issue_watchers: Watchers
+setting_commit_logs_encoding: Commit messages encoding
+button_quote: Quote
+setting_sequential_project_identifiers: Generate sequential project identifiers
+notice_unable_delete_version: Unable to delete version
+label_renamed: renamed
+label_copied: copied
+setting_plain_text_mail: plain text only (no HTML)
+permission_view_files: View files
+permission_edit_issues: Edit issues
+permission_edit_own_time_entries: Edit own time logs
+permission_manage_public_queries: Manage public queries
+permission_add_issues: Add issues
+permission_log_time: Log spent time
+permission_view_changesets: View changesets
+permission_view_time_entries: View spent time
+permission_manage_versions: Manage versions
+permission_manage_wiki: Manage wiki
+permission_manage_categories: Manage issue categories
+permission_protect_wiki_pages: Protect wiki pages
+permission_comment_news: Comment news
+permission_delete_messages: Delete messages
+permission_select_project_modules: Select project modules
+permission_manage_documents: Manage documents
+permission_edit_wiki_pages: Edit wiki pages
+permission_add_issue_watchers: Add watchers
+permission_view_gantt: View gantt chart
+permission_move_issues: Move issues
+permission_manage_issue_relations: Manage issue relations
+permission_delete_wiki_pages: Delete wiki pages
+permission_manage_boards: Manage boards
+permission_delete_wiki_pages_attachments: Delete attachments
+permission_view_wiki_edits: View wiki history
+permission_add_messages: Post messages
+permission_view_messages: View messages
+permission_manage_files: Manage files
+permission_edit_issue_notes: Edit notes
+permission_manage_news: Manage news
+permission_view_calendar: View calendrier
+permission_manage_members: Manage members
+permission_edit_messages: Edit messages
+permission_delete_issues: Delete issues
+permission_view_issue_watchers: View watchers list
+permission_manage_repository: Manage repository
+permission_commit_access: Commit access
+permission_browse_repository: Browse repository
+permission_view_documents: View documents
+permission_edit_project: Edit project
+permission_add_issue_notes: Add notes
+permission_save_queries: Save queries
+permission_view_wiki_pages: View wiki
+permission_rename_wiki_pages: Rename wiki pages
+permission_edit_time_entries: Edit time logs
+permission_edit_own_issue_notes: Edit own notes
+setting_gravatar_enabled: Use Gravatar user icons
+label_example: Example
+text_repository_usernames_mapping: "Select ou update the Redmine user mapped to each username found in the repository log.\nUsers with the same Redmine and repository username or email are automatically mapped."
+permission_edit_own_messages: Edit own messages
+permission_delete_own_messages: Delete own messages
+label_user_activity: "%s's activity"
+label_updated_time_by: Updated by %s %s ago
