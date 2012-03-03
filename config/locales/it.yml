@@ -1,6 +1,7 @@
 # Italian translations for Ruby on Rails 
 # by Claudio Poli (masterkain@gmail.com)
 # by Diego Pierotto (ita.translations@tiscali.it)
+# by Emidio Stani (emidiostani@gmail.com)
 
 it:
   direction: ltr
@@ -15,7 +16,10 @@ it:
     abbr_day_names: [Dom, Lun, Mar, Mer, Gio, Ven, Sab]
     month_names: [~, Gennaio, Febbraio, Marzo, Aprile, Maggio, Giugno, Luglio, Agosto, Settembre, Ottobre, Novembre, Dicembre]
     abbr_month_names: [~, Gen, Feb, Mar, Apr, Mag, Giu, Lug, Ago, Set, Ott, Nov, Dic]
-    order: [ :day, :month, :year ]
+    order:
+      - :day
+      - :month
+      - :year
   
   time:
     formats:
@@ -126,7 +130,7 @@ it:
         greater_than_start_date: "deve essere maggiore della data di partenza"
         not_same_project: "non appartiene allo stesso progetto"
         circular_dependency: "Questa relazione creerebbe una dipendenza circolare"
-        cant_link_an_issue_with_a_descendant: "An issue can not be linked to one of its subtasks"
+        cant_link_an_issue_with_a_descendant: "Una segnalazione non può essere collegata a una delle sue discendenti"
 
   actionview_instancetag_blank_option: Scegli
   
@@ -135,17 +139,17 @@ it:
   general_text_no: 'no'
   general_text_yes: 'sì'
   general_lang_name: 'Italiano'
-  general_csv_separator: ','
-  general_csv_decimal_separator: '.'
+  general_csv_separator: ';'
+  general_csv_decimal_separator: ','
   general_csv_encoding: ISO-8859-1
-  general_pdf_encoding: ISO-8859-1
+  general_pdf_encoding: UTF-8
   general_first_day_of_week: '1'
   
-  notice_account_updated: L'utente è stata aggiornato.
+  notice_account_updated: L'utente è stato aggiornato.
   notice_account_invalid_creditentials: Nome utente o password non validi.
   notice_account_password_updated: La password è stata aggiornata.
   notice_account_wrong_password: Password errata
-  notice_account_register_done: L'utente è stata creato.
+  notice_account_register_done: L'utente è stato creato.
   notice_account_unknown_email: Utente sconosciuto.
   notice_can_t_change_password: Questo utente utilizza un metodo di autenticazione esterno. Impossibile cambiare la password.
   notice_account_lost_email_sent: Ti è stata spedita una email con le istruzioni per cambiare la password.
@@ -233,7 +237,7 @@ it:
   field_attr_mail: Attributo email
   field_onthefly: Creazione utente "al volo"
   field_start_date: Inizio
-  field_done_ratio: % completato
+  field_done_ratio: "% completato"
   field_auth_source: Modalità di autenticazione
   field_hide_mail: Nascondi il mio indirizzo email
   field_comments: Commento
@@ -462,7 +466,7 @@ it:
   label_all_words: Tutte le parole
   label_wiki: Wiki
   label_wiki_edit: Modifica wiki
-  label_wiki_edit_plural: Modfiche wiki
+  label_wiki_edit_plural: Modifiche wiki
   label_wiki_page: Pagina Wiki
   label_wiki_page_plural: Pagine wiki
   label_index_by_title: Ordina per titolo
@@ -729,10 +733,9 @@ it:
   label_generate_key: Genera una chiave
   setting_mail_handler_api_enabled: Abilita WS per le email in arrivo
   setting_mail_handler_api_key: Chiave API
-  text_email_delivery_not_configured: "La consegna via email non è configurata e le notifiche sono disabilitate.\nConfigura il tuo server SMTP in config/email.yml e riavvia l'applicazione per abilitarle."
+  text_email_delivery_not_configured: "La consegna via email non è configurata e le notifiche sono disabilitate.\nConfigura il tuo server SMTP in config/configuration.yml e riavvia l'applicazione per abilitarle."
   field_parent_title: Pagina principale
   label_issue_watchers: Osservatori
-  setting_commit_logs_encoding: Codifica dei messaggi di commit
   button_quote: Quota
   setting_sequential_project_identifiers: Genera progetti con identificativi in sequenza
   notice_unable_delete_version: Impossibile eliminare la versione
@@ -913,26 +916,62 @@ it:
   text_zoom_in: Aumenta ingrandimento
   notice_unable_delete_time_entry: Impossibile eliminare il valore time log.
   label_overall_spent_time: Totale tempo impiegato
-  field_time_entries: Log time
+  field_time_entries: Tempo di collegamento
   project_module_gantt: Gantt
-  project_module_calendar: Calendar
-  button_edit_associated_wikipage: "Edit associated Wiki page: %{page_title}"
-  text_are_you_sure_with_children: Delete issue and all child issues?
-  field_text: Text field
-  label_user_mail_option_only_owner: Only for things I am the owner of
-  setting_default_notification_option: Default notification option
-  label_user_mail_option_only_my_events: Only for things I watch or I'm involved in
-  label_user_mail_option_only_assigned: Only for things I am assigned to
-  label_user_mail_option_none: No events
-  field_member_of_group: Assignee's group
-  field_assigned_to_role: Assignee's role
-  notice_not_authorized_archived_project: The project you're trying to access has been archived.
-  label_principal_search: "Search for user or group:"
-  label_user_search: "Search for user:"
-  field_visible: Visible
-  setting_emails_header: Emails header
-  setting_commit_logtime_activity_id: Activity for logged time
-  text_time_logged_by_changeset: Applied in changeset %{value}.
-  setting_commit_logtime_enabled: Enable time logging
-  notice_gantt_chart_truncated: The chart was truncated because it exceeds the maximum number of items that can be displayed (%{max})
-  setting_gantt_items_limit: Maximum number of items displayed on the gantt chart
+  project_module_calendar: Calendario
+  button_edit_associated_wikipage: "Modifica la pagina wiki associata: %{page_title}"
+  text_are_you_sure_with_children: Eliminare la segnalazione e tutte le discendenti?
+  field_text: Campo di testo
+  label_user_mail_option_only_owner: Solo se io sono il proprietario
+  setting_default_notification_option: Opzione di notifica predefinita
+  label_user_mail_option_only_my_events: Solo se sono un osservatore o sono coinvolto
+  label_user_mail_option_only_assigned: Solo quando mi assegnano attività
+  label_user_mail_option_none: Nessun evento
+  field_member_of_group: Gruppo dell'assegnatario
+  field_assigned_to_role: Ruolo dell'assegnatario
+  notice_not_authorized_archived_project: Il progetto a cui stai accedendo è stato archiviato.
+  label_principal_search: "Cerca utente o gruppo:"
+  label_user_search: "Cerca utente:"
+  field_visible: Visibile
+  setting_emails_header: Intestazione email
+  setting_commit_logtime_activity_id: Attività per il tempo di collegamento
+  text_time_logged_by_changeset: Usato nel changeset %{value}.
+  setting_commit_logtime_enabled: Abilita registrazione del tempo di collegamento
+  notice_gantt_chart_truncated: Il grafico è stato troncato perchè eccede il numero di oggetti (%{max}) da visualizzare
+  setting_gantt_items_limit: Massimo numero di oggetti da visualizzare sul diagramma di gantt
+  field_warn_on_leaving_unsaved: Warn me when leaving a page with unsaved text
+  text_warn_on_leaving_unsaved: The current page contains unsaved text that will be lost if you leave this page.
+  label_my_queries: My custom queries
+  text_journal_changed_no_detail: "%{label} updated"
+  label_news_comment_added: Comment added to a news
+  button_expand_all: Expand all
+  button_collapse_all: Collapse all
+  label_additional_workflow_transitions_for_assignee: Additional transitions allowed when the user is the assignee
+  label_additional_workflow_transitions_for_author: Additional transitions allowed when the user is the author
+  label_bulk_edit_selected_time_entries: Bulk edit selected time entries
+  text_time_entries_destroy_confirmation: Are you sure you want to delete the selected time entr(y/ies)?
+  label_role_anonymous: Anonymous
+  label_role_non_member: Non member
+  label_issue_note_added: Note added
+  label_issue_status_updated: Status updated
+  label_issue_priority_updated: Priority updated
+  label_issues_visibility_own: Issues created by or assigned to the user
+  field_issues_visibility: Issues visibility
+  label_issues_visibility_all: All issues
+  permission_set_own_issues_private: Set own issues public or private
+  field_is_private: Private
+  permission_set_issues_private: Set issues public or private
+  label_issues_visibility_public: All non private issues
+  text_issues_destroy_descendants_confirmation: This will also delete %{count} subtask(s).
+  field_commit_logs_encoding: Codifica dei messaggi di commit
+  field_scm_path_encoding: Path encoding
+  text_scm_path_encoding_note: "Default: UTF-8"
+  field_path_to_repository: Path to repository
+  field_root_directory: Root directory
+  field_cvs_module: Module
+  field_cvsroot: CVSROOT
+  text_git_repository_note: Bare and local repository (e.g. /gitrepo, c:\gitrepo)
+  text_mercurial_repository_note: Local repository (e.g. /hgrepo, c:\hgrepo)
+  text_scm_command: Command
+  text_scm_command_version: Version
+  label_git_report_last_commit: Report last commit for files and directories
