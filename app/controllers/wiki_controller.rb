@@ -18,12 +18,15 @@
 require 'diff'
 
 class WikiController < ApplicationController
+  default_search_scope :wiki_pages
   before_filter :find_wiki, :authorize
+  before_filter :find_existing_page, :only => [:rename, :protect, :history, :diff, :annotate, :add_attachment, :destroy]
   
-  verify :method => :post, :only => [:destroy, :destroy_attachment, :protect], :redirect_to => { :action => :index }
+  verify :method => :post, :only => [:destroy, :protect], :redirect_to => { :action => :index }
 
   helper :attachments
   include AttachmentsHelper   
+  helper :watchers
   
   # display a page (in editing mode if it doesn't exist)
   def index
@@ -44,11 +47,11 @@ class WikiController < ApplicationController
       return
     end
     @content = @page.content_for_version(params[:version])
-    if params[:export] == 'html'
+    if params[:format] == 'html'
       export = render_to_string :action => 'export', :layout => false
       send_data(export, :type => 'text/html', :filename => "#{@page.title}.html")
       return
-    elsif params[:export] == 'txt'
+    elsif params[:format] == 'txt'
       send_data(@content.text, :type => 'text/plain', :filename => "#{@page.title}.txt")
       return
     end
@@ -81,6 +84,7 @@ class WikiController < ApplicationController
       @content.author = User.current
       # if page is new @page.save will also save content, but not if page isn't a new record
       if (@page.new_record? ? @page.save : @content.save)
+        call_hook(:controller_wiki_edit_after_save, { :params => params, :page => @page})
         redirect_to :action => 'index', :id => @project, :page => @page.title
       end
     end
@@ -91,8 +95,7 @@ class WikiController < ApplicationController
   
   # rename a page
   def rename
-    @page = @wiki.find_page(params[:page])
-	return render_403 unless editable?
+    return render_403 unless editable?
     @page.redirect_existing_links = true
     # used to display the *original* title if some AR validation errors occur
     @original_title = @page.pretty_title
@@ -103,15 +106,12 @@ class WikiController < ApplicationController
   end
   
   def protect
-    page = @wiki.find_page(params[:page])
-    page.update_attribute :protected, params[:protected]
-    redirect_to :action => 'index', :id => @project, :page => page.title
+    @page.update_attribute :protected, params[:protected]
+    redirect_to :action => 'index', :id => @project, :page => @page.title
   end
 
   # show page history
   def history
-    @page = @wiki.find_page(params[:page])
-    
     @version_count = @page.content.versions.count
     @version_pages = Paginator.new self, @version_count, per_page_option, params['p']
     # don't load text    
@@ -125,21 +125,41 @@ class WikiController < ApplicationController
   end
   
   def diff
-    @page = @wiki.find_page(params[:page])
     @diff = @page.diff(params[:version], params[:version_from])
     render_404 unless @diff
   end
   
   def annotate
-    @page = @wiki.find_page(params[:page])
     @annotate = @page.annotate(params[:version])
+    render_404 unless @annotate
   end
   
-  # remove a wiki page and its history
+  # Removes a wiki page and its history
+  # Children can be either set as root pages, removed or reassigned to another parent page
   def destroy
-    @page = @wiki.find_page(params[:page])
-	return render_403 unless editable?
-    @page.destroy if @page
+    return render_403 unless editable?
+    
+    @descendants_count = @page.descendants.size
+    if @descendants_count > 0
+      case params[:todo]
+      when 'nullify'
+        # Nothing to do
+      when 'destroy'
+        # Removes all its descendants
+        @page.descendants.each(&:destroy)
+      when 'reassign'
+        # Reassign children to another parent page
+        reassign_to = @wiki.pages.find_by_id(params[:reassign_to_id].to_i)
+        return unless reassign_to
+        @page.children.each do |child|
+          child.update_attribute(:parent, reassign_to)
+        end
+      else
+        @reassignable_to = @wiki.pages - @page.self_and_descendants
+        return
+      end
+    end
+    @page.destroy
     redirect_to :action => 'special', :id => @project, :page => 'Page_index'
   end
 
@@ -163,7 +183,8 @@ class WikiController < ApplicationController
       return      
     else
       # requested special page doesn't exist, redirect to default page
-      redirect_to :action => 'index', :id => @project, :page => nil and return
+      redirect_to :action => 'index', :id => @project, :page => nil
+      return
     end
     render :action => "special_#{page_title}"
   end
@@ -181,16 +202,8 @@ class WikiController < ApplicationController
   end
 
   def add_attachment
-    @page = @wiki.find_page(params[:page])
     return render_403 unless editable?
     attach_files(@page, params[:attachments])
-    redirect_to :action => 'index', :page => @page.title
-  end
-
-  def destroy_attachment
-    @page = @wiki.find_page(params[:page])
-    return render_403 unless editable?
-    @page.attachments.find(params[:attachment_id]).destroy
     redirect_to :action => 'index', :page => @page.title
   end
 
@@ -202,6 +215,12 @@ private
     render_404 unless @wiki
   rescue ActiveRecord::RecordNotFound
     render_404
+  end
+  
+  # Finds the requested page and returns a 404 error if it doesn't exist
+  def find_existing_page
+    @page = @wiki.find_page(params[:page])
+    render_404 if @page.nil?
   end
   
   # Returns true if the current user is allowed to edit the page, otherwise false

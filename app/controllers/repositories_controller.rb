@@ -1,5 +1,5 @@
-# redMine - project management software
-# Copyright (C) 2006-2007  Jean-Philippe Lang
+# Redmine - project management software
+# Copyright (C) 2006-2009  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,6 +24,8 @@ class InvalidRevisionParam < Exception; end
 
 class RepositoriesController < ApplicationController
   menu_item :repository
+  default_search_scope :changesets
+  
   before_filter :find_repository, :except => :edit
   before_filter :find_project, :only => :edit
   before_filter :authorize
@@ -51,8 +53,9 @@ class RepositoriesController < ApplicationController
     @users += User.find_all_by_id(additional_user_ids) unless additional_user_ids.empty?
     @users.compact!
     @users.sort!
-    if request.post?
-      @repository.committer_ids = params[:committers]
+    if request.post? && params[:committers].is_a?(Hash)
+      # Build a hash with repository usernames as keys and corresponding user ids as values
+      @repository.committer_ids = params[:committers].values.inject({}) {|h, c| h[c.first] = c.last; h}
       flash[:notice] = l(:notice_successful_update)
       redirect_to :action => 'committers', :id => @project
     end
@@ -63,31 +66,26 @@ class RepositoriesController < ApplicationController
     redirect_to :controller => 'projects', :action => 'settings', :id => @project, :tab => 'repository'
   end
   
-  def show
-    # check if new revisions have been committed in the repository
-    @repository.fetch_changesets if Setting.autofetch_changesets?
-    # root entries
-    @entries = @repository.entries('', @rev)    
-    # latest changesets
-    @changesets = @repository.changesets.find(:all, :limit => 10, :order => "committed_on DESC")
-    show_error_not_found unless @entries || @changesets.any?
-  end
-  
-  def browse
+  def show 
+    @repository.fetch_changesets if Setting.autofetch_changesets? && @path.empty?
+
     @entries = @repository.entries(@path, @rev)
     if request.xhr?
       @entries ? render(:partial => 'dir_list_content') : render(:nothing => true)
     else
-      show_error_not_found and return unless @entries
+      (show_error_not_found; return) unless @entries
+      @changesets = @repository.latest_changesets(@path, @rev)
       @properties = @repository.properties(@path, @rev)
-      render :action => 'browse'
+      render :action => 'show'
     end
   end
+
+  alias_method :browse, :show
   
   def changes
     @entry = @repository.entry(@path, @rev)
-    show_error_not_found and return unless @entry
-    @changesets = @repository.changesets_for_path(@path)
+    (show_error_not_found; return) unless @entry
+    @changesets = @repository.latest_changesets(@path, @rev, Setting.repository_log_display_limit.to_i)
     @properties = @repository.properties(@path, @rev)
   end
   
@@ -99,7 +97,7 @@ class RepositoriesController < ApplicationController
     @changesets = @repository.changesets.find(:all,
 						:limit  =>  @changeset_pages.items_per_page,
 						:offset =>  @changeset_pages.current.offset,
-            :include => :user)
+            :include => [:user, :repository])
 
     respond_to do |format|
       format.html { render :layout => false if request.xhr? }
@@ -109,15 +107,15 @@ class RepositoriesController < ApplicationController
   
   def entry
     @entry = @repository.entry(@path, @rev)
-    show_error_not_found and return unless @entry
-    
+    (show_error_not_found; return) unless @entry
+
     # If the entry is a dir, show the browser
-    browse and return if @entry.is_dir?
-    
+    (show; return) if @entry.is_dir?
+
     @content = @repository.cat(@path, @rev)
-    show_error_not_found and return unless @content
-    if 'raw' == params[:format] || @content.is_binary_data?
-      # Force the download if it's a binary file
+    (show_error_not_found; return) unless @content
+    if 'raw' == params[:format] || @content.is_binary_data? || (@entry.size && @entry.size > Setting.file_max_size_displayed.to_i.kilobyte)
+      # Force the download
       send_data @content, :filename => @path.split('/').last
     else
       # Prevent empty lines when displaying a file with Windows style eol
@@ -126,12 +124,15 @@ class RepositoriesController < ApplicationController
   end
   
   def annotate
+    @entry = @repository.entry(@path, @rev)
+    (show_error_not_found; return) unless @entry
+    
     @annotate = @repository.scm.annotate(@path, @rev)
-    render_error l(:error_scm_annotate) and return if @annotate.nil? || @annotate.empty?
+    (render_error l(:error_scm_annotate); return) if @annotate.nil? || @annotate.empty?
   end
   
   def revision
-    @changeset = @repository.changesets.find_by_revision(@rev)
+    @changeset = @repository.find_changeset_by_name(@rev)
     raise ChangesetNotFound unless @changeset
 
     respond_to do |format|
@@ -145,7 +146,7 @@ class RepositoriesController < ApplicationController
   def diff
     if params[:format] == 'diff'
       @diff = @repository.diff(@path, @rev, @rev_to)
-      show_error_not_found and return unless @diff
+      (show_error_not_found; return) unless @diff
       filename = "changeset_r#{@rev}"
       filename << "_r#{@rev_to}" if @rev_to
       send_data @diff.join, :filename => "#{filename}.diff",
@@ -195,17 +196,14 @@ private
     render_404
   end
   
-  REV_PARAM_RE = %r{^[a-f0-9]*$}
-  
   def find_repository
     @project = Project.find(params[:id])
     @repository = @project.repository
-    render_404 and return false unless @repository
+    (render_404; return false) unless @repository
     @path = params[:path].join('/') unless params[:path].nil?
     @path ||= ''
-    @rev = params[:rev]
+    @rev = params[:rev].blank? ? @repository.default_branch : params[:rev].strip
     @rev_to = params[:rev_to]
-    raise InvalidRevisionParam unless @rev.to_s.match(REV_PARAM_RE) && @rev.to_s.match(REV_PARAM_RE)
   rescue ActiveRecord::RecordNotFound
     render_404
   rescue InvalidRevisionParam
@@ -234,8 +232,7 @@ private
     changes_by_day.each {|c| changes_by_month[c.first.to_date.months_ago] += c.last }
    
     fields = []
-    month_names = l(:actionview_datehelper_select_month_names_abbr).split(',')
-    12.times {|m| fields << month_names[((Date.today.month - 1 - m) % 12)]}
+    12.times {|m| fields << month_name(((Date.today.month - 1 - m) % 12) + 1)}
   
     graph = SVG::Graph::Bar.new(
       :height => 300,
@@ -264,7 +261,7 @@ private
 
   def graph_commits_per_author(repository)
     commits_by_author = repository.changesets.count(:all, :group => :committer)
-    commits_by_author.sort! {|x, y| x.last <=> y.last}
+    commits_by_author.to_a.sort! {|x, y| x.last <=> y.last}
 
     changes_by_author = repository.changes.count(:all, :group => :committer)
     h = changes_by_author.inject({}) {|o, i| o[i.first] = i.last; o}

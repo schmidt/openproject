@@ -121,7 +121,7 @@ module RepositoriesHelper
   
   def repository_field_tags(form, repository)    
     method = repository.class.name.demodulize.underscore + "_field_tags"
-    send(method, form, repository) if repository.is_a?(Repository) && respond_to?(method)
+    send(method, form, repository) if repository.is_a?(Repository) && respond_to?(method) && method != 'repository_field_tags'
   end
   
   def scm_select_tag(repository)
@@ -147,7 +147,7 @@ module RepositoriesHelper
 
   def subversion_field_tags(form, repository)
       content_tag('p', form.text_field(:url, :size => 60, :required => true, :disabled => (repository && !repository.root_url.blank?)) +
-                       '<br />(http://, https://, svn://, file:///)') +
+                       '<br />(file:///, http://, https://, svn://, svn+[tunnelscheme]://)') +
       content_tag('p', form.text_field(:login, :size => 30)) +
       content_tag('p', form.password_field(:password, :size => 30, :name => 'ignore',
                                            :value => ((repository.new_record? || repository.password.blank?) ? '' : ('x'*15)),

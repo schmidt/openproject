@@ -17,7 +17,7 @@
 
 require File.dirname(__FILE__) + '/../test_helper'
 
-class RepositoryDarcsTest < Test::Unit::TestCase
+class RepositoryDarcsTest < ActiveSupport::TestCase
   fixtures :projects
   
   # No '..' in the repository path
@@ -47,6 +47,12 @@ class RepositoryDarcsTest < Test::Unit::TestCase
       
       @repository.fetch_changesets
       assert_equal 6, @repository.changesets.count
+    end
+    
+    def test_deleted_files_should_not_be_listed
+      entries = @repository.entries('sources')
+      assert entries.detect {|e| e.name == 'watchers_controller.rb'}
+      assert_nil entries.detect {|e| e.name == 'welcome_controller.rb'}
     end
     
     def test_cat

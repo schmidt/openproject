@@ -22,6 +22,7 @@ class JournalsController < ApplicationController
     if request.post?
       @journal.update_attributes(:notes => params[:notes]) if params[:notes]
       @journal.destroy if @journal.details.empty? && @journal.notes.blank?
+      call_hook(:controller_journals_edit_post, { :journal => @journal, :params => params})
       respond_to do |format|
         format.html { redirect_to :controller => 'issues', :action => 'show', :id => @journal.journalized_id }
         format.js { render :action => 'update' }
@@ -32,7 +33,7 @@ class JournalsController < ApplicationController
 private
   def find_journal
     @journal = Journal.find(params[:id])
-    render_403 and return false unless @journal.editable_by?(User.current)
+    (render_403; return false) unless @journal.editable_by?(User.current)
     @project = @journal.journalized.project
   rescue ActiveRecord::RecordNotFound
     render_404

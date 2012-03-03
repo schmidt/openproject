@@ -46,7 +46,7 @@ class TimelogController < ApplicationController
                                           :klass => Tracker,
                                           :label => :label_tracker},
                              'activity' => {:sql => "#{TimeEntry.table_name}.activity_id",
-                                           :klass => Enumeration,
+                                           :klass => TimeEntryActivity,
                                            :label => :label_activity},
                              'issue' => {:sql => "#{TimeEntry.table_name}.issue_id",
                                          :klass => Issue,
@@ -67,7 +67,14 @@ class TimelogController < ApplicationController
                                              :format => cf.field_format,
                                              :label => cf.name}
     end
-    
+
+    # Add list and boolean time entry activity custom fields
+    TimeEntryActivityCustomField.find(:all).select {|cf| %w(list bool).include? cf.field_format }.each do |cf|
+      @available_criterias["cf_#{cf.id}"] = {:sql => "(SELECT c.value FROM #{CustomValue.table_name} c WHERE c.custom_field_id = #{cf.id} AND c.customized_type = 'Enumeration' AND c.customized_id = #{TimeEntry.table_name}.activity_id)",
+                                             :format => cf.field_format,
+                                             :label => cf.name}
+    end
+
     @criterias = params[:criterias] || []
     @criterias = @criterias.select{|criteria| @available_criterias.has_key? criteria}
     @criterias.uniq!
@@ -80,15 +87,23 @@ class TimelogController < ApplicationController
     unless @criterias.empty?
       sql_select = @criterias.collect{|criteria| @available_criterias[criteria][:sql] + " AS " + criteria}.join(', ')
       sql_group_by = @criterias.collect{|criteria| @available_criterias[criteria][:sql]}.join(', ')
+      sql_condition = ''
       
+      if @project.nil?
+        sql_condition = Project.allowed_to_condition(User.current, :view_time_entries)
+      elsif @issue.nil?
+        sql_condition = @project.project_condition(Setting.display_subprojects_issues?)
+      else
+        sql_condition = "#{TimeEntry.table_name}.issue_id = #{@issue.id}"
+      end
+
       sql = "SELECT #{sql_select}, tyear, tmonth, tweek, spent_on, SUM(hours) AS hours"
       sql << " FROM #{TimeEntry.table_name}"
       sql << " LEFT JOIN #{Issue.table_name} ON #{TimeEntry.table_name}.issue_id = #{Issue.table_name}.id"
       sql << " LEFT JOIN #{Project.table_name} ON #{TimeEntry.table_name}.project_id = #{Project.table_name}.id"
       sql << " WHERE"
-      sql << " (%s) AND" % @project.project_condition(Setting.display_subprojects_issues?) if @project
-      sql << " (%s) AND" % Project.allowed_to_condition(User.current, :view_time_entries)
-      sql << " (spent_on BETWEEN '%s' AND '%s')" % [ActiveRecord::Base.connection.quoted_date(@from.to_time), ActiveRecord::Base.connection.quoted_date(@to.to_time)]
+      sql << " (%s) AND" % sql_condition
+      sql << " (spent_on BETWEEN '%s' AND '%s')" % [ActiveRecord::Base.connection.quoted_date(@from), ActiveRecord::Base.connection.quoted_date(@to)]
       sql << " GROUP BY #{sql_group_by}, tyear, tmonth, tweek, spent_on"
       
       @hours = ActiveRecord::Base.connection.select_all(sql)
@@ -132,13 +147,18 @@ class TimelogController < ApplicationController
     
     respond_to do |format|
       format.html { render :layout => !request.xhr? }
-      format.csv  { send_data(report_to_csv(@criterias, @periods, @hours).read, :type => 'text/csv; header=present', :filename => 'timelog.csv') }
+      format.csv  { send_data(report_to_csv(@criterias, @periods, @hours), :type => 'text/csv; header=present', :filename => 'timelog.csv') }
     end
   end
   
   def details
     sort_init 'spent_on', 'desc'
-    sort_update
+    sort_update 'spent_on' => 'spent_on',
+                'user' => 'user_id',
+                'activity' => 'activity_id',
+                'project' => "#{Project.table_name}.name",
+                'issue' => 'issue_id',
+                'hours' => 'hours'
     
     cond = ARCondition.new
     if @project.nil?
@@ -182,16 +202,19 @@ class TimelogController < ApplicationController
                                     :include => [:project, :activity, :user, {:issue => [:tracker, :assigned_to, :priority]}],
                                     :conditions => cond.conditions,
                                     :order => sort_clause)
-          send_data(entries_to_csv(@entries).read, :type => 'text/csv; header=present', :filename => 'timelog.csv')
+          send_data(entries_to_csv(@entries), :type => 'text/csv; header=present', :filename => 'timelog.csv')
         }
       end
     end
   end
   
   def edit
-    render_403 and return if @time_entry && !@time_entry.editable_by?(User.current)
-    @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => Date.today)
+    (render_403; return) if @time_entry && !@time_entry.editable_by?(User.current)
+    @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => User.current.today)
     @time_entry.attributes = params[:time_entry]
+    
+    call_hook(:controller_timelog_edit_before_save, { :params => params, :time_entry => @time_entry })
+    
     if request.post? and @time_entry.save
       flash[:notice] = l(:notice_successful_update)
       redirect_back_or_default :action => 'details', :project_id => @time_entry.project
@@ -200,8 +223,8 @@ class TimelogController < ApplicationController
   end
   
   def destroy
-    render_404 and return unless @time_entry
-    render_403 and return unless @time_entry.editable_by?(User.current)
+    (render_404; return) unless @time_entry
+    (render_403; return) unless @time_entry.editable_by?(User.current)
     @time_entry.destroy
     flash[:notice] = l(:notice_successful_delete)
     redirect_to :back

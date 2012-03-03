@@ -17,7 +17,7 @@
 
 require File.dirname(__FILE__) + '/../test_helper'
 require 'pp'
-class RepositoryCvsTest < Test::Unit::TestCase
+class RepositoryCvsTest < ActiveSupport::TestCase
   fixtures :projects
   
   # No '..' in the repository path
@@ -52,6 +52,12 @@ class RepositoryCvsTest < Test::Unit::TestCase
       
       @repository.fetch_changesets
       assert_equal 5, @repository.changesets.count
+    end
+    
+    def test_deleted_files_should_not_be_listed
+      entries = @repository.entries('sources')
+      assert entries.detect {|e| e.name == 'watchers_controller.rb'}
+      assert_nil entries.detect {|e| e.name == 'welcome_controller.rb'}
     end
   else
     puts "CVS test repository NOT FOUND. Skipping unit tests !!!"

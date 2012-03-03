@@ -270,7 +270,7 @@ class RedCloth3 < String
         
         @urlrefs = {}
         @shelf = []
-        textile_rules = [:refs_textile, :block_textile_table, :block_textile_lists,
+        textile_rules = [:block_textile_table, :block_textile_lists,
                          :block_textile_prefix, :inline_textile_image, :inline_textile_link,
                          :inline_textile_code, :inline_textile_span, :glyphs_textile]
         markdown_rules = [:refs_markdown, :block_markdown_setext, :block_markdown_atx, :block_markdown_rule,
@@ -382,14 +382,14 @@ class RedCloth3 < String
                 (#{rcq})
                 (#{C})
                 (?::(\S+?))?
-                ([^\s\-].*?[^\s\-]|\w)
+                (\w|[^\s\-].*?[^\s\-])
                 #{rcq}
                 (?=[[:punct:]]|\s|\)|$)/x
             else
                 /(#{rcq})
                 (#{C})
                 (?::(\S+))?
-                ([^\s\-].*?[^\s\-]|\w)
+                (\w|[^\s\-].*?[^\s\-])
                 #{rcq}/xm 
             end
         [rc, ht, re, rtype]
@@ -408,7 +408,7 @@ class RedCloth3 < String
     #   [ /"(?=[#{PUNCT_Q}]*[\s#{PUNCT_NOQ}])/, '&#8221;' ], # double closing
     #   [ /"/, '&#8220;' ], # double opening
     #   [ /\b( )?\.{3}/, '\1&#8230;' ], # ellipsis
-        [ /\b([A-Z][A-Z0-9]{2,})\b(?:[(]([^)]*)[)])/, '<acronym title="\2">\1</acronym>' ], # 3+ uppercase acronym
+    #   [ /\b([A-Z][A-Z0-9]{2,})\b(?:[(]([^)]*)[)])/, '<acronym title="\2">\1</acronym>' ], # 3+ uppercase acronym
     #   [ /(^|[^"][>\s])([A-Z][A-Z0-9 ]+[A-Z0-9])([^<A-Za-z0-9]|$)/, '\1<span class="caps">\2</span>\3', :no_span_caps ], # 3+ uppercase caps
     #   [ /(\.\s)?\s?--\s?/, '\1&#8212;' ], # em dash
     #   [ /\s->\s/, ' &rarr; ' ], # right arrow
@@ -435,19 +435,25 @@ class RedCloth3 < String
     #
     # Flexible HTML escaping
     #
-    def htmlesc( str, mode )
+    def htmlesc( str, mode=:Quotes )
+      if str
         str.gsub!( '&', '&amp;' )
         str.gsub!( '"', '&quot;' ) if mode != :NoQuotes
         str.gsub!( "'", '&#039;' ) if mode == :Quotes
         str.gsub!( '<', '&lt;')
         str.gsub!( '>', '&gt;')
+      end
+      str
     end
 
     # Search and replace for Textile glyphs (quotes, dashes, other symbols)
     def pgl( text )
-        GLYPHS.each do |re, resub, tog|
-            next if tog and method( tog ).call
-            text.gsub! re, resub
+        #GLYPHS.each do |re, resub, tog|
+        #    next if tog and method( tog ).call
+        #    text.gsub! re, resub
+        #end
+        text.gsub!(/\b([A-Z][A-Z0-9]{2,})\b(?:[(]([^)]*)[)])/) do |m|
+          "<acronym title=\"#{htmlesc $2}\">#{$1}</acronym>"
         end
     end
 
@@ -464,8 +470,7 @@ class RedCloth3 < String
             style << "vertical-align:#{ v_align( $& ) };" if text =~ A_VLGN
         end
 
-        style << "#{ $1 };" if not filter_styles and
-            text.sub!( /\{([^}]*)\}/, '' )
+        style << "#{ htmlesc $1 };" if text.sub!( /\{([^}]*)\}/, '' ) && !filter_styles
 
         lang = $1 if
             text.sub!( /\[([^)]+?)\]/, '' )
@@ -572,7 +577,7 @@ class RedCloth3 < String
         end
     end
     
-    QUOTES_RE = /(^>+([^\n]*?)\n?)+/m
+    QUOTES_RE = /(^>+([^\n]*?)(\n|$))+/m
     QUOTES_CONTENT_RE = /^([> ]+)(.*)$/m
     
     def block_textile_quotes( text )
@@ -779,6 +784,7 @@ class RedCloth3 < String
     end
 
     LINK_RE = /
+            (
             ([\s\[{(]|[#{PUNCT}])?     # $pre
             "                          # start
             (#{C})                     # $atts
@@ -786,16 +792,22 @@ class RedCloth3 < String
             \s?
             (?:\(([^)]+?)\)(?="))?     # $title
             ":
-            ([\w\/]\S+?)               # $url
+            (                          # $url
+            (\/|[a-zA-Z]+:\/\/|www\.|mailto:)  # $proto
+            [\w\/]\S+?
+            )               
             (\/)?                      # $slash
             ([^\w\=\/;\(\)]*?)         # $post
+            )
             (?=<|\s|$)
         /x 
 #"
     def inline_textile_link( text ) 
         text.gsub!( LINK_RE ) do |m|
-            pre,atts,text,title,url,slash,post = $~[1..7]
-
+          all,pre,atts,text,title,url,proto,slash,post = $~[1..9]
+          if text.include?('<br />')
+            all
+          else
             url, url_title = check_refs( url )
             title ||= url_title
             
@@ -807,12 +819,13 @@ class RedCloth3 < String
             end
             atts = pba( atts )
             atts = " href=\"#{ url }#{ slash }\"#{ atts }"
-            atts << " title=\"#{ title }\"" if title
+            atts << " title=\"#{ htmlesc title }\"" if title
             atts = shelve( atts ) if atts
             
             external = (url =~ /^https?:\/\//) ? ' class="external"' : ''
             
             "#{ pre }<a#{ atts }#{ external }>#{ text }</a>#{ post }"
+          end
         end
     end
 
@@ -899,7 +912,7 @@ class RedCloth3 < String
     end
 
     IMAGE_RE = /
-            (<p>|.|^)            # start of line?
+            (>|\s|^)           # start of line?
             \!                   # opening
             (\<|\=|\>)?          # optional alignment atts
             (#{C})               # optional style,class atts
@@ -914,6 +927,7 @@ class RedCloth3 < String
     def inline_textile_image( text ) 
         text.gsub!( IMAGE_RE )  do |m|
             stln,algn,atts,url,title,href,href_a1,href_a2 = $~[1..8]
+            htmlesc title
             atts = pba( atts )
             atts = " src=\"#{ url }\"#{ atts }"
             atts << " title=\"#{ title }\"" if title
@@ -1002,7 +1016,7 @@ class RedCloth3 < String
     end
     
     OFFTAGS = /(code|pre|kbd|notextile)/
-    OFFTAG_MATCH = /(?:(<\/#{ OFFTAGS }>)|(<#{ OFFTAGS }[^>]*>))(.*?)(?=<\/?#{ OFFTAGS }|\Z)/mi
+    OFFTAG_MATCH = /(?:(<\/#{ OFFTAGS }>)|(<#{ OFFTAGS }[^>]*>))(.*?)(?=<\/?#{ OFFTAGS }\W|\Z)/mi
     OFFTAG_OPEN = /<#{ OFFTAGS }/
     OFFTAG_CLOSE = /<\/?#{ OFFTAGS }/
     HASTAG_MATCH = /(<\/?\w[^\n]*?>)/m

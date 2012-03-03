@@ -1,4 +1,4 @@
-# redMine - project management software
+# Redmine - project management software
 # Copyright (C) 2006-2008  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
@@ -21,6 +21,15 @@ namespace :redmine do
     desc <<-END_DESC
 Read an email from standard input.
 
+General options:
+  unknown_user=ACTION      how to handle emails from an unknown user
+                           ACTION can be one of the following values:
+                           ignore: email is ignored (default)
+                           accept: accept as anonymous user
+                           create: create a user account
+  no_permission_check=1    disable permission checking when receiving
+                           the email
+  
 Issue attributes control options:
   project=PROJECT          identifier of the target project
   status=STATUS            name of the target status
@@ -47,6 +56,8 @@ END_DESC
       options = { :issue => {} }
       %w(project status tracker category priority).each { |a| options[:issue][a.to_sym] = ENV[a] if ENV[a] }
       options[:allow_override] = ENV['allow_override'] if ENV['allow_override']
+      options[:unknown_user] = ENV['unknown_user'] if ENV['unknown_user']
+      options[:no_permission_check] = ENV['no_permission_check'] if ENV['no_permission_check']
       
       MailHandler.receive(STDIN.read, options)
     end
@@ -54,6 +65,15 @@ END_DESC
     desc <<-END_DESC
 Read emails from an IMAP server.
 
+General options:
+  unknown_user=ACTION      how to handle emails from an unknown user
+                           ACTION can be one of the following values:
+                           ignore: email is ignored (default)
+                           accept: accept as anonymous user
+                           create: create a user account
+  no_permission_check=1    disable permission checking when receiving
+                           the email
+  
 Available IMAP options:
   host=HOST                IMAP server host (default: 127.0.0.1)
   port=PORT                IMAP server port (default: 143)
@@ -61,7 +81,7 @@ Available IMAP options:
   username=USERNAME        IMAP account
   password=PASSWORD        IMAP password
   folder=FOLDER            IMAP folder to read (default: INBOX)
-
+  
 Issue attributes control options:
   project=PROJECT          identifier of the target project
   status=STATUS            name of the target status
@@ -71,6 +91,11 @@ Issue attributes control options:
   allow_override=ATTRS     allow email content to override attributes
                            specified by previous options
                            ATTRS is a comma separated list of attributes
+                           
+Processed emails control options:
+  move_on_success=MAILBOX  move emails that were successfully received
+                           to MAILBOX instead of deleting them
+  move_on_failure=MAILBOX  move emails that were ignored to MAILBOX
   
 Examples:
   # No project specified. Emails MUST contain the 'Project' keyword:
@@ -95,11 +120,15 @@ END_DESC
                       :ssl => ENV['ssl'],
                       :username => ENV['username'],
                       :password => ENV['password'],
-                      :folder => ENV['folder']}
+                      :folder => ENV['folder'],
+                      :move_on_success => ENV['move_on_success'],
+                      :move_on_failure => ENV['move_on_failure']}
                       
       options = { :issue => {} }
       %w(project status tracker category priority).each { |a| options[:issue][a.to_sym] = ENV[a] if ENV[a] }
       options[:allow_override] = ENV['allow_override'] if ENV['allow_override']
+      options[:unknown_user] = ENV['unknown_user'] if ENV['unknown_user']
+      options[:no_permission_check] = ENV['no_permission_check'] if ENV['no_permission_check']
 
       Redmine::IMAP.check(imap_options, options)
     end

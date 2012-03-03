@@ -17,13 +17,14 @@
 
 require File.dirname(__FILE__) + '/../test_helper'
 
-class TimeEntryTest < Test::Unit::TestCase
+class TimeEntryTest < ActiveSupport::TestCase
   fixtures :issues, :projects, :users, :time_entries
 
   def test_hours_format
     assertions = { "2"      => 2.0,
                    "21.1"   => 21.1,
                    "2,1"    => 2.1,
+                   "1,5h"   => 1.5,
                    "7:12"   => 7.2,
                    "10h"    => 10.0,
                    "10 h"   => 10.0,
@@ -40,7 +41,11 @@ class TimeEntryTest < Test::Unit::TestCase
     
     assertions.each do |k, v|
       t = TimeEntry.new(:hours => k)
-      assert_equal v, t.hours
+      assert_equal v, t.hours, "Converting #{k} failed:"
     end
+  end
+  
+  def test_hours_should_default_to_nil
+    assert_nil TimeEntry.new.hours
   end
 end

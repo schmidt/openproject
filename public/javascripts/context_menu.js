@@ -8,7 +8,7 @@ ContextMenu.prototype = {
 	initialize: function (url) {
 	this.url = url;
 
-	// prevent selection when using Ctrl/Shit key
+	// prevent text selection in the issue list
 	var tables = $$('table.issues');
 	for (i=0; i<tables.length; i++) {
 		tables[i].onselectstart = function () { return false; } // ie
@@ -48,7 +48,7 @@ ContextMenu.prototype = {
     if (window.opera && e.altKey) {	return; }
     if (Event.isLeftClick(e) || (navigator.appVersion.match(/\bMSIE\b/))) {      
       var tr = Event.findElement(e, 'tr');
-      if (tr!=document && tr.hasClassName('hascontextmenu')) {
+      if (tr!=null && tr!=document && tr.hasClassName('hascontextmenu')) {
         // a row was clicked, check if the click was on checkbox
         var box = Event.findElement(e, 'input');
         if (box!=document && box!=undefined) {

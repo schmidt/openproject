@@ -17,7 +17,7 @@
 
 require File.dirname(__FILE__) + '/../test_helper'
 
-class RepositoryTest < Test::Unit::TestCase
+class RepositoryTest < ActiveSupport::TestCase
   fixtures :projects,
            :trackers,
            :projects_trackers,
@@ -60,7 +60,7 @@ class RepositoryTest < Test::Unit::TestCase
     Setting.enabled_scm = ['Darcs', 'Git']
     repository = Repository::Subversion.new(:project => Project.find(3), :url => "svn://localhost")
     assert !repository.save
-    assert_equal :activerecord_error_invalid, repository.errors.on(:type)
+    assert_equal I18n.translate('activerecord.errors.messages.invalid'), repository.errors.on(:type)
     # re-enable Subversion for following tests
     Setting.delete_all
   end

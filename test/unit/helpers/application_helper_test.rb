@@ -1,5 +1,5 @@
-# redMine - project management software
-# Copyright (C) 2006-2007  Jean-Philippe Lang
+# Redmine - project management software
+# Copyright (C) 2006-2009  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,6 +20,8 @@ require File.dirname(__FILE__) + '/../../test_helper'
 class ApplicationHelperTest < HelperTestCase
   include ApplicationHelper
   include ActionView::Helpers::TextHelper
+  include ActionView::Helpers::DateHelper
+  
   fixtures :projects, :roles, :enabled_modules, :users,
                       :repositories, :changesets, 
                       :trackers, :issue_statuses, :issues, :versions, :documents,
@@ -55,6 +57,8 @@ class ApplicationHelperTest < HelperTestCase
       'ftp://foo.bar' => '<a class="external" href="ftp://foo.bar">ftp://foo.bar</a>',
       'ftps://foo.bar' => '<a class="external" href="ftps://foo.bar">ftps://foo.bar</a>',
       'sftp://foo.bar' => '<a class="external" href="sftp://foo.bar">sftp://foo.bar</a>',
+      # two exclamation marks
+      'http://example.net/path!602815048C7B5C20!302.html' => '<a class="external" href="http://example.net/path!602815048C7B5C20!302.html">http://example.net/path!602815048C7B5C20!302.html</a>',
     }
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
   end
@@ -69,15 +73,44 @@ class ApplicationHelperTest < HelperTestCase
       '!http://foo.bar/image.jpg!' => '<img src="http://foo.bar/image.jpg" alt="" />',
       'floating !>http://foo.bar/image.jpg!' => 'floating <div style="float:right"><img src="http://foo.bar/image.jpg" alt="" /></div>',
       'with class !(some-class)http://foo.bar/image.jpg!' => 'with class <img src="http://foo.bar/image.jpg" class="some-class" alt="" />',
-      'with style !{width:100px;height100px}http://foo.bar/image.jpg!' => 'with style <img src="http://foo.bar/image.jpg" style="width:100px;height100px;" alt="" />',
+      # inline styles should be stripped
+      'with style !{width:100px;height100px}http://foo.bar/image.jpg!' => 'with style <img src="http://foo.bar/image.jpg" alt="" />',
+      'with title !http://foo.bar/image.jpg(This is a title)!' => 'with title <img src="http://foo.bar/image.jpg" title="This is a title" alt="This is a title" />',
+      'with title !http://foo.bar/image.jpg(This is a double-quoted "title")!' => 'with title <img src="http://foo.bar/image.jpg" title="This is a double-quoted &quot;title&quot;" alt="This is a double-quoted &quot;title&quot;" />',
     }
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
+  end
+  
+  def test_inline_images_inside_tags
+    raw = <<-RAW
+h1. !foo.png! Heading
+
+Centered image:
+
+p=. !bar.gif!
+RAW
+
+    assert textilizable(raw).include?('<img src="foo.png" alt="" />')
+    assert textilizable(raw).include?('<img src="bar.gif" alt="" />')
+  end
+  
+  def test_acronyms
+    to_test = {
+      'this is an acronym: GPL(General Public License)' => 'this is an acronym: <acronym title="General Public License">GPL</acronym>',
+      'GPL(This is a double-quoted "title")' => '<acronym title="This is a double-quoted &quot;title&quot;">GPL</acronym>',
+    }
+    to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
+    
   end
   
   def test_attached_images
     to_test = {
       'Inline image: !logo.gif!' => 'Inline image: <img src="/attachments/download/3" title="This is a logo" alt="This is a logo" />',
-      'Inline image: !logo.GIF!' => 'Inline image: <img src="/attachments/download/3" title="This is a logo" alt="This is a logo" />'
+      'Inline image: !logo.GIF!' => 'Inline image: <img src="/attachments/download/3" title="This is a logo" alt="This is a logo" />',
+      'No match: !ogo.gif!' => 'No match: <img src="ogo.gif" alt="" />',
+      'No match: !ogo.GIF!' => 'No match: <img src="ogo.GIF" alt="" />',
+      # link image
+      '!logo.gif!:http://foo.bar/' => '<a href="http://foo.bar/"><img src="/attachments/download/3" title="This is a logo" alt="This is a logo" /></a>',
     }
     attachments = Attachment.find(:all)
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text, :attachments => attachments) }
@@ -88,19 +121,26 @@ class ApplicationHelperTest < HelperTestCase
       'This is a "link":http://foo.bar' => 'This is a <a href="http://foo.bar" class="external">link</a>',
       'This is an intern "link":/foo/bar' => 'This is an intern <a href="/foo/bar">link</a>',
       '"link (Link title)":http://foo.bar' => '<a href="http://foo.bar" title="Link title" class="external">link</a>',
+      '"link (Link title with "double-quotes")":http://foo.bar' => '<a href="http://foo.bar" title="Link title with &quot;double-quotes&quot;" class="external">link</a>',
       "This is not a \"Link\":\n\nAnother paragraph" => "This is not a \"Link\":</p>\n\n\n\t<p>Another paragraph",
       # no multiline link text
-      "This is a double quote \"on the first line\nand another on a second line\":test" => "This is a double quote \"on the first line<br />\nand another on a second line\":test"
+      "This is a double quote \"on the first line\nand another on a second line\":test" => "This is a double quote \"on the first line<br />and another on a second line\":test",
+      # mailto link
+      "\"system administrator\":mailto:sysadmin@example.com?subject=redmine%20permissions" => "<a href=\"mailto:sysadmin@example.com?subject=redmine%20permissions\">system administrator</a>",
+      # two exclamation marks
+      '"a link":http://example.net/path!602815048C7B5C20!302.html' => '<a href="http://example.net/path!602815048C7B5C20!302.html" class="external">a link</a>',
     }
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
   end
   
   def test_redmine_links
     issue_link = link_to('#3', {:controller => 'issues', :action => 'show', :id => 3}, 
-                               :class => 'issue', :title => 'Error 281 when updating a recipe (New)')
+                               :class => 'issue status-1 priority-1 overdue', :title => 'Error 281 when updating a recipe (New)')
     
     changeset_link = link_to('r1', {:controller => 'repositories', :action => 'revision', :id => 'ecookbook', :rev => 1},
                                    :class => 'changeset', :title => 'My very first commit')
+    changeset_link2 = link_to('r2', {:controller => 'repositories', :action => 'revision', :id => 'ecookbook', :rev => 2},
+                                    :class => 'changeset', :title => 'This commit fixes #1, #2 and references #1 & #3')
     
     document_link = link_to('Test document', {:controller => 'documents', :action => 'show', :id => 1},
                                              :class => 'document')
@@ -118,6 +158,9 @@ class ApplicationHelperTest < HelperTestCase
       '#3, #3 and #3.'              => "#{issue_link}, #{issue_link} and #{issue_link}.",
       # changesets
       'r1'                          => changeset_link,
+      'r1.'                         => "#{changeset_link}.",
+      'r1, r2'                      => "#{changeset_link}, #{changeset_link2}",
+      'r1,r2'                       => "#{changeset_link},#{changeset_link2}",
       # documents
       'document#1'                  => document_link,
       'document:"Test document"'    => document_link,
@@ -161,25 +204,28 @@ class ApplicationHelperTest < HelperTestCase
   
   def test_wiki_links
     to_test = {
-      '[[CookBook documentation]]' => '<a href="/wiki/ecookbook/CookBook_documentation" class="wiki-page">CookBook documentation</a>',
-      '[[Another page|Page]]' => '<a href="/wiki/ecookbook/Another_page" class="wiki-page">Page</a>',
+      '[[CookBook documentation]]' => '<a href="/projects/ecookbook/wiki/CookBook_documentation" class="wiki-page">CookBook documentation</a>',
+      '[[Another page|Page]]' => '<a href="/projects/ecookbook/wiki/Another_page" class="wiki-page">Page</a>',
       # link with anchor
-      '[[CookBook documentation#One-section]]' => '<a href="/wiki/ecookbook/CookBook_documentation#One-section" class="wiki-page">CookBook documentation</a>',
-      '[[Another page#anchor|Page]]' => '<a href="/wiki/ecookbook/Another_page#anchor" class="wiki-page">Page</a>',
+      '[[CookBook documentation#One-section]]' => '<a href="/projects/ecookbook/wiki/CookBook_documentation#One-section" class="wiki-page">CookBook documentation</a>',
+      '[[Another page#anchor|Page]]' => '<a href="/projects/ecookbook/wiki/Another_page#anchor" class="wiki-page">Page</a>',
       # page that doesn't exist
-      '[[Unknown page]]' => '<a href="/wiki/ecookbook/Unknown_page" class="wiki-page new">Unknown page</a>',
-      '[[Unknown page|404]]' => '<a href="/wiki/ecookbook/Unknown_page" class="wiki-page new">404</a>',
+      '[[Unknown page]]' => '<a href="/projects/ecookbook/wiki/Unknown_page" class="wiki-page new">Unknown page</a>',
+      '[[Unknown page|404]]' => '<a href="/projects/ecookbook/wiki/Unknown_page" class="wiki-page new">404</a>',
       # link to another project wiki
-      '[[onlinestore:]]' => '<a href="/wiki/onlinestore/" class="wiki-page">onlinestore</a>',
-      '[[onlinestore:|Wiki]]' => '<a href="/wiki/onlinestore/" class="wiki-page">Wiki</a>',
-      '[[onlinestore:Start page]]' => '<a href="/wiki/onlinestore/Start_page" class="wiki-page">Start page</a>',
-      '[[onlinestore:Start page|Text]]' => '<a href="/wiki/onlinestore/Start_page" class="wiki-page">Text</a>',
-      '[[onlinestore:Unknown page]]' => '<a href="/wiki/onlinestore/Unknown_page" class="wiki-page new">Unknown page</a>',
+      '[[onlinestore:]]' => '<a href="/projects/onlinestore/wiki/" class="wiki-page">onlinestore</a>',
+      '[[onlinestore:|Wiki]]' => '<a href="/projects/onlinestore/wiki/" class="wiki-page">Wiki</a>',
+      '[[onlinestore:Start page]]' => '<a href="/projects/onlinestore/wiki/Start_page" class="wiki-page">Start page</a>',
+      '[[onlinestore:Start page|Text]]' => '<a href="/projects/onlinestore/wiki/Start_page" class="wiki-page">Text</a>',
+      '[[onlinestore:Unknown page]]' => '<a href="/projects/onlinestore/wiki/Unknown_page" class="wiki-page new">Unknown page</a>',
       # striked through link
-      '-[[Another page|Page]]-' => '<del><a href="/wiki/ecookbook/Another_page" class="wiki-page">Page</a></del>',
-      '-[[Another page|Page]] link-' => '<del><a href="/wiki/ecookbook/Another_page" class="wiki-page">Page</a> link</del>',
+      '-[[Another page|Page]]-' => '<del><a href="/projects/ecookbook/wiki/Another_page" class="wiki-page">Page</a></del>',
+      '-[[Another page|Page]] link-' => '<del><a href="/projects/ecookbook/wiki/Another_page" class="wiki-page">Page</a> link</del>',
       # escaping
       '![[Another page|Page]]' => '[[Another page|Page]]',
+      # project does not exist
+      '[[unknowproject:Start]]' => '[[unknowproject:Start]]',
+      '[[unknowproject:Start|Page title]]' => '[[unknowproject:Start|Page title]]',
     }
     @project = Project.find(1)
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
@@ -212,7 +258,29 @@ class ApplicationHelperTest < HelperTestCase
     to_test.each { |text, result| assert_equal result, textilizable(text) }
   end
   
-  def syntax_highlight
+  def test_pre_tags
+    raw = <<-RAW
+Before
+
+<pre>
+<prepared-statement-cache-size>32</prepared-statement-cache-size>
+</pre>
+
+After
+RAW
+
+    expected = <<-EXPECTED
+<p>Before</p>
+<pre>
+&lt;prepared-statement-cache-size&gt;32&lt;/prepared-statement-cache-size&gt;
+</pre>
+<p>After</p>
+EXPECTED
+    
+    assert_equal expected.gsub(%r{[\r\n\t]}, ''), textilizable(raw).gsub(%r{[\r\n\t]}, '')
+  end
+  
+  def test_syntax_highlight
     raw = <<-RAW
 <pre><code class="ruby">
 # Some ruby code here
@@ -229,9 +297,9 @@ EXPECTED
   
   def test_wiki_links_in_tables
     to_test = {"|[[Page|Link title]]|[[Other Page|Other title]]|\n|Cell 21|[[Last page]]|" =>
-                 '<tr><td><a href="/wiki/ecookbook/Page" class="wiki-page new">Link title</a></td>' +
-                 '<td><a href="/wiki/ecookbook/Other_Page" class="wiki-page new">Other title</a></td>' +
-                 '</tr><tr><td>Cell 21</td><td><a href="/wiki/ecookbook/Last_page" class="wiki-page new">Last page</a></td></tr>'
+                 '<tr><td><a href="/projects/ecookbook/wiki/Page" class="wiki-page new">Link title</a></td>' +
+                 '<td><a href="/projects/ecookbook/wiki/Other_Page" class="wiki-page new">Other title</a></td>' +
+                 '</tr><tr><td>Cell 21</td><td><a href="/projects/ecookbook/wiki/Last_page" class="wiki-page new">Last page</a></td></tr>'
     }
     @project = Project.find(1)
     to_test.each { |text, result| assert_equal "<table>#{result}</table>", textilizable(text).gsub(/[\t\n]/, '') }
@@ -239,7 +307,10 @@ EXPECTED
   
   def test_text_formatting
     to_test = {'*_+bold, italic and underline+_*' => '<strong><em><ins>bold, italic and underline</ins></em></strong>',
-               '(_text within parentheses_)' => '(<em>text within parentheses</em>)'
+               '(_text within parentheses_)' => '(<em>text within parentheses</em>)',
+               'a *Humane Web* Text Generator' => 'a <strong>Humane Web</strong> Text Generator',
+               'a H *umane* W *eb* T *ext* G *enerator*' => 'a H <strong>umane</strong> W <strong>eb</strong> T <strong>ext</strong> G <strong>enerator</strong>',
+               'a *H* umane *W* eb *T* ext *G* enerator' => 'a <strong>H</strong> umane <strong>W</strong> eb <strong>T</strong> ext <strong>G</strong> enerator',
               }
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text) }
   end
@@ -277,9 +348,11 @@ h1. Title
 
 Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas sed libero.
 
-h2. Subtitle
+h2. Subtitle with a [[Wiki]] link
 
 Nullam commodo metus accumsan nulla. Curabitur lobortis dui id dolor.
+
+h2. Subtitle with [[Wiki|another Wiki]] link
 
 h2. Subtitle with %{color:red}red text%
 
@@ -289,7 +362,8 @@ RAW
 
     expected = '<ul class="toc">' +
                '<li class="heading1"><a href="#Title">Title</a></li>' +
-               '<li class="heading2"><a href="#Subtitle">Subtitle</a></li>' + 
+               '<li class="heading2"><a href="#Subtitle-with-a-Wiki-link">Subtitle with a Wiki link</a></li>' + 
+               '<li class="heading2"><a href="#Subtitle-with-another-Wiki-link">Subtitle with another Wiki link</a></li>' + 
                '<li class="heading2"><a href="#Subtitle-with-red-text">Subtitle with red text</a></li>' +
                '<li class="heading1"><a href="#Another-title">Another title</a></li>' +
                '</ul>'
@@ -359,6 +433,49 @@ EXPECTED
     assert_equal expected.gsub(%r{\s+}, ''), textilizable(raw).gsub(%r{\s+}, '')
   end
   
+  def test_table_with_line_breaks
+    raw = <<-RAW
+This is a table with line breaks:
+
+|cell11
+continued|cell12||
+|-cell21-||cell23
+cell23 line2
+cell23 *line3*|
+|cell31|cell32
+cell32 line2|cell33|
+
+RAW
+
+    expected = <<-EXPECTED
+<p>This is a table with line breaks:</p>
+
+<table>
+  <tr>
+    <td>cell11<br />continued</td>
+    <td>cell12</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><del>cell21</del></td>
+    <td></td>
+    <td>cell23<br/>cell23 line2<br/>cell23 <strong>line3</strong></td>
+  </tr>
+  <tr>
+    <td>cell31</td>
+    <td>cell32<br/>cell32 line2</td>
+    <td>cell33</td>
+  </tr>
+</table>
+EXPECTED
+
+    assert_equal expected.gsub(%r{\s+}, ''), textilizable(raw).gsub(%r{\s+}, '')
+  end
+  
+  def test_textile_should_not_mangle_brackets
+    assert_equal '<p>[msg1][msg2]</p>', textilizable('[msg1][msg2]')
+  end
+  
   def test_default_formatter
     Setting.text_formatting = 'unknown'
     text = 'a *link*: http://www.example.net/'
@@ -366,50 +483,14 @@ EXPECTED
     Setting.text_formatting = 'textile'
   end
   
-  def test_date_format_default
-    today = Date.today
-    Setting.date_format = ''    
-    assert_equal l_date(today), format_date(today)
-  end
-  
-  def test_date_format
-    today = Date.today
-    Setting.date_format = '%d %m %Y'
-    assert_equal today.strftime('%d %m %Y'), format_date(today)
-  end
-  
-  def test_time_format_default
-    now = Time.now
-    Setting.date_format = ''
-    Setting.time_format = ''    
-    assert_equal l_datetime(now), format_time(now)
-    assert_equal l_time(now), format_time(now, false)
-  end
-  
-  def test_time_format
-    now = Time.now
-    Setting.date_format = '%d %m %Y'
-    Setting.time_format = '%H %M'
-    assert_equal now.strftime('%d %m %Y %H %M'), format_time(now)
-    assert_equal now.strftime('%H %M'), format_time(now, false)
-  end
-  
-  def test_utc_time_format
-    now = Time.now.utc
-    Setting.date_format = '%d %m %Y'
-    Setting.time_format = '%H %M'
-    assert_equal Time.now.strftime('%d %m %Y %H %M'), format_time(now)
-    assert_equal Time.now.strftime('%H %M'), format_time(now, false)
-  end
-  
   def test_due_date_distance_in_words
     to_test = { Date.today => 'Due in 0 days',
                 Date.today + 1 => 'Due in 1 day',
-                Date.today + 100 => 'Due in 100 days',
-                Date.today + 20000 => 'Due in 20000 days',
+                Date.today + 100 => 'Due in about 3 months',
+                Date.today + 20000 => 'Due in over 54 years',
                 Date.today - 1 => '1 day late',
-                Date.today - 100 => '100 days late',
-                Date.today - 20000 => '20000 days late',
+                Date.today - 100 => 'about 3 months late',
+                Date.today - 20000 => 'over 54 years late',
                }
     to_test.each do |date, expected|
       assert_equal expected, due_date_distance_in_words(date)
@@ -427,5 +508,25 @@ EXPECTED
     # turn off avatars
     Setting.gravatar_enabled = '0'
     assert_nil avatar(User.find_by_mail('jsmith@somenet.foo'))
+  end
+  
+  def test_link_to_user
+    user = User.find(2)
+    t = link_to_user(user)
+    assert_equal "<a href=\"/users/2\">#{ user.name }</a>", t
+  end
+                                      
+  def test_link_to_user_should_not_link_to_locked_user
+    user = User.find(5)
+    assert user.locked?
+    t = link_to_user(user)
+    assert_equal user.name, t
+  end
+                                                                          
+  def test_link_to_user_should_not_link_to_anonymous
+    user = User.anonymous
+    assert user.anonymous?
+    t = link_to_user(user)
+    assert_equal ::I18n.t(:label_user_anonymous), t
   end
 end
