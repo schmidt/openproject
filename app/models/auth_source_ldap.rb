@@ -15,7 +15,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require 'net/ldap'
 require 'iconv'
 
 class AuthSourceLdap < AuthSource
@@ -27,7 +26,8 @@ class AuthSourceLdap < AuthSource
 
   before_validation :strip_ldap_attributes
 
-  def after_initialize
+  def initialize(attributes=nil, *args)
+    super
     self.port = 389 if self.port == 0
   end
 

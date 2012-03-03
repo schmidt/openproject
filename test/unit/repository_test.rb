@@ -50,6 +50,19 @@ class RepositoryTest < ActiveSupport::TestCase
     assert_equal repository, project.repository
   end
 
+  def test_first_repository_should_be_set_as_default
+    repository1 = Repository::Subversion.new(:project => Project.find(3), :identifier => 'svn1', :url => 'file:///svn1')
+    assert repository1.save
+    assert repository1.is_default?
+
+    repository2 = Repository::Subversion.new(:project => Project.find(3), :identifier => 'svn2', :url => 'file:///svn2')
+    assert repository2.save
+    assert !repository2.is_default?
+
+    assert_equal repository1, Project.find(3).repository
+    assert_equal [repository1, repository2], Project.find(3).repositories.sort
+  end
+
   def test_destroy
     changesets = Changeset.count(:all, :conditions => "repository_id = 10")
     changes = Change.count(:all, :conditions => "repository_id = 10",
@@ -61,6 +74,24 @@ class RepositoryTest < ActiveSupport::TestCase
     end
   end
 
+  def test_destroy_should_delete_parents_associations
+    changeset = Changeset.find(102)
+    changeset.parents = Changeset.find_all_by_id([100, 101])
+
+    assert_difference 'Changeset.connection.select_all("select * from changeset_parents").size', -2 do
+      Repository.find(10).destroy
+    end
+  end
+
+  def test_destroy_should_delete_issues_associations
+    changeset = Changeset.find(102)
+    changeset.issues = Issue.find_all_by_id([1, 2])
+
+    assert_difference 'Changeset.connection.select_all("select * from changesets_issues").size', -2 do
+      Repository.find(10).destroy
+    end
+  end
+
   def test_should_not_create_with_disabled_scm
     # disable Subversion
     with_settings :enabled_scm => ['Darcs', 'Git'] do
@@ -68,7 +99,7 @@ class RepositoryTest < ActiveSupport::TestCase
                       :project => Project.find(3), :url => "svn://localhost")
       assert !repository.save
       assert_equal I18n.translate('activerecord.errors.messages.invalid'),
-                                  repository.errors.on(:type)
+                                  repository.errors[:type].to_s
     end
   end
 

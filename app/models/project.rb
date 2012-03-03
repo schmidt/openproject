@@ -46,7 +46,8 @@ class Project < ActiveRecord::Base
   has_many :news, :dependent => :destroy, :include => :author
   has_many :issue_categories, :dependent => :delete_all, :order => "#{IssueCategory.table_name}.name"
   has_many :boards, :dependent => :destroy, :order => "position ASC"
-  has_one :repository, :dependent => :destroy
+  has_one :repository, :conditions => ["is_default = ?", true]
+  has_many :repositories, :dependent => :destroy
   has_many :changesets, :through => :repository
   has_one :wiki, :dependent => :destroy
   # Custom field for the project issues
@@ -75,7 +76,7 @@ class Project < ActiveRecord::Base
   validates_length_of :homepage, :maximum => 255
   validates_length_of :identifier, :in => 1..IDENTIFIER_MAX_LENGTH
   # donwcase letters, digits, dashes but not digits only
-  validates_format_of :identifier, :with => /^(?!\d+$)[a-z0-9\-]*$/, :if => Proc.new { |p| p.identifier_changed? }
+  validates_format_of :identifier, :with => /^(?!\d+$)[a-z0-9\-_]*$/, :if => Proc.new { |p| p.identifier_changed? }
   # reserved words
   validates_exclusion_of :identifier, :in => %w( new )
 
@@ -83,10 +84,30 @@ class Project < ActiveRecord::Base
 
   named_scope :has_module, lambda { |mod| { :conditions => ["#{Project.table_name}.id IN (SELECT em.project_id FROM #{EnabledModule.table_name} em WHERE em.name=?)", mod.to_s] } }
   named_scope :active, { :conditions => "#{Project.table_name}.status = #{STATUS_ACTIVE}"}
+  named_scope :status, lambda {|arg| arg.blank? ? {} : {:conditions => {:status => arg.to_i}} }
   named_scope :all_public, { :conditions => { :is_public => true } }
   named_scope :visible, lambda {|*args| {:conditions => Project.visible_condition(args.shift || User.current, *args) }}
+  named_scope :allowed_to, lambda {|*args| 
+    user = User.current
+    permission = nil
+    if args.first.is_a?(Symbol)
+      permission = args.shift
+    else
+      user = args.shift
+      permission = args.shift
+    end
+    { :conditions => Project.allowed_to_condition(user, permission, *args) }
+  }
+  named_scope :like, lambda {|arg|
+    if arg.blank?
+      {}
+    else
+      pattern = "%#{arg.to_s.strip.downcase}%"
+      {:conditions => ["LOWER(identifier) LIKE :p OR LOWER(name) LIKE :p", {:p => pattern}]}
+    end
+  }
 
-  def initialize(attributes = nil)
+  def initialize(attributes=nil, *args)
     super
 
     initialized = (attributes || {}).stringify_keys
@@ -253,7 +274,7 @@ class Project < ActiveRecord::Base
 
   def to_param
     # id is used for projects with a numeric identifier (compatibility)
-    @to_param ||= (identifier.to_s =~ %r{^\d*$} ? id : identifier)
+    @to_param ||= (identifier.to_s =~ %r{^\d*$} ? id.to_s : identifier)
   end
 
   def active?
@@ -390,16 +411,21 @@ class Project < ActiveRecord::Base
 
   # Returns a scope of the Versions used by the project
   def shared_versions
-    @shared_versions ||= begin
-      r = root? ? self : root
+    if new_record?
       Version.scoped(:include => :project,
-                     :conditions => "#{Project.table_name}.id = #{id}" +
-                                    " OR (#{Project.table_name}.status = #{Project::STATUS_ACTIVE} AND (" +
+                     :conditions => "#{Project.table_name}.status = #{Project::STATUS_ACTIVE} AND #{Version.table_name}.sharing = 'system'")
+    else
+      @shared_versions ||= begin
+        r = root? ? self : root
+        Version.scoped(:include => :project,
+                       :conditions => "#{Project.table_name}.id = #{id}" +
+                                      " OR (#{Project.table_name}.status = #{Project::STATUS_ACTIVE} AND (" +
                                           " #{Version.table_name}.sharing = 'system'" +
                                           " OR (#{Project.table_name}.lft >= #{r.lft} AND #{Project.table_name}.rgt <= #{r.rgt} AND #{Version.table_name}.sharing = 'tree')" +
                                           " OR (#{Project.table_name}.lft < #{lft} AND #{Project.table_name}.rgt > #{rgt} AND #{Version.table_name}.sharing IN ('hierarchy', 'descendants'))" +
                                           " OR (#{Project.table_name}.lft > #{lft} AND #{Project.table_name}.rgt < #{rgt} AND #{Version.table_name}.sharing = 'hierarchy')" +
                                           "))")
+      end
     end
   end
 
@@ -801,7 +827,7 @@ class Project < ActiveRecord::Base
   # Copies queries from +project+
   def copy_queries(project)
     project.queries.each do |query|
-      new_query = Query.new
+      new_query = ::Query.new
       new_query.attributes = query.attributes.dup.except("id", "project_id", "sort_criteria")
       new_query.sort_criteria = query.sort_criteria if query.sort_criteria
       new_query.project = self

@@ -15,8 +15,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require 'ar_condition'
-
 class Mailer < ActionMailer::Base
   layout 'mailer'
   helper :application
@@ -43,6 +41,7 @@ class Mailer < ActionMailer::Base
                     'Issue-Author' => issue.author.login
     redmine_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
     message_id issue
+    @author = issue.author
     recipients issue.recipients
     cc(issue.watcher_recipients - @recipients)
     subject "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] (#{issue.status.name}) #{issue.subject}"
@@ -74,7 +73,7 @@ class Mailer < ActionMailer::Base
     subject s
     body :issue => issue,
          :journal => journal,
-         :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
+         :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue, :anchor => "change-#{journal.id}")
 
     render_multipart('issue_edit', body)
   end
@@ -343,16 +342,15 @@ class Mailer < ActionMailer::Base
     tracker = options[:tracker] ? Tracker.find(options[:tracker]) : nil
     user_ids = options[:users]
 
-    s = ARCondition.new ["#{IssueStatus.table_name}.is_closed = ? AND #{Issue.table_name}.due_date <= ?", false, days.day.from_now.to_date]
-    s << "#{Issue.table_name}.assigned_to_id IS NOT NULL"
-    s << ["#{Issue.table_name}.assigned_to_id IN (?)", user_ids] if user_ids.present?
-    s << "#{Project.table_name}.status = #{Project::STATUS_ACTIVE}"
-    s << "#{Issue.table_name}.project_id = #{project.id}" if project
-    s << "#{Issue.table_name}.tracker_id = #{tracker.id}" if tracker
+    scope = Issue.open.scoped(:conditions => ["#{Issue.table_name}.assigned_to_id IS NOT NULL" +
+      " AND #{Project.table_name}.status = #{Project::STATUS_ACTIVE}" +
+      " AND #{Issue.table_name}.due_date <= ?", days.day.from_now.to_date]
+    )
+    scope = scope.scoped(:conditions => {:assigned_to_id => user_ids}) if user_ids.present?
+    scope = scope.scoped(:conditions => {:project_id => project.id}) if project
+    scope = scope.scoped(:conditions => {:tracker_id => tracker.id}) if tracker
 
-    issues_by_assignee = Issue.find(:all, :include => [:status, :assigned_to, :project, :tracker],
-                                          :conditions => s.conditions
-                                    ).group_by(&:assigned_to)
+    issues_by_assignee = scope.all(:include => [:status, :assigned_to, :project, :tracker]).group_by(&:assigned_to)
     issues_by_assignee.each do |assignee, issues|
       deliver_reminder(assignee, issues, days) if assignee && assignee.active?
     end
@@ -384,7 +382,7 @@ class Mailer < ActionMailer::Base
 
   # Appends a Redmine header field (name is prepended with 'X-Redmine-')
   def redmine_headers(h)
-    h.each { |k,v| headers["X-Redmine-#{k}"] = v }
+    h.each { |k,v| headers["X-Redmine-#{k}"] = v.to_s }
   end
 
   # Overrides the create_mail method
@@ -395,6 +393,10 @@ class Mailer < ActionMailer::Base
     if @author.pref[:no_self_notified]
       recipients.delete(@author.mail) if recipients
       cc.delete(@author.mail) if cc
+    end
+
+    if @author.logged?
+      redmine_headers 'Sender' => @author.login
     end
 
     notified_users = [recipients, cc].flatten.compact.uniq

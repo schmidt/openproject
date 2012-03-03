@@ -76,6 +76,8 @@ module Redmine
           end
           SetCreator(Redmine::Info.app_name)
           SetFont(@font_for_content)
+          @outlines = []
+          @outlineRoot = nil
         end
 
         def SetFontStyle(style, size)
@@ -142,6 +144,94 @@ module Redmine
           SetX(-30)
           RDMCell(0, 5, PageNo().to_s + '/{nb}', 0, 0, 'C')
         end
+
+        def Bookmark(txt, level=0, y=0)
+          if (y == -1)
+            y = GetY()
+          end
+          @outlines << {:t => txt, :l => level, :p => PageNo(), :y => (@h - y)*@k}
+        end
+
+        def bookmark_title(txt)
+          txt = begin
+            utf16txt = Iconv.conv('UTF-16BE', 'UTF-8', txt)
+            hextxt = "<FEFF"  # FEFF is BOM
+            hextxt << utf16txt.unpack("C*").map {|x| sprintf("%02X",x) }.join
+            hextxt << ">"
+          rescue
+            txt
+          end || ''
+        end
+
+        def putbookmarks
+          nb=@outlines.size
+          return if (nb==0)
+          lru=[]
+          level=0
+          @outlines.each_with_index do |o, i|
+            if(o[:l]>0)
+              parent=lru[o[:l]-1]
+              #Set parent and last pointers
+              @outlines[i][:parent]=parent
+              @outlines[parent][:last]=i
+              if (o[:l]>level)
+                #Level increasing: set first pointer
+                @outlines[parent][:first]=i
+              end
+            else
+              @outlines[i][:parent]=nb
+            end
+            if (o[:l]<=level && i>0)
+              #Set prev and next pointers
+              prev=lru[o[:l]]
+              @outlines[prev][:next]=i
+              @outlines[i][:prev]=prev
+            end
+            lru[o[:l]]=i
+            level=o[:l]
+          end
+          #Outline items
+          n=self.n+1
+          @outlines.each_with_index do |o, i|
+            newobj()
+            out('<</Title '+bookmark_title(o[:t]))
+            out("/Parent #{n+o[:parent]} 0 R")
+            if (o[:prev])
+              out("/Prev #{n+o[:prev]} 0 R")
+            end
+            if (o[:next])
+              out("/Next #{n+o[:next]} 0 R")
+            end
+            if (o[:first])
+              out("/First #{n+o[:first]} 0 R")
+            end
+            if (o[:last])
+              out("/Last #{n+o[:last]} 0 R")
+            end
+            out("/Dest [%d 0 R /XYZ 0 %.2f null]" % [1+2*o[:p], o[:y]])
+            out('/Count 0>>')
+            out('endobj')
+          end
+          #Outline root
+          newobj()
+          @outlineRoot=self.n
+          out("<</Type /Outlines /First #{n} 0 R");
+          out("/Last #{n+lru[0]} 0 R>>");
+          out('endobj');
+        end
+
+        def putresources()
+          super
+          putbookmarks()
+        end
+
+        def putcatalog()
+          super
+          if(@outlines.size > 0)
+            out("/Outlines #{@outlineRoot} 0 R");
+            out('/PageMode /UseOutlines');
+          end
+        end
       end
 
       # Returns a PDF string of a list of issues
@@ -205,16 +295,17 @@ module Redmine
           if query.grouped? &&
                (group = query.group_by_column.value(issue)) != previous_group
             pdf.SetFontStyle('B',9)
-            pdf.RDMCell(277, row_height,
-              (group.blank? ? 'None' : group.to_s) + " (#{query.issue_count_by_group[group]})",
-              1, 1, 'L')
+            group_label = group.blank? ? 'None' : group.to_s
+            group_label << " (#{query.issue_count_by_group[group]})"
+            pdf.Bookmark group_label, 0, -1
+            pdf.RDMCell(277, row_height, group_label, 1, 1, 'L')
             pdf.SetFontStyle('',8)
             previous_group = group
           end
           # fetch all the row values
           col_values = query.columns.collect do |column|
             s = if column.is_a?(QueryCustomFieldColumn)
-              cv = issue.custom_values.detect {|v| v.custom_field_id == column.custom_field.id}
+              cv = issue.custom_field_values.detect {|v| v.custom_field_id == column.custom_field.id}
               show_value(cv)
             else
               value = issue.send(column.name)
@@ -452,16 +543,20 @@ module Redmine
         pdf.SetFontStyle('B',9)
         pdf.RDMCell(190,5, l(:label_history), "B")
         pdf.Ln
+        indice = 0
         for journal in issue.journals.find(
                           :all, :include => [:user, :details],
                           :order => "#{Journal.table_name}.created_on ASC")
+          indice = indice + 1
           pdf.SetFontStyle('B',8)
           pdf.RDMCell(190,5,
-             format_time(journal.created_on) + " - " + journal.user.name)
+             "#" + indice.to_s +
+             " - " + format_time(journal.created_on) +
+             " - " + journal.user.name)
           pdf.Ln
           pdf.SetFontStyle('I',8)
-          for detail in journal.details
-            pdf.RDMMultiCell(190,5, "- " + show_detail(detail, true))
+          details_to_strings(journal.details, true).each do |string|
+            pdf.RDMMultiCell(190,5, "- " + string)
           end
           if journal.notes?
             pdf.Ln unless journal.details.empty?
@@ -488,8 +583,25 @@ module Redmine
         pdf.Output
       end
 
+      # Returns a PDF string of a set of wiki pages
+      def wiki_pages_to_pdf(pages, project)
+        pdf = ITCPDF.new(current_language)
+        pdf.SetTitle(project.name)
+        pdf.alias_nb_pages
+        pdf.footer_date = format_date(Date.today)
+        pdf.AddPage
+        pdf.SetFontStyle('B',11)
+        pdf.RDMMultiCell(190,5, project.name)
+        pdf.Ln
+        # Set resize image scale
+        pdf.SetImageScale(1.6)
+        pdf.SetFontStyle('',9)
+        write_page_hierarchy(pdf, pages.group_by(&:parent_id))
+        pdf.Output
+      end
+
       # Returns a PDF string of a single wiki page
-      def wiki_to_pdf(page, project)
+      def wiki_page_to_pdf(page, project)
         pdf = ITCPDF.new(current_language)
         pdf.SetTitle("#{project} - #{page.title}")
         pdf.alias_nb_pages
@@ -502,8 +614,28 @@ module Redmine
         # Set resize image scale
         pdf.SetImageScale(1.6)
         pdf.SetFontStyle('',9)
+        write_wiki_page(pdf, page)
+        pdf.Output
+      end
+
+      def write_page_hierarchy(pdf, pages, node=nil, level=0)
+        if pages[node]
+          pages[node].each do |page|
+            if @new_page
+              pdf.AddPage
+            else
+              @new_page = true
+            end
+            pdf.Bookmark page.title, level
+            write_wiki_page(pdf, page)
+            write_page_hierarchy(pdf, pages, page.id, level + 1) if pages[page.id]
+          end
+        end
+      end
+
+      def write_wiki_page(pdf, page)
         pdf.RDMwriteHTMLCell(190,5,0,0,
-              page.content.text.to_s, page.attachments, "TLRB")
+              page.content.text.to_s, page.attachments, 0)
         if page.attachments.any?
           pdf.Ln
           pdf.SetFontStyle('B',9)
@@ -518,7 +650,6 @@ module Redmine
             pdf.Ln
           end
         end
-        pdf.Output
       end
 
       class RDMPdfEncoding

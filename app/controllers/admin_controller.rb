@@ -17,6 +17,10 @@
 
 class AdminController < ApplicationController
   layout 'admin'
+  menu_item :projects, :only => :projects
+  menu_item :plugins, :only => :plugins
+  menu_item :info, :only => :info
+
   before_filter :require_admin
   helper :sort
   include SortHelper	
@@ -26,14 +30,12 @@ class AdminController < ApplicationController
   end
 	
   def projects
-    @status = params[:status] ? params[:status].to_i : 1
-    c = ARCondition.new(@status == 0 ? "status <> 0" : ["status = ?", @status])
-    unless params[:name].blank?
-      name = "%#{params[:name].strip.downcase}%"
-      c << ["LOWER(identifier) LIKE ? OR LOWER(name) LIKE ?", name, name]
-    end
-    @projects = Project.find :all, :order => 'lft',
-                                   :conditions => c.conditions
+    @status = params[:status] || 1
+
+    scope = Project.status(@status)
+    scope = scope.like(params[:name]) if params[:name].present?
+
+    @projects = scope.all(:order => 'lft')
 
     render :action => "projects", :layout => false if request.xhr?
   end

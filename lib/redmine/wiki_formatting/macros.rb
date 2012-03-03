@@ -77,8 +77,8 @@ module Redmine
       end
 
       desc "Displays a list of all available macros, including description if available."
-      macro :macro_list do
-        out = ''
+      macro :macro_list do |obj, args|
+        out = ''.html_safe
         @@available_macros.keys.collect(&:to_s).sort.each do |macro|
           out << content_tag('dt', content_tag('code', macro))
           out << content_tag('dd', textilizable(@@available_macros[macro.to_sym]))

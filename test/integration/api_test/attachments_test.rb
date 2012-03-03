@@ -30,13 +30,17 @@ class ApiTest::AttachmentsTest < ActionController::IntegrationTest
 
   def setup
     Setting.rest_api_enabled = '1'
-    Attachment.storage_path = "#{Rails.root}/test/fixtures/files"
+    set_fixtures_attachments_directory
+  end
+
+  def teardown
+    set_tmp_attachments_directory
   end
 
   context "/attachments/:id" do
     context "GET" do
       should "return the attachment" do
-        get '/attachments/7.xml', {}, :authorization => credentials('jsmith')
+        get '/attachments/7.xml', {}, credentials('jsmith')
         assert_response :success
         assert_equal 'application/xml', @response.content_type
         assert_tag :tag => 'attachment',
@@ -65,8 +69,7 @@ class ApiTest::AttachmentsTest < ActionController::IntegrationTest
   context "/attachments/download/:id/:filename" do
     context "GET" do
       should "return the attachment content" do
-        get '/attachments/download/7/archive.zip',
-            {}, :authorization => credentials('jsmith')
+        get '/attachments/download/7/archive.zip', {}, credentials('jsmith')
         assert_response :success
         assert_equal 'application/octet-stream', @response.content_type
         set_tmp_attachments_directory
@@ -78,9 +81,5 @@ class ApiTest::AttachmentsTest < ActionController::IntegrationTest
         set_tmp_attachments_directory
       end
     end
-  end
-
-  def credentials(user, password=nil)
-    ActionController::HttpAuthentication::Basic.encode_credentials(user, password || user)
   end
 end

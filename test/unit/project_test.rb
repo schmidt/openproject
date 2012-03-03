@@ -19,8 +19,13 @@ require File.expand_path('../../test_helper', __FILE__)
 
 class ProjectTest < ActiveSupport::TestCase
   fixtures :projects, :trackers, :issue_statuses, :issues,
+           :journals, :journal_details,
            :enumerations, :users, :issue_categories,
            :projects_trackers,
+           :custom_fields,
+           :custom_fields_projects,
+           :custom_fields_trackers,
+           :custom_values,
            :roles,
            :member_roles,
            :members,
@@ -29,11 +34,13 @@ class ProjectTest < ActiveSupport::TestCase
            :versions,
            :wikis, :wiki_pages, :wiki_contents, :wiki_content_versions,
            :groups_users,
-           :boards
+           :boards,
+           :repositories
 
   def setup
     @ecookbook = Project.find(1)
     @ecookbook_sub1 = Project.find(3)
+    set_tmp_attachments_directory
     User.current = nil
   end
 
@@ -112,6 +119,7 @@ class ProjectTest < ActiveSupport::TestCase
     to_test = {"abc" => true,
                "ab12" => true,
                "ab-12" => true,
+               "ab_12" => true,
                "12" => false,
                "new" => false}
 
@@ -119,7 +127,11 @@ class ProjectTest < ActiveSupport::TestCase
       p = Project.new
       p.identifier = identifier
       p.valid?
-      assert_equal valid, p.errors['identifier'].nil?
+      if valid
+        assert p.errors['identifier'].blank?, "identifier #{identifier} was not valid"
+      else
+        assert p.errors['identifier'].present?, "identifier #{identifier} was valid"
+      end
     end
   end
 
@@ -273,7 +285,7 @@ class ProjectTest < ActiveSupport::TestCase
 
     parent.reload
     assert_equal 4, parent.children.size
-    assert_equal parent.children.sort_by(&:name), parent.children
+    assert_equal parent.children.all.sort_by(&:name), parent.children.all
   end
 
   def test_rebuild_should_sort_children_alphabetically
@@ -289,7 +301,7 @@ class ProjectTest < ActiveSupport::TestCase
 
     parent.reload
     assert_equal 4, parent.children.size
-    assert_equal parent.children.sort_by(&:name), parent.children
+    assert_equal parent.children.all.sort_by(&:name), parent.children.all
   end
 
 
@@ -586,6 +598,13 @@ class ProjectTest < ActiveSupport::TestCase
     assert !versions.collect(&:id).include?(6)
   end
 
+  def test_shared_versions_for_new_project_should_include_system_shared_versions
+    p = Project.find(5)
+    v = Version.create!(:name => 'system_sharing', :project => p, :sharing => 'system')
+
+    assert_include v, Project.new.shared_versions
+  end
+
   def test_next_identifier
     ProjectCustomField.delete_all
     Project.create!(:name => 'last', :identifier => 'p2008040')
@@ -857,6 +876,18 @@ class ProjectTest < ActiveSupport::TestCase
       assert_equal "duplicates", copied_relation.relation_type
       assert_equal 1, copied_relation.issue_from_id, "Cross project relation not kept"
       assert_not_equal source_relation_cross_project.id, copied_relation.id
+    end
+
+    should "copy issue attachments" do
+      issue = Issue.generate!(:subject => "copy with attachment", :tracker_id => 1, :project_id => @source_project.id)
+      Attachment.create!(:container => issue, :file => uploaded_test_file("testfile.txt", "text/plain"), :author_id => 1)
+      @source_project.issues << issue
+      assert @project.copy(@source_project)
+
+      copied_issue = @project.issues.first(:conditions => {:subject => "copy with attachment"})
+      assert_not_nil copied_issue
+      assert_equal 1, copied_issue.attachments.count, "Attachment not copied"
+      assert_equal "testfile.txt", copied_issue.attachments.first.filename
     end
 
     should "copy memberships" do

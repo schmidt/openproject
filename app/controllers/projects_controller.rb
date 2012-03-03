@@ -29,7 +29,7 @@ class ProjectsController < ApplicationController
 
   after_filter :only => [:create, :edit, :update, :archive, :unarchive, :destroy] do |controller|
     if controller.request.post?
-      controller.send :expire_action, :controller => 'welcome', :action => 'robots.txt'
+      controller.send :expire_action, :controller => 'welcome', :action => 'robots'
     end
   end
 
@@ -176,7 +176,6 @@ class ProjectsController < ApplicationController
     @issue_category ||= IssueCategory.new
     @member ||= @project.members.new
     @trackers = Tracker.all
-    @repository ||= @project.repository
     @wiki ||= @project.wiki
   end
 
@@ -228,18 +227,15 @@ class ProjectsController < ApplicationController
     redirect_to(url_for(:controller => 'admin', :action => 'projects', :status => params[:status]))
   end
 
+  verify :method => :delete, :only => :destroy, :render => {:nothing => true, :status => :method_not_allowed }
   # Delete @project
   def destroy
     @project_to_destroy = @project
-    if request.get?
-      # display confirmation view
-    else
-      if api_request? || params[:confirm]
-        @project_to_destroy.destroy
-        respond_to do |format|
-          format.html { redirect_to :controller => 'admin', :action => 'projects' }
-          format.api  { head :ok }
-        end
+    if api_request? || params[:confirm]
+      @project_to_destroy.destroy
+      respond_to do |format|
+        format.html { redirect_to :controller => 'admin', :action => 'projects' }
+        format.api  { head :ok }
       end
     end
     # hide project in layout

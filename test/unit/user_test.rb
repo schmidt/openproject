@@ -54,7 +54,18 @@ class UserTest < ActiveSupport::TestCase
     u = User.new
     u.mail = ''
     assert !u.valid?
-    assert_equal I18n.translate('activerecord.errors.messages.blank'), u.errors.on(:mail)
+    assert_equal I18n.translate('activerecord.errors.messages.blank'),
+                 u.errors[:mail].to_s
+  end
+
+  def test_login_length_validation
+    user = User.new(:firstname => "new", :lastname => "user", :mail => "newuser@somenet.foo")
+    user.login = "x" * (User::LOGIN_LENGTH_LIMIT+1)
+    assert !user.valid?
+
+    user.login = "x" * (User::LOGIN_LENGTH_LIMIT)
+    assert user.valid?
+    assert user.save
   end
 
   def test_create
@@ -99,7 +110,8 @@ class UserTest < ActiveSupport::TestCase
       u.login = 'NewUser'
       u.password, u.password_confirmation = "password", "password"
       assert !u.save
-      assert_equal I18n.translate('activerecord.errors.messages.taken'), u.errors.on(:login)
+      assert_equal I18n.translate('activerecord.errors.messages.taken'),
+                   u.errors[:login].to_s
     end
   end
 
@@ -113,7 +125,8 @@ class UserTest < ActiveSupport::TestCase
     u.login = 'newuser2'
     u.password, u.password_confirmation = "password", "password"
     assert !u.save
-    assert_equal I18n.translate('activerecord.errors.messages.taken'), u.errors.on(:mail)
+    assert_equal I18n.translate('activerecord.errors.messages.taken'),
+                 u.errors[:mail].to_s
   end
 
   def test_update
@@ -313,9 +326,8 @@ class UserTest < ActiveSupport::TestCase
 
   def test_destroy_should_nullify_changesets
     changeset = Changeset.create!(
-      :repository => Repository::Subversion.create!(
-        :project_id => 1,
-        :url => 'file:///var/svn'
+      :repository => Repository::Subversion.generate!(
+        :project_id => 1
       ),
       :revision => '12',
       :committed_on => Time.now,
@@ -392,10 +404,12 @@ class UserTest < ActiveSupport::TestCase
 
   def test_name_format
     assert_equal 'Smith, John', @jsmith.name(:lastname_coma_firstname)
-    Setting.user_format = :firstname_lastname
-    assert_equal 'John Smith', @jsmith.reload.name
-    Setting.user_format = :username
-    assert_equal 'jsmith', @jsmith.reload.name
+    with_settings :user_format => :firstname_lastname do
+      assert_equal 'John Smith', @jsmith.reload.name
+    end
+    with_settings :user_format => :username do
+      assert_equal 'jsmith', @jsmith.reload.name
+    end
   end
   
   def test_fields_for_order_statement_should_return_fields_according_user_format_setting

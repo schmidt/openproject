@@ -103,8 +103,8 @@ class AccountTest < ActionController::IntegrationTest
     assert_response :success
     assert_template 'account/register'
 
-    post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar"},
-                             :password => "newpass", :password_confirmation => "newpass"
+    post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar",
+                             :password => "newpass", :password_confirmation => "newpass"}
     assert_redirected_to '/my/account'
     follow_redirect!
     assert_response :success
@@ -119,8 +119,8 @@ class AccountTest < ActionController::IntegrationTest
   def test_register_with_manual_activation
     Setting.self_registration = '2'
 
-    post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar"},
-                             :password => "newpass", :password_confirmation => "newpass"
+    post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar",
+                             :password => "newpass", :password_confirmation => "newpass"}
     assert_redirected_to '/login'
     assert !User.find_by_login('newuser').active?
   end
@@ -129,8 +129,8 @@ class AccountTest < ActionController::IntegrationTest
     Setting.self_registration = '1'
     Token.delete_all
 
-    post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar"},
-                             :password => "newpass", :password_confirmation => "newpass"
+    post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar",
+                             :password => "newpass", :password_confirmation => "newpass"}
     assert_redirected_to '/login'
     assert !User.find_by_login('newuser').active?
 
@@ -144,14 +144,12 @@ class AccountTest < ActionController::IntegrationTest
     log_user('newuser', 'newpass')
   end
 
-  if Object.const_defined?(:Mocha)
-
   def test_onthefly_registration
     # disable registration
     Setting.self_registration = '0'
     AuthSource.expects(:authenticate).returns({:login => 'foo', :firstname => 'Foo', :lastname => 'Smith', :mail => 'foo@bar.com', :auth_source_id => 66})
 
-    post 'account/login', :username => 'foo', :password => 'bar'
+    post '/login', :username => 'foo', :password => 'bar'
     assert_redirected_to '/my/page'
 
     user = User.find_by_login('foo')
@@ -165,7 +163,7 @@ class AccountTest < ActionController::IntegrationTest
     Setting.self_registration = '0'
     AuthSource.expects(:authenticate).returns({:login => 'foo', :lastname => 'Smith', :auth_source_id => 66})
 
-    post 'account/login', :username => 'foo', :password => 'bar'
+    post '/login', :username => 'foo', :password => 'bar'
     assert_response :success
     assert_template 'account/register'
     assert_tag :input, :attributes => { :name => 'user[firstname]', :value => '' }
@@ -198,9 +196,5 @@ class AccountTest < ActionController::IntegrationTest
     get '/logout'
     assert_not_equal sid, session[:session_id], "logout should reset session"
     assert_nil session[:user_id]
-  end
-
-  else
-    puts 'Mocha is missing. Skipping tests.'
   end
 end

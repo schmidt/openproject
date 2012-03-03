@@ -62,6 +62,11 @@ module Redmine
           # projects argument can be either nil (will search all projects), a project or an array of projects
           # Returns the results and the results count
           def search(tokens, projects=nil, options={})
+            if projects.is_a?(Array) && projects.empty?
+              # no results
+              return [[], 0]
+            end
+
             # TODO: make user an argument
             user = User.current
             tokens = [] << tokens unless tokens.is_a?(Array)
@@ -114,13 +119,11 @@ module Redmine
             
             results = []
             results_count = 0
-            
-            with_scope(:find => {:conditions => project_conditions}) do
-              with_scope(:find => find_options) do
-                results_count = scope.count(:all)
-                results = scope.find(:all, limit_options)
-              end
-            end
+
+            scope = scope.scoped({:conditions => project_conditions}).scoped(find_options)
+            results_count = scope.count(:all)
+            results = scope.find(:all, limit_options)
+
             [results, results_count]
           end
         end
