@@ -15,6 +15,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+class ScmFetchError < Exception; end
+
 class Repository < ActiveRecord::Base
   include Redmine::Ciphering
 
@@ -30,7 +32,13 @@ class Repository < ActiveRecord::Base
 
   validates_length_of :password, :maximum => 255, :allow_nil => true
   # Checks if the SCM is enabled when creating a repository
-  validate_on_create { |r| r.errors.add(:type, :invalid) unless Setting.enabled_scm.include?(r.class.name.demodulize) }
+  validate :repo_create_validation, :on => :create
+
+  def repo_create_validation
+    unless Setting.enabled_scm.include?(self.class.name.demodulize)
+      errors.add(:type, :invalid)
+    end
+  end
 
   def self.human_attribute_name(attribute_key_name)
     attr_name = attribute_key_name
@@ -100,6 +108,10 @@ class Repository < ActiveRecord::Base
     false
   end
 
+  def supports_revision_graph?
+    false
+  end
+
   def entry(path=nil, identifier=nil)
     scm.entry(path, identifier)
   end
@@ -117,7 +129,7 @@ class Repository < ActiveRecord::Base
   end
 
   def default_branch
-    scm.default_branch
+    nil
   end
 
   def properties(path, identifier=nil)
@@ -276,7 +288,7 @@ class Repository < ActiveRecord::Base
     ret = ""
     begin
       ret = self.scm_adapter_class.client_command if self.scm_adapter_class
-    rescue Redmine::Scm::Adapters::CommandFailed => e
+    rescue Exception => e
       logger.error "scm: error during get command: #{e.message}"
     end
     ret
@@ -286,7 +298,7 @@ class Repository < ActiveRecord::Base
     ret = ""
     begin
       ret = self.scm_adapter_class.client_version_string if self.scm_adapter_class
-    rescue Redmine::Scm::Adapters::CommandFailed => e
+    rescue Exception => e
       logger.error "scm: error during get version string: #{e.message}"
     end
     ret
@@ -296,20 +308,13 @@ class Repository < ActiveRecord::Base
     ret = false
     begin
       ret = self.scm_adapter_class.client_available if self.scm_adapter_class
-    rescue Redmine::Scm::Adapters::CommandFailed => e
+    rescue Exception => e
       logger.error "scm: error during get scm available: #{e.message}"
     end
     ret
   end
 
   private
-
-  def before_save
-    # Strips url and root_url
-    url.strip!
-    root_url.strip!
-    true
-  end
 
   def clear_changesets
     cs, ch, ci = Changeset.table_name, Change.table_name, "#{table_name_prefix}changesets_issues#{table_name_suffix}"

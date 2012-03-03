@@ -158,6 +158,14 @@ ja:
   general_csv_separator: ','
   general_csv_decimal_separator: '.'
   general_csv_encoding: CP932
+  ## Redmine 1.2.0 現在、この値によって、pdfの出力のフォントを切り替えています。
+  ## CRuby では CP932 にしてください。
+  ## JRuby 1.6.2 (ruby-1.8.7-p330) では、CP932 ですと
+  ## Iconv::InvalidEncoding例外が発生します。
+  ## JRuby では、SJIS か Shift_JIS にしてください。
+  ## ご存知の通り、CP932 と SJIS は別物ですが、
+  ## そこまでの検証はしていません。
+  # general_pdf_encoding: SJIS
   general_pdf_encoding: CP932
   general_first_day_of_week: '7'
 
@@ -314,7 +322,7 @@ ja:
   field_time_zone: タイムゾーン
   field_searchable: 検索条件に設定可能とする
   field_default_value: デフォルト値
-  field_comments_sorting: コメントを表示
+  field_comments_sorting: コメントの表示順
   field_parent_title: 親ページ
   field_editable: 編集可能
   field_watcher: ウォッチャー
@@ -361,7 +369,7 @@ ja:
   setting_time_format: 時刻の形式
   setting_cross_project_issue_relations: 異なるプロジェクトのチケット間で関係の設定を許可
   setting_issue_list_default_columns: チケットの一覧で表示する項目
-  setting_repositories_encodings: リポジトリのエンコーディング
+  setting_repositories_encodings: 添付ファイルとリポジトリのエンコーディング
   setting_emails_header: メールのヘッダ
   setting_emails_footer: メールのフッタ
   setting_protocol: プロトコル
@@ -392,7 +400,7 @@ ja:
   setting_commit_logtime_enabled: コミット時に作業時間を記録する
   setting_commit_logtime_activity_id: 作業時間の作業分類
   setting_gantt_items_limit: ガントチャート最大表示項目数
-  
+
   permission_add_project: プロジェクトの追加
   permission_add_subprojects: サブプロジェクトの追加
   permission_edit_project: プロジェクトの編集
@@ -448,7 +456,7 @@ ja:
   permission_delete_messages: メッセージの削除
   permission_delete_own_messages: 自身が記入したメッセージの削除
   permission_manage_subtasks: 子チケットの管理
-  
+
   project_module_issue_tracking: チケットトラッキング
   project_module_time_tracking: 時間トラッキング
   project_module_news: ニュース
@@ -459,7 +467,7 @@ ja:
   project_module_boards: フォーラム
   project_module_gantt: ガントチャート
   project_module_calendar: カレンダー
-  
+
   label_user: ユーザ
   label_user_plural: ユーザ
   label_user_new: 新しいユーザ
@@ -705,6 +713,7 @@ ja:
   label_statistics: 統計
   label_commits_per_month: 月別のコミット
   label_commits_per_author: 起票者別のコミット
+  label_diff: 差分
   label_view_diff: 差分を見る
   label_diff_inline: インライン
   label_diff_side_by_side: 横に並べる
@@ -826,6 +835,8 @@ ja:
   label_principal_search: "ユーザまたはグループの検索:"
   label_user_search: "ユーザの検索:"
   label_git_report_last_commit: ファイルとディレクトリの最新コミットを表示する
+  label_parent_revision: 親
+  label_child_revision: 子
 
   button_login: ログイン
   button_submit: 変更
@@ -873,11 +884,11 @@ ja:
   button_quote: 引用
   button_duplicate: 複製
   button_show: 表示
-  
+
   status_active: 有効
   status_registered: 登録
   status_locked: ロック
-  
+
   version_status_open: 進行中
   version_status_locked: ロック中
   version_status_closed: 終了
@@ -946,10 +957,12 @@ ja:
   text_zoom_out: 縮小
   text_warn_on_leaving_unsaved: このページから移動すると、保存されていないデータが失われます。
   text_scm_path_encoding_note: "デフォルト: UTF-8"
-  text_git_repository_note: "Bare、かつ、ローカルリポジトリ (例: /gitrepo, c:\gitrepo)"
-  text_mercurial_repository_note: "ローカルリポジトリ (例: /hgrepo, c:\hgrepo)"
+  text_mercurial_repository_note: "ローカルリポジトリ (例: /hgrepo, c:\\hgrepo)"
+  text_git_repository_note: "Bare、かつ、ローカルリポジトリ (例: /gitrepo, c:\\gitrepo)"
   text_scm_command: コマンド
   text_scm_command_version: バージョン
+  text_scm_config: バージョン管理システムのコマンドをconfig/configuration.ymlで設定できます。設定後、Redmineを再起動してください。
+  text_scm_command_not_available: バージョン管理システムのコマンドが利用できません。管理画面にて設定を確認してください。
 
   default_role_manager: 管理者
   default_role_developer: 開発者
@@ -972,7 +985,7 @@ ja:
   default_priority_immediate: 今すぐ
   default_activity_design: 設計作業
   default_activity_development: 開発作業
-  
+
   enumeration_issue_priorities: チケットの優先度
   enumeration_doc_categories: 文書カテゴリ
   enumeration_activities: 作業分類 (時間トラッキング)
@@ -995,4 +1008,31 @@ ja:
   field_is_private: プライベート
   permission_set_issues_private: チケットをプライベートに設定
   label_issues_visibility_public: プライベートチケット以外
-  text_issues_destroy_descendants_confirmation: %{count}個の子チケットも削除されます。
+  text_issues_destroy_descendants_confirmation: "%{count}個の子チケットも削除されます。"
+  notice_issue_successful_create: チケット %{id} が作成されました。
+  label_between: 次の範囲内
+  setting_issue_group_assignment: グループへのチケット割り当てを許可
+  description_query_sort_criteria_direction: Sort direction
+  description_project_scope: Search scope
+  description_filter: Filter
+  description_user_mail_notification: Mail notification settings
+  description_date_from: Enter start date
+  description_message_content: Message content
+  description_available_columns: Available Columns
+  description_date_range_interval: Choose range by selecting start and end date
+  description_issue_category_reassign: Choose issue category
+  description_search: Searchfield
+  description_notes: Notes
+  description_date_range_list: Choose range from list
+  description_choose_project: Projects
+  description_date_to: Enter end date
+  description_query_sort_criteria_attribute: Sort attribute
+  description_wiki_subpages_reassign: Choose new parent page
+  description_selected_columns: Selected Columns
+  error_scm_annotate_big_text_file: The entry cannot be annotated, as it exceeds the maximum text file size.
+  setting_default_issue_start_date_to_creation_date: Use current date as start date for new issues
+  button_edit_section: Edit this section
+  description_all_columns: All Columns
+  button_export: Export
+  label_export_options: "%{export_format} export options"
+  error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})

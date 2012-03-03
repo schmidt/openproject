@@ -24,9 +24,21 @@ module Redmine
       end
 
       class AbstractAdapter #:nodoc:
+
+        # raised if scm command exited with error, e.g. unknown revision.
+        class ScmCommandAborted < CommandFailed; end
+
         class << self
           def client_command
             ""
+          end
+
+          def shell_quote_command
+            if Redmine::Platform.mswin? && RUBY_PLATFORM == 'java'
+              client_command
+            else
+              shell_quote(client_command)
+            end
           end
 
           # Returns the version of the scm client
@@ -180,10 +192,14 @@ module Redmine
           info ? info.root_url : nil
         end
 
-        def target(path)
+        def target(path, sq=true)
           path ||= ''
           base = path.match(/^\//) ? root_url : url
-          shell_quote("#{base}/#{path}".gsub(/[?<>\*]/, ''))
+          str = "#{base}/#{path}".gsub(/[?<>\*]/, '')
+          if sq
+            str = shell_quote(str)
+          end
+          str
         end
 
         def logger
@@ -195,14 +211,16 @@ module Redmine
         end
 
         def self.logger
-          RAILS_DEFAULT_LOGGER
+          Rails.logger
         end
 
         def self.shellout(cmd, &block)
-          logger.debug "Shelling out: #{strip_credential(cmd)}" if logger && logger.debug?
+          if logger && logger.debug?
+            logger.debug "Shelling out: #{strip_credential(cmd)}"
+          end
           if Rails.env == 'development'
             # Capture stderr when running in dev environment
-            cmd = "#{cmd} 2>>#{RAILS_ROOT}/log/scm.stderr.log"
+            cmd = "#{cmd} 2>>#{Rails.root}/log/scm.stderr.log"
           end
           begin
             if RUBY_VERSION < '1.9'
@@ -214,10 +232,20 @@ module Redmine
               io.close_write
               block.call(io) if block_given?
             end
-          rescue Errno::ENOENT => e
+          ## If scm command does not exist,
+          ## Linux JRuby 1.6.2 (ruby-1.8.7-p330) raises java.io.IOException
+          ## in production environment.
+          # rescue Errno::ENOENT => e
+          rescue Exception => e
             msg = strip_credential(e.message)
             # The command failed, log it and re-raise
-            logger.error("SCM command failed, make sure that your SCM binary (eg. svn) is in PATH (#{ENV['PATH']}): #{strip_credential(cmd)}\n  with: #{msg}")
+            logmsg = "SCM command failed, "
+            logmsg += "make sure that your SCM command (e.g. svn) is "
+            logmsg += "in PATH (#{ENV['PATH']})\n"
+            logmsg += "You can configure your scm commands in config/configuration.yml.\n"
+            logmsg += "#{strip_credential(cmd)}\n"
+            logmsg += "with: #{msg}"
+            logger.error(logmsg)
             raise CommandFailed.new(msg)
           end
         end
@@ -305,7 +333,8 @@ module Redmine
 
       class Revision
         attr_accessor :scmid, :name, :author, :time, :message,
-                      :paths, :revision, :branch, :identifier
+                      :paths, :revision, :branch, :identifier,
+                      :parents
 
         def initialize(attributes={})
           self.identifier = attributes[:identifier]
@@ -317,6 +346,7 @@ module Redmine
           self.paths      = attributes[:paths]
           self.revision   = attributes[:revision]
           self.branch     = attributes[:branch]
+          self.parents    = attributes[:parents]
         end
 
         # Returns the readable identifier.
@@ -345,6 +375,10 @@ module Redmine
         def empty?
           lines.empty?
         end
+      end
+
+      class Branch < String
+        attr_accessor :revision, :scmid
       end
     end
   end

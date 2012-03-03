@@ -18,12 +18,19 @@
 require 'uri'
 require 'cgi'
 
+class Unauthorized < Exception; end
+
 class ApplicationController < ActionController::Base
   include Redmine::I18n
 
   layout 'base'
   exempt_from_layout 'builder', 'rsb'
 
+  protect_from_forgery
+  def handle_unverified_request
+    super
+    cookies.delete(:autologin)
+  end
   # Remove broken cookie after upgrade from 0.8.x (#4292)
   # See https://rails.lighthouseapp.com/projects/8994/tickets/3360
   # TODO: remove it when Rails is fixed
@@ -38,9 +45,9 @@ class ApplicationController < ActionController::Base
 
   before_filter :user_setup, :check_if_login_required, :set_localization
   filter_parameter_logging :password
-  protect_from_forgery
 
   rescue_from ActionController::InvalidAuthenticityToken, :with => :invalid_authenticity_token
+  rescue_from ::Unauthorized, :with => :deny_access
 
   include Redmine::Search::Controller
   include Redmine::MenuManager::MenuController
@@ -68,11 +75,11 @@ class ApplicationController < ActionController::Base
       user = User.try_to_autologin(cookies[:autologin])
       session[:user_id] = user.id if user
       user
-    elsif params[:format] == 'atom' && params[:key] && accept_key_auth_actions.include?(params[:action])
+    elsif params[:format] == 'atom' && params[:key] && request.get? && accept_rss_auth?
       # RSS key authentication does not start a session
       User.find_by_rss_key(params[:key])
-    elsif Setting.rest_api_enabled? && api_request?
-      if (key = api_key_from_request) && accept_key_auth_actions.include?(params[:action])
+    elsif Setting.rest_api_enabled? && accept_api_auth?
+      if (key = api_key_from_request)
         # Use API key
         User.find_by_api_key(key)
       else
@@ -199,8 +206,6 @@ class ApplicationController < ActionController::Base
     render_404 unless @object.present?
 
     @project = @object.project
-  rescue ActiveRecord::RecordNotFound
-    render_404
   end
 
   def find_model_object
@@ -247,7 +252,7 @@ class ApplicationController < ActionController::Base
       if @project.is_public? || User.current.member_of?(@project) || User.current.admin?
         true
       else
-        User.current.logged? ? render_403 : require_login
+        deny_access
       end
     else
       @project = nil
@@ -307,6 +312,19 @@ class ApplicationController < ActionController::Base
       format.json { head @status }
     end
   end
+  
+  # Filter for actions that provide an API response
+  # but have no HTML representation for non admin users
+  def require_admin_or_api_request
+    return true if api_request?
+    if User.current.admin?
+      true
+    elsif User.current.logged?
+      render_error(:status => 406)
+    else
+      deny_access
+    end
+  end
 
   # Picks which layout to use based on the request
   #
@@ -327,16 +345,44 @@ class ApplicationController < ActionController::Base
     @items.sort! {|x,y| y.event_datetime <=> x.event_datetime }
     @items = @items.slice(0, Setting.feeds_limit.to_i)
     @title = options[:title] || Setting.app_title
-    render :template => "common/feed.atom.rxml", :layout => false, :content_type => 'application/atom+xml'
+    render :template => "common/feed.atom", :layout => false,
+           :content_type => 'application/atom+xml'
   end
 
+  # TODO: remove in Redmine 1.4
   def self.accept_key_auth(*actions)
-    actions = actions.flatten.map(&:to_s)
-    write_inheritable_attribute('accept_key_auth_actions', actions)
+    ActiveSupport::Deprecation.warn "ApplicationController.accept_key_auth is deprecated and will be removed in Redmine 1.4. Use accept_rss_auth (or accept_api_auth) instead."
+    accept_rss_auth(*actions)
   end
 
+  # TODO: remove in Redmine 1.4
   def accept_key_auth_actions
-    self.class.read_inheritable_attribute('accept_key_auth_actions') || []
+    ActiveSupport::Deprecation.warn "ApplicationController.accept_key_auth_actions is deprecated and will be removed in Redmine 1.4. Use accept_rss_auth (or accept_api_auth) instead."
+    self.class.accept_rss_auth
+  end
+
+  def self.accept_rss_auth(*actions)
+    if actions.any?
+      write_inheritable_attribute('accept_rss_auth_actions', actions)
+    else
+      read_inheritable_attribute('accept_rss_auth_actions') || []
+    end
+  end
+
+  def accept_rss_auth?(action=action_name)
+    self.class.accept_rss_auth.include?(action.to_sym)
+  end
+
+  def self.accept_api_auth(*actions)
+    if actions.any?
+      write_inheritable_attribute('accept_api_auth_actions', actions)
+    else
+      read_inheritable_attribute('accept_api_auth_actions') || []
+    end
+  end
+
+  def accept_api_auth?(action=action_name)
+    self.class.accept_api_auth.include?(action.to_sym)
   end
 
   # Returns the number of objects that should be displayed
@@ -443,13 +489,6 @@ class ApplicationController < ActionController::Base
     session.delete(:query)
     sort_clear if respond_to?(:sort_clear)
     render_error "An error occurred while executing the query and has been logged. Please report this error to your Redmine administrator."
-  end
-
-  # Converts the errors on an ActiveRecord object into a common JSON format
-  def object_errors_to_json(object)
-    object.errors.collect do |attribute, error|
-      { attribute => error }
-    end.to_json
   end
 
   # Renders API response on validation failure
