@@ -63,6 +63,9 @@ it:
       over_x_years:
         one:  "oltre un anno"
         other: "oltre {{count}} anni"
+      almost_x_years:
+        one:   "almost 1 year"
+        other: "almost {{count}} years"
       
   number:
     format:
@@ -584,7 +587,7 @@ it:
   text_issue_category_reassign_to: Riassegna segnalazioni a questa categoria
   
   default_role_manager: Manager
-  default_role_developper: Sviluppatore
+  default_role_developer: Sviluppatore
   default_role_reporter: Reporter
   default_tracker_bug: Segnalazione
   default_tracker_feature: Funzione
@@ -882,3 +885,29 @@ it:
   setting_mail_handler_body_delimiters: Truncate emails after one of these lines
   permission_add_subprojects: Create subprojects
   label_subproject_new: New subproject
+  text_own_membership_delete_confirmation: |-
+    You are about to remove some or all of your permissions and may no longer be able to edit this project after that.
+    Are you sure you want to continue?
+  label_close_versions: Close completed versions
+  label_board_sticky: Sticky
+  label_board_locked: Locked
+  permission_export_wiki_pages: Export wiki pages
+  setting_cache_formatted_text: Cache formatted text
+  permission_manage_project_activities: Manage project activities
+  error_unable_delete_issue_status: Unable to delete issue status
+  label_profile: Profile
+  permission_manage_subtasks: Manage subtasks
+  field_parent_issue: Parent task
+  label_subtask_plural: Subtasks
+  label_project_copy_notifications: Send email notifications during the project copy
+  error_can_not_delete_custom_field: Unable to delete custom field
+  error_unable_to_connect: Unable to connect ({{value}})
+  error_can_not_remove_role: This role is in use and can not be deleted.
+  error_can_not_delete_tracker: This tracker contains issues and can't be deleted.
+  field_principal: Principal
+  label_my_page_block: My page block
+  notice_failed_to_save_members: "Failed to save member(s): {{errors}}."
+  text_zoom_out: Zoom out
+  text_zoom_in: Zoom in
+  notice_unable_delete_time_entry: Unable to delete time log entry.
+  label_overall_spent_time: Overall spent time

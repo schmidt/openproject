@@ -34,21 +34,6 @@ class AttachmentsControllerTest < ActionController::TestCase
     User.current = nil
   end
   
-  def test_routing
-    assert_routing('/attachments/1', :controller => 'attachments', :action => 'show', :id => '1')
-    assert_routing('/attachments/1/filename.ext', :controller => 'attachments', :action => 'show', :id => '1', :filename => 'filename.ext')
-    assert_routing('/attachments/download/1', :controller => 'attachments', :action => 'download', :id => '1')
-    assert_routing('/attachments/download/1/filename.ext', :controller => 'attachments', :action => 'download', :id => '1', :filename => 'filename.ext')
-  end
-  
-  def test_recognizes
-    assert_recognizes({:controller => 'attachments', :action => 'show', :id => '1'}, '/attachments/1')
-    assert_recognizes({:controller => 'attachments', :action => 'show', :id => '1'}, '/attachments/show/1')
-    assert_recognizes({:controller => 'attachments', :action => 'show', :id => '1', :filename => 'filename.ext'}, '/attachments/1/filename.ext')
-    assert_recognizes({:controller => 'attachments', :action => 'download', :id => '1'}, '/attachments/download/1')
-    assert_recognizes({:controller => 'attachments', :action => 'download', :id => '1', :filename => 'filename.ext'},'/attachments/download/1/filename.ext')
-  end
-  
   def test_show_diff
     get :show, :id => 5
     assert_response :success
@@ -82,6 +67,14 @@ class AttachmentsControllerTest < ActionController::TestCase
     get :download, :id => 4
     assert_response :success
     assert_equal 'application/x-ruby', @response.content_type
+  end
+  
+  def test_download_should_assign_content_type_if_blank
+    Attachment.find(4).update_attribute(:content_type, '')
+    
+    get :download, :id => 4
+    assert_response :success
+    assert_equal 'text/x-ruby', @response.content_type
   end
   
   def test_download_missing_file
