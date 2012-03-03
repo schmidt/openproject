@@ -64,9 +64,16 @@ class AccountControllerTest < ActionController::TestCase
     assert existing_user.save!
 
     post :login, :openid_url => existing_user.identity_url
-    assert_redirected_to 'my/page'
+    assert_redirected_to '/my/page'
   end
 
+  def test_login_with_invalid_openid_provider
+    Setting.self_registration = '0'
+    Setting.openid = '1'
+    post :login, :openid_url => 'http;//openid.example.com/good_user'
+    assert_redirected_to home_url
+  end
+  
   def test_login_with_openid_for_existing_non_active_user
     Setting.self_registration = '2'
     Setting.openid = '1'
@@ -79,14 +86,14 @@ class AccountControllerTest < ActionController::TestCase
     assert existing_user.save!
 
     post :login, :openid_url => existing_user.identity_url
-    assert_redirected_to 'login'
+    assert_redirected_to '/login'
   end
 
   def test_login_with_openid_with_new_user_created
     Setting.self_registration = '3'
     Setting.openid = '1'
     post :login, :openid_url => 'http://openid.example.com/good_user'
-    assert_redirected_to 'my/account'
+    assert_redirected_to '/my/account'
     user = User.find_by_login('cool_user')
     assert user
     assert_equal 'Cool', user.firstname
@@ -106,7 +113,7 @@ class AccountControllerTest < ActionController::TestCase
     Setting.self_registration = '1'
     Setting.openid = '1'
     post :login, :openid_url => 'http://openid.example.com/good_user'
-    assert_redirected_to 'login'
+    assert_redirected_to '/login'
     user = User.find_by_login('cool_user')
     assert user
 
@@ -118,7 +125,7 @@ class AccountControllerTest < ActionController::TestCase
     Setting.self_registration = '2'
     Setting.openid = '1'
     post :login, :openid_url => 'http://openid.example.com/good_user'
-    assert_redirected_to 'login'
+    assert_redirected_to '/login'
     user = User.find_by_login('cool_user')
     assert user
     assert_equal User::STATUS_REGISTERED, user.status
@@ -150,7 +157,68 @@ class AccountControllerTest < ActionController::TestCase
   def test_logout
     @request.session[:user_id] = 2
     get :logout
-    assert_redirected_to ''
+    assert_redirected_to '/'
     assert_nil @request.session[:user_id]
   end
+
+  context "GET #register" do
+    context "with self registration on" do
+      setup do
+        Setting.self_registration = '3'
+        get :register
+      end
+      
+      should_respond_with :success
+      should_render_template :register
+      should_assign_to :user
+    end
+    
+    context "with self registration off" do
+      setup do
+        Setting.self_registration = '0'
+        get :register
+      end
+
+      should_redirect_to('/') { home_url }
+    end
+  end
+
+  # See integration/account_test.rb for the full test
+  context "POST #register" do
+    context "with self registration on automatic" do
+      setup do
+        Setting.self_registration = '3'
+        post :register, :user => {
+          :login => 'register',
+          :password => 'test',
+          :password_confirmation => 'test',
+          :firstname => 'John',
+          :lastname => 'Doe',
+          :mail => 'register@example.com'
+        }
+      end
+      
+      should_respond_with :redirect
+      should_assign_to :user
+      should_redirect_to('my page') { {:controller => 'my', :action => 'account'} }
+
+      should_create_a_new_user { User.last(:conditions => {:login => 'register'}) }
+
+      should 'set the user status to active' do
+        user = User.last(:conditions => {:login => 'register'})
+        assert user
+        assert_equal User::STATUS_ACTIVE, user.status
+      end
+    end
+    
+    context "with self registration off" do
+      setup do
+        Setting.self_registration = '0'
+        post :register
+      end
+
+      should_redirect_to('/') { home_url }
+    end
+  end
+
 end
