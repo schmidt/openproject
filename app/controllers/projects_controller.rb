@@ -52,8 +52,10 @@ class ProjectsController < ApplicationController
       format.html { 
         @projects = Project.visible.find(:all, :order => 'lft') 
       }
-      format.xml  {
-        @projects = Project.visible.find(:all, :order => 'lft')
+      format.api  {
+        @offset, @limit = api_offset_and_limit
+        @project_count = Project.visible.count
+        @projects = Project.visible.all(:offset => @offset, :limit => @limit, :order => 'lft')
       }
       format.atom {
         projects = Project.visible.find(:all, :order => 'created_on DESC',
@@ -67,19 +69,15 @@ class ProjectsController < ApplicationController
     @issue_custom_fields = IssueCustomField.find(:all, :order => "#{CustomField.table_name}.position")
     @trackers = Tracker.all
     @project = Project.new(params[:project])
-
-    @project.identifier = Project.next_identifier if Setting.sequential_project_identifiers?
-    @project.trackers = Tracker.all
-    @project.is_public = Setting.default_projects_public?
-    @project.enabled_module_names = Setting.default_projects_modules
   end
 
   def create
     @issue_custom_fields = IssueCustomField.find(:all, :order => "#{CustomField.table_name}.position")
     @trackers = Tracker.all
-    @project = Project.new(params[:project])
+    @project = Project.new
+    @project.safe_attributes = params[:project]
 
-    @project.enabled_module_names = params[:enabled_modules]
+    @project.enabled_module_names = params[:enabled_modules] if params[:enabled_modules]
     if validate_parent_id && @project.save
       @project.set_allowed_parent!(params[:project]['parent_id']) if params[:project].has_key?('parent_id')
       # Add current user as a project member if he is not admin
@@ -93,12 +91,12 @@ class ProjectsController < ApplicationController
           flash[:notice] = l(:notice_successful_create)
           redirect_to :controller => 'projects', :action => 'settings', :id => @project
         }
-        format.xml  { render :action => 'show', :status => :created, :location => url_for(:controller => 'projects', :action => 'show', :id => @project.id) }
+        format.api  { render :action => 'show', :status => :created, :location => url_for(:controller => 'projects', :action => 'show', :id => @project.id) }
       end
     else
       respond_to do |format|
         format.html { render :action => 'new' }
-        format.xml  { render :xml => @project.errors, :status => :unprocessable_entity }
+        format.api  { render_validation_errors(@project) }
       end
     end
     
@@ -120,7 +118,8 @@ class ProjectsController < ApplicationController
       end  
     else
       Mailer.with_deliveries(params[:notifications] == '1') do
-        @project = Project.new(params[:project])
+        @project = Project.new
+        @project.safe_attributes = params[:project]
         @project.enabled_module_names = params[:enabled_modules]
         if validate_parent_id && @project.copy(@source_project, :only => params[:only])
           @project.set_allowed_parent!(params[:project]['parent_id']) if params[:project].has_key?('parent_id')
@@ -169,7 +168,7 @@ class ProjectsController < ApplicationController
     
     respond_to do |format|
       format.html
-      format.xml
+      format.api
     end
   end
 
@@ -186,7 +185,7 @@ class ProjectsController < ApplicationController
   end
 
   def update
-    @project.attributes = params[:project]
+    @project.safe_attributes = params[:project]
     if validate_parent_id && @project.save
       @project.set_allowed_parent!(params[:project]['parent_id']) if params[:project].has_key?('parent_id')
       respond_to do |format|
@@ -194,7 +193,7 @@ class ProjectsController < ApplicationController
           flash[:notice] = l(:notice_successful_update)
           redirect_to :action => 'settings', :id => @project
         }
-        format.xml  { head :ok }
+        format.api  { head :ok }
       end
     else
       respond_to do |format|
@@ -202,7 +201,7 @@ class ProjectsController < ApplicationController
           settings
           render :action => 'settings'
         }
-        format.xml  { render :xml => @project.errors, :status => :unprocessable_entity }
+        format.api  { render_validation_errors(@project) }
       end
     end
   end
@@ -233,11 +232,11 @@ class ProjectsController < ApplicationController
     if request.get?
       # display confirmation view
     else
-      if params[:format] == 'xml' || params[:confirm]
+      if api_request? || params[:confirm]
         @project_to_destroy.destroy
         respond_to do |format|
           format.html { redirect_to :controller => 'admin', :action => 'projects' }
-          format.xml  { head :ok }
+          format.api  { head :ok }
         end
       end
     end

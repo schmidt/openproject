@@ -15,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require File.dirname(__FILE__) + '/../test_helper'
+require File.expand_path('../../test_helper', __FILE__)
 require 'repositories_controller'
 
 # Re-raise errors caught by the controller.
@@ -164,6 +164,12 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
                                                        }
                                         }
                             }
+    end
+    
+    def test_invalid_revision
+      get :revision, :id => 1, :rev => 'something_weird'
+      assert_response 500
+      assert_error_tag :content => /was not found/
     end
     
     def test_revision_with_repository_pointing_to_a_subdirectory
