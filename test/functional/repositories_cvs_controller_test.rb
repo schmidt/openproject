@@ -16,12 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'repositories_controller'
-
-# Re-raise errors caught by the controller.
-class RepositoriesController; def rescue_action(e) raise e end; end
 
 class RepositoriesCvsControllerTest < ActionController::TestCase
+  tests RepositoriesController
+
   fixtures :projects, :users, :roles, :members, :member_roles,
            :repositories, :enabled_modules
 
@@ -33,9 +31,6 @@ class RepositoriesCvsControllerTest < ActionController::TestCase
   NUM_REV = 7
 
   def setup
-    @controller = RepositoriesController.new
-    @request    = ActionController::TestRequest.new
-    @response   = ActionController::TestResponse.new
     Setting.default_language = 'en'
     User.current = nil
 
@@ -48,6 +43,16 @@ class RepositoriesCvsControllerTest < ActionController::TestCase
   end
 
   if File.directory?(REPOSITORY_PATH)
+    def test_get_new
+      @request.session[:user_id] = 1
+      @project.repository.destroy
+      get :new, :project_id => 'subproject1', :repository_scm => 'Cvs'
+      assert_response :success
+      assert_template 'new'
+      assert_kind_of Repository::Cvs, assigns(:repository)
+      assert assigns(:repository).new_record?
+    end
+
     def test_browse_root
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
@@ -241,7 +246,9 @@ class RepositoriesCvsControllerTest < ActionController::TestCase
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository
@@ -249,28 +256,20 @@ class RepositoriesCvsControllerTest < ActionController::TestCase
 
     def test_destroy_invalid_repository
       @request.session[:user_id] = 1 # admin
-      assert_equal 0, @repository.changesets.count
-      @repository.fetch_changesets
-      @project.reload
-      assert_equal NUM_REV, @repository.changesets.count
-
-      get :destroy, :id => PRJ_ID
-      assert_response 302
-      @project.reload
-      assert_nil @project.repository
-
-      @repository  = Repository::Cvs.create(
+      @project.repository.destroy
+      @repository  = Repository::Cvs.create!(
                               :project      => Project.find(PRJ_ID),
                               :root_url     => "/invalid",
                               :url          => MODULE_NAME,
                               :log_encoding => 'UTF-8'
                               )
-      assert @repository
       @repository.fetch_changesets
       @project.reload
       assert_equal 0, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository

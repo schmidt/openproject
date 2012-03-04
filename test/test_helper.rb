@@ -18,7 +18,6 @@
 ENV["RAILS_ENV"] = "test"
 require File.expand_path(File.dirname(__FILE__) + "/../config/environment")
 require 'test_help'
-require File.expand_path(File.dirname(__FILE__) + '/helper_testcase')
 require Rails.root.join('test', 'mocks', 'open_id_authentication_mock.rb').to_s
 
 require File.expand_path(File.dirname(__FILE__) + '/object_daddy_helpers')
@@ -63,6 +62,10 @@ class ActiveSupport::TestCase
       ActiveSupport::TestCase.fixture_path + "/files/#{name}", mime, true)
   end
 
+  def credentials(user, password=nil)
+    {:authorization => ActionController::HttpAuthentication::Basic.encode_credentials(user, password || user)}
+  end
+
   # Mock out a file
   def self.mock_file
     file = 'a_file.png'
@@ -95,6 +98,10 @@ class ActiveSupport::TestCase
       Dir.mkdir "#{Rails.root}/tmp/test/attachments"
     end
     Attachment.storage_path = "#{Rails.root}/tmp/test/attachments"
+  end
+
+  def set_fixtures_attachments_directory
+    Attachment.storage_path = "#{Rails.root}/test/fixtures/files"
   end
 
   def with_settings(options, &block)
@@ -203,15 +210,6 @@ class ActiveSupport::TestCase
     end
   end
 
-  def self.should_create_a_new_user(&block)
-    should "create a new user" do
-      user = instance_eval &block
-      assert user
-      assert_kind_of User, user
-      assert !user.new_record?
-    end
-  end
-
   # Test that a request allows the three types of API authentication
   #
   # * HTTP Basic with username and password
@@ -246,8 +244,7 @@ class ActiveSupport::TestCase
       context "with a valid HTTP authentication" do
         setup do
           @user = User.generate_with_protected!(:password => 'my_password', :password_confirmation => 'my_password', :admin => true) # Admin so they can access the project
-          @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@user.login, 'my_password')
-          send(http_method, url, parameters, {:authorization => @authorization})
+          send(http_method, url, parameters, credentials(@user.login, 'my_password'))
         end
 
         should_respond_with success_code
@@ -260,8 +257,7 @@ class ActiveSupport::TestCase
       context "with an invalid HTTP authentication" do
         setup do
           @user = User.generate_with_protected!
-          @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@user.login, 'wrong_password')
-          send(http_method, url, parameters, {:authorization => @authorization})
+          send(http_method, url, parameters, credentials(@user.login, 'wrong_password'))
         end
 
         should_respond_with failure_code
@@ -273,7 +269,7 @@ class ActiveSupport::TestCase
 
       context "without credentials" do
         setup do
-          send(http_method, url, parameters, {:authorization => ''})
+          send(http_method, url, parameters)
         end
 
         should_respond_with failure_code
@@ -303,8 +299,7 @@ class ActiveSupport::TestCase
         setup do
           @user = User.generate_with_protected!(:admin => true)
           @token = Token.generate!(:user => @user, :action => 'api')
-          @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@token.value, 'X')
-          send(http_method, url, parameters, {:authorization => @authorization})
+          send(http_method, url, parameters, credentials(@token.value, 'X'))
         end
 
         should_respond_with success_code
@@ -319,8 +314,7 @@ class ActiveSupport::TestCase
         setup do
           @user = User.generate_with_protected!
           @token = Token.generate!(:user => @user, :action => 'feeds')
-          @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@token.value, 'X')
-          send(http_method, url, parameters, {:authorization => @authorization})
+          send(http_method, url, parameters, credentials(@token.value, 'X'))
         end
 
         should_respond_with failure_code

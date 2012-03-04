@@ -54,6 +54,15 @@ class AdminControllerTest < ActionController::TestCase
     assert_nil assigns(:projects).detect {|u| !u.active?}
   end
 
+  def test_projects_with_status_filter
+    get :projects, :status => 1
+    assert_response :success
+    assert_template 'projects'
+    assert_not_nil assigns(:projects)
+    # active projects only
+    assert_nil assigns(:projects).detect {|u| !u.active?}
+  end
+
   def test_projects_with_name_filter
     get :projects, :name => 'store', :status => ''
     assert_response :success
@@ -79,6 +88,13 @@ class AdminControllerTest < ActionController::TestCase
     assert_kind_of TMail::Mail, mail
     user = User.find(1)
     assert_equal [user.mail], mail.bcc
+  end
+
+  def test_test_email_failure_should_display_the_error
+    Mailer.stubs(:deliver_test).raises(Exception, 'Some error message')
+    get :test_email
+    assert_redirected_to '/settings/edit?tab=notifications'
+    assert_match /Some error message/, flash[:error]
   end
 
   def test_no_plugins

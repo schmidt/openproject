@@ -7,12 +7,12 @@
 # Specifies gem version of Rails to use when vendor/rails is not present
 RAILS_GEM_VERSION = '2.3.14' unless defined? RAILS_GEM_VERSION
 
-if RUBY_VERSION >= '1.9'
-  Encoding.default_external = 'UTF-8'
-end
-
 # Bootstrap the Rails environment, frameworks, and default configuration
 require File.join(File.dirname(__FILE__), 'boot')
+
+if RUBY_VERSION >= '1.9' && defined?(Rails) && Rails::VERSION::MAJOR < 3
+  Encoding.default_external = 'UTF-8'
+end
 
 # Load Engine plugin if available
 begin
@@ -54,8 +54,8 @@ Rails::Initializer.run do |config|
   # It will automatically turn deliveries on
   config.action_mailer.perform_deliveries = false
 
-  config.gem 'rubytree', :lib => 'tree'
   config.gem 'coderay', :version => '~>1.0.0'
+  config.gem 'net-ldap', :version => '~>0.2.2'
 
   # Load any local configuration that is kept out of source control
   # (e.g. gems, patches).

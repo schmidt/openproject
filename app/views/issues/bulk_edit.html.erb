@@ -1,14 +1,28 @@
-<h2><%= l(:label_bulk_edit_selected_issues) %></h2>
+<h2><%= @copy ? l(:button_copy) : l(:label_bulk_edit_selected_issues) %></h2>
 
-<ul><%= @issues.collect {|i| content_tag('li', link_to(h("#{i.tracker} ##{i.id}"), { :action => 'show', :id => i }) + h(": #{i.subject}")) }.join("\n") %></ul>
+<ul><%= @issues.collect {|i|
+            content_tag('li',
+                        link_to(h("#{i.tracker} ##{i.id}"),
+                                { :action => 'show', :id => i }
+                            ) + h(": #{i.subject}"))
+         }.join("\n").html_safe %></ul>
 
-<% form_tag(:action => 'bulk_update') do %>
-<%= @issues.collect {|i| hidden_field_tag('ids[]', i.id)}.join %>
+<% form_tag({:action => 'bulk_update'}, :id => 'bulk_edit_form') do %>
+<%= @issues.collect {|i| hidden_field_tag('ids[]', i.id)}.join("\n").html_safe %>
 <div class="box tabular">
 <fieldset class="attributes">
 <legend><%= l(:label_change_properties) %></legend>
 
 <div class="splitcontentleft">
+<% if @allowed_projects.present? %>
+<p>
+  <label for="issue_project_id"><%= l(:field_project) %></label>
+  <%= select_tag('issue[project_id]', "<option value=\"\">#{l(:label_no_change_option)}</option>" + project_tree_options_for_select(@allowed_projects, :selected => @target_project)) %>
+</p>
+<%= observe_field :issue_project_id, :url => {:action => 'bulk_edit'},
+                                     :update => 'content',
+                                     :with => "Form.serialize('bulk_edit_form')" %>
+<% end %>
 <p>
   <label for="issue_tracker_id"><%= l(:field_tracker) %></label>
   <%= select_tag('issue[tracker_id]', "<option value=\"\">#{l(:label_no_change_option)}</option>" + options_from_collection_for_select(@trackers, :id, :name)) %>
@@ -48,13 +62,21 @@
 <% end %>
 
 <% @custom_fields.each do |custom_field| %>
-  <p><label><%= h(custom_field.name) %> <%= custom_field_tag_for_bulk_edit('issue', custom_field, @projects) %></label></p>
+  <p><label><%= h(custom_field.name) %></label> <%= custom_field_tag_for_bulk_edit('issue', custom_field, @projects) %></p>
 <% end %>
 
 <%= call_hook(:view_issues_bulk_edit_details_bottom, { :issues => @issues }) %>
 </div>
 
 <div class="splitcontentright">
+<% if @safe_attributes.include?('is_private') %>
+<p>
+  <label for='issue_is_private'><%= l(:field_is_private) %></label>
+  <%= select_tag('issue[is_private]', content_tag('option', l(:label_no_change_option), :value => '') +
+                                content_tag('option', l(:general_text_Yes), :value => '1') +
+                                content_tag('option', l(:general_text_No), :value => '0')) %>
+</p>
+<% end %>
 <% if @project && User.current.allowed_to?(:manage_subtasks, @project) %>
 <p>
   <label for='issue_parent_issue_id'><%= l(:field_parent_issue) %></label>
@@ -87,5 +109,17 @@
 </fieldset>
 </div>
 
-<p><%= submit_tag l(:button_submit) %></p>
+<p>
+	<% if @copy %>
+	  <%= hidden_field_tag 'copy', '1' %>
+	  <%= submit_tag l(:button_copy) %>
+	  <%= submit_tag l(:button_copy_and_follow), :name => 'follow' %>
+	<% elsif @target_project %>
+	  <%= submit_tag l(:button_move) %>
+	  <%= submit_tag l(:button_move_and_follow), :name => 'follow' %>
+	<% else %>
+	  <%= submit_tag l(:button_submit) %>
+	<% end %>
+</p>
+
 <% end %>

@@ -25,6 +25,10 @@ module Redmine
         # Git executable name
         GIT_BIN = Redmine::Configuration['scm_git_command'] || "git"
 
+        class GitBranch < Branch 
+          attr_accessor :is_default
+        end
+
         class << self
           def client_command
             @@bin    ||= GIT_BIN
@@ -80,10 +84,11 @@ module Redmine
           cmd_args = %w|branch --no-color --verbose --no-abbrev|
           scm_cmd(*cmd_args) do |io|
             io.each_line do |line|
-              branch_rev = line.match('\s*\*?\s*(.*?)\s*([0-9a-f]{40}).*$')
-              bran = Branch.new(branch_rev[1])
-              bran.revision =  branch_rev[2]
-              bran.scmid    =  branch_rev[2]
+              branch_rev = line.match('\s*(\*?)\s*(.*?)\s*([0-9a-f]{40}).*$')
+              bran = GitBranch.new(branch_rev[2])
+              bran.revision =  branch_rev[3]
+              bran.scmid    =  branch_rev[3]
+              bran.is_default = ( branch_rev[1] == '*' )
               @branches << bran
             end
           end
@@ -105,7 +110,10 @@ module Redmine
         def default_branch
           bras = self.branches
           return nil if bras.nil?
-          bras.include?('master') ? 'master' : bras.first
+          default_bras = bras.select{|x| x.is_default == true}
+          return default_bras.first.to_s if ! default_bras.empty?
+          master_bras = bras.select{|x| x.to_s == 'master'}
+          master_bras.empty? ? bras.first.to_s : 'master' 
         end
 
         def entry(path=nil, identifier=nil)
@@ -191,13 +199,19 @@ module Redmine
           revs = Revisions.new
           cmd_args = %w|log --no-color --encoding=UTF-8 --raw --date=iso --pretty=fuller --parents|
           cmd_args << "--reverse" if options[:reverse]
-          cmd_args << "--all" if options[:all]
           cmd_args << "-n" << "#{options[:limit].to_i}" if options[:limit]
           from_to = ""
-          from_to << "#{identifier_from}.." if identifier_from
-          from_to << "#{identifier_to}" if identifier_to
-          cmd_args << from_to if !from_to.empty?
-          cmd_args << "--since=#{options[:since].strftime("%Y-%m-%d %H:%M:%S")}" if options[:since]
+          if identifier_from || identifier_to
+            from_to << "#{identifier_from}.." if identifier_from
+            from_to << "#{identifier_to}" if identifier_to
+            cmd_args << from_to if !from_to.empty?
+          else
+            cmd_args += options[:includes] unless options[:includes].blank?
+            unless options[:excludes].blank?
+              cmd_args << "--not"
+              cmd_args += options[:excludes]
+            end
+          end
           cmd_args << "--" << scm_iconv(@path_encoding, 'UTF-8', path) if path && !path.empty?
 
           scm_cmd *cmd_args do |io|
@@ -284,8 +298,13 @@ module Redmine
           end
           revs
         rescue ScmCommandAborted => e
-          logger.error("git log #{from_to.to_s} error: #{e.message}")
-          revs
+          err_msg = "git log error: #{e.message}"
+          logger.error(err_msg)
+          if block_given?
+            raise CommandFailed, err_msg
+          else
+            revs
+          end
         end
 
         def diff(path, identifier_from, identifier_to=nil)

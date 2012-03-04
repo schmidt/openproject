@@ -17,29 +17,52 @@
 
 class MembersController < ApplicationController
   model_object Member
-  before_filter :find_model_object, :except => [:new, :autocomplete_for_member]
-  before_filter :find_project_from_association, :except => [:new, :autocomplete_for_member]
-  before_filter :find_project, :only => [:new, :autocomplete_for_member]
+  before_filter :find_model_object, :except => [:index, :create, :autocomplete]
+  before_filter :find_project_from_association, :except => [:index, :create, :autocomplete]
+  before_filter :find_project_by_project_id, :only => [:index, :create, :autocomplete]
   before_filter :authorize
+  accept_api_auth :index, :show, :create, :update, :destroy
 
-  def new
-    members = []
-    if params[:member] && request.post?
-      attrs = params[:member].dup
-      if (user_ids = attrs.delete(:user_ids))
-        user_ids.each do |user_id|
-          members << Member.new(attrs.merge(:user_id => user_id))
-        end
-      else
-        members << Member.new(attrs)
-      end
-      @project.members << members
+  def index
+    @offset, @limit = api_offset_and_limit
+    @member_count = @project.member_principals.count
+    @member_pages = Paginator.new self, @member_count, @limit, params['page']
+    @offset ||= @member_pages.current.offset
+    @members =  @project.member_principals.all(
+      :order => "#{Member.table_name}.id",
+      :limit  =>  @limit,
+      :offset =>  @offset
+    )
+
+    respond_to do |format|
+      format.html { head 406 }
+      format.api
     end
+  end
+
+  def show
+    respond_to do |format|
+      format.html { head 406 }
+      format.api
+    end
+  end
+
+  def create
+    members = []
+    if params[:membership] && params[:membership][:user_ids]
+      attrs = params[:membership].dup
+      user_ids = attrs.delete(:user_ids)
+      user_ids.each do |user_id|
+        members << Member.new(attrs.merge(:user_id => user_id))
+      end
+    else
+      members << Member.new(params[:membership])
+    end
+    @project.members << members
+
     respond_to do |format|
       if members.present? && members.all? {|m| m.valid? }
-
         format.html { redirect_to :controller => 'projects', :action => 'settings', :tab => 'members', :id => @project }
-
         format.js {
           render(:update) {|page|
             page.replace_html "tab-content-members", :partial => 'projects/settings/members'
@@ -47,8 +70,11 @@ class MembersController < ApplicationController
             members.each {|member| page.visual_effect(:highlight, "member-#{member.id}") }
           }
         }
+        format.api {
+          @member = members.first
+          render :action => 'show', :status => :created, :location => membership_url(@member)
+        }
       else
-
         format.js {
           render(:update) {|page|
             errors = members.collect {|m|
@@ -58,28 +84,37 @@ class MembersController < ApplicationController
             page.alert(l(:notice_failed_to_save_members, :errors => errors.join(', ')))
           }
         }
-
+        format.api { render_validation_errors(members.first) }
       end
     end
   end
 
-  def edit
-    if request.post? and @member.update_attributes(params[:member])
-  	 respond_to do |format|
-        format.html { redirect_to :controller => 'projects', :action => 'settings', :tab => 'members', :id => @project }
-        format.js {
-          render(:update) {|page|
-            page.replace_html "tab-content-members", :partial => 'projects/settings/members'
-            page << 'hideOnLoad()'
-            page.visual_effect(:highlight, "member-#{@member.id}")
-          }
+  def update
+    if params[:membership]
+      @member.role_ids = params[:membership][:role_ids]
+    end
+    saved = @member.save
+    respond_to do |format|
+      format.html { redirect_to :controller => 'projects', :action => 'settings', :tab => 'members', :id => @project }
+      format.js {
+        render(:update) {|page|
+          page.replace_html "tab-content-members", :partial => 'projects/settings/members'
+          page << 'hideOnLoad()'
+          page.visual_effect(:highlight, "member-#{@member.id}")
         }
-      end
+      }
+      format.api {
+        if saved
+          head :ok
+        else
+          render_validation_errors(@member)
+        end
+      }
     end
   end
 
   def destroy
-    if request.post? && @member.deletable?
+    if request.delete? && @member.deletable?
       @member.destroy
     end
     respond_to do |format|
@@ -89,10 +124,17 @@ class MembersController < ApplicationController
           page << 'hideOnLoad()'
         }
       }
+      format.api {
+        if @member.destroyed?
+          head :ok
+        else
+          head :unprocessable_entity
+        end
+      }
     end
   end
 
-  def autocomplete_for_member
+  def autocomplete
     @principals = Principal.active.like(params[:q]).find(:all, :limit => 100) - @project.principals
     render :layout => false
   end

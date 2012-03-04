@@ -48,7 +48,7 @@ class MailerTest < ActiveSupport::TestCase
     assert_select_email do
       # link to the main ticket
       assert_select "a[href=?]",
-                    "https://mydomain.foo/issues/1",
+                    "https://mydomain.foo/issues/1#change-2",
                     :text => "Bug #1: Can't print recipes"
       # link to a referenced ticket
       assert_select "a[href=?][title=?]",
@@ -78,7 +78,7 @@ class MailerTest < ActiveSupport::TestCase
     assert_select_email do
       # link to the main ticket
       assert_select "a[href=?]",
-                    "http://mydomain.foo/rdm/issues/1",
+                    "http://mydomain.foo/rdm/issues/1#change-2",
                     :text => "Bug #1: Can't print recipes"
       # link to a referenced ticket
       assert_select "a[href=?][title=?]",
@@ -111,7 +111,7 @@ class MailerTest < ActiveSupport::TestCase
     assert_select_email do
       # link to the main ticket
       assert_select "a[href=?]",
-                    "http://mydomain.foo/rdm/issues/1",
+                    "http://mydomain.foo/rdm/issues/1#change-2",
                     :text => "Bug #1: Can't print recipes"
       # link to a referenced ticket
       assert_select "a[href=?][title=?]",
@@ -136,6 +136,14 @@ class MailerTest < ActiveSupport::TestCase
     assert_not_nil mail
     assert_equal 'OOF', mail.header_string('X-Auto-Response-Suppress')
     assert_equal 'auto-generated', mail.header_string('Auto-Submitted')
+  end
+
+  def test_email_headers_should_include_sender
+    issue = Issue.find(1)
+    Mailer.deliver_issue_add(issue)
+    mail = ActionMailer::Base.deliveries.last
+    assert_not_nil mail
+    assert_equal issue.author.login, mail.header_string('X-Redmine-Sender')
   end
 
   def test_plain_text_mail
@@ -213,6 +221,11 @@ class MailerTest < ActiveSupport::TestCase
     assert_not_nil mail
     assert_equal Mailer.message_id_for(journal), mail.message_id
     assert_equal Mailer.message_id_for(journal.issue), mail.references.first.to_s
+    assert_select_email do
+      # link to the update
+      assert_select "a[href=?]",
+                    "http://mydomain.foo/issues/#{journal.journalized_id}#change-#{journal.id}"
+    end
   end
 
   def test_message_posted_message_id
@@ -434,6 +447,17 @@ class MailerTest < ActiveSupport::TestCase
     assert_equal '1 issue(s) due in the next 42 days', mail.subject
   end
 
+  def test_reminders_should_not_include_closed_issues
+    Issue.generate!(:project_id => 1, :tracker_id => 1, :status_id => 5, :subject => 'Closed issue', :assigned_to_id => 3, :due_date => 5.days.from_now)
+    ActionMailer::Base.deliveries.clear
+
+    Mailer.reminders(:days => 42)
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    mail = ActionMailer::Base.deliveries.last
+    assert mail.bcc.include?('dlopper@somenet.foo')
+    assert !mail.body.include?('Closed issue')
+  end
+
   def test_reminders_for_users
     Mailer.reminders(:days => 42, :users => ['5'])
     assert_equal 0, ActionMailer::Base.deliveries.size # No mail for dlopper
@@ -481,15 +505,12 @@ class MailerTest < ActiveSupport::TestCase
     assert !mail.encoded.strip.split("\r\n").detect(&:blank?), "#{mail.encoded} malformed"
   end
 
-  context "layout" do
-    should "include the emails_header" do
-      with_settings(:emails_header => "*Header content*") do
-        assert Mailer.deliver_test(User.find(1))
-
-        assert_select_email do
-          assert_select ".header" do
-            assert_select "strong", :text => "Header content"
-          end
+  def test_layout_should_include_the_emails_header
+    with_settings :emails_header => "*Header content*" do
+      assert Mailer.deliver_test(User.find(1))
+      assert_select_email do
+        assert_select ".header" do
+          assert_select "strong", :text => "Header content"
         end
       end
     end

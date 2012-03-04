@@ -16,12 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'repositories_controller'
-
-# Re-raise errors caught by the controller.
-class RepositoriesController; def rescue_action(e) raise e end; end
 
 class RepositoriesMercurialControllerTest < ActionController::TestCase
+  tests RepositoriesController
+
   fixtures :projects, :users, :roles, :members, :member_roles,
            :repositories, :enabled_modules
 
@@ -34,9 +32,6 @@ class RepositoriesMercurialControllerTest < ActionController::TestCase
      (RUBY_VERSION >= '1.9' && Encoding.default_external.to_s != 'UTF-8')
 
   def setup
-    @controller = RepositoriesController.new
-    @request    = ActionController::TestRequest.new
-    @response   = ActionController::TestResponse.new
     User.current = nil
     @project    = Project.find(PRJ_ID)
     @repository = Repository::Mercurial.create(
@@ -64,6 +59,17 @@ class RepositoriesMercurialControllerTest < ActionController::TestCase
          "Current value is '#{Encoding.default_external.to_s}'"
     def test_fake; assert true end
   elsif File.directory?(REPOSITORY_PATH)
+
+    def test_get_new
+      @request.session[:user_id] = 1
+      @project.repository.destroy
+      get :new, :project_id => 'subproject1', :repository_scm => 'Mercurial'
+      assert_response :success
+      assert_template 'new'
+      assert_kind_of Repository::Mercurial, assigns(:repository)
+      assert assigns(:repository).new_record?
+    end
+
     def test_show_root
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
@@ -155,6 +161,16 @@ class RepositoriesMercurialControllerTest < ActionController::TestCase
         assert_not_nil changesets
         assert_equal %w(21 20 19 18 17), changesets.collect(&:revision)
       end
+    end
+
+    def show_should_show_branch_selection_form
+      @repository.fetch_changesets
+      @project.reload
+      get :show, :id => PRJ_ID
+      assert_tag 'form', :attributes => {:id => 'revision_selector', :action => '/projects/subproject1/repository/show'}
+      assert_tag 'select', :attributes => {:name => 'branch'},
+        :child => {:tag => 'option', :attributes => {:value => 'test-branch-01'}},
+        :parent => {:tag => 'form', :attributes => {:id => 'revision_selector'}}
     end
 
     def test_show_branch
@@ -462,10 +478,11 @@ class RepositoriesMercurialControllerTest < ActionController::TestCase
       @request.session[:user_id] = 1 # admin
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
-      @project.reload
       assert_equal NUM_REV, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository
@@ -473,27 +490,18 @@ class RepositoriesMercurialControllerTest < ActionController::TestCase
 
     def test_destroy_invalid_repository
       @request.session[:user_id] = 1 # admin
-      assert_equal 0, @repository.changesets.count
-      @repository.fetch_changesets
-      @project.reload
-      assert_equal NUM_REV, @repository.changesets.count
-
-      get :destroy, :id => PRJ_ID
-      assert_response 302
-      @project.reload
-      assert_nil @project.repository
-
-      @repository = Repository::Mercurial.create(
+      @project.repository.destroy
+      @repository = Repository::Mercurial.create!(
                       :project => Project.find(PRJ_ID),
                       :url     => "/invalid",
                       :path_encoding => 'ISO-8859-1'
                       )
-      assert @repository
       @repository.fetch_changesets
-      @project.reload
       assert_equal 0, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository

@@ -16,12 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'repositories_controller'
-
-# Re-raise errors caught by the controller.
-class RepositoriesController; def rescue_action(e) raise e end; end
 
 class RepositoriesGitControllerTest < ActionController::TestCase
+  tests RepositoriesController
+
   fixtures :projects, :users, :roles, :members, :member_roles,
            :repositories, :enabled_modules
 
@@ -29,7 +27,7 @@ class RepositoriesGitControllerTest < ActionController::TestCase
   REPOSITORY_PATH.gsub!(/\//, "\\") if Redmine::Platform.mswin?
   PRJ_ID     = 3
   CHAR_1_HEX = "\xc3\x9c"
-  NUM_REV = 21
+  NUM_REV = 28
 
   ## Git, Mercurial and CVS path encodings are binary.
   ## Subversion supports URL encoding for path.
@@ -43,9 +41,6 @@ class RepositoriesGitControllerTest < ActionController::TestCase
     @ruby19_non_utf8_pass =
       (RUBY_VERSION >= '1.9' && Encoding.default_external.to_s != 'UTF-8')
 
-    @controller = RepositoriesController.new
-    @request    = ActionController::TestRequest.new
-    @response   = ActionController::TestResponse.new
     User.current = nil
     @project    = Project.find(PRJ_ID)
     @repository = Repository::Git.create(
@@ -63,6 +58,16 @@ class RepositoriesGitControllerTest < ActionController::TestCase
   end
 
   if File.directory?(REPOSITORY_PATH)
+    def test_get_new
+      @request.session[:user_id] = 1
+      @project.repository.destroy
+      get :new, :project_id => 'subproject1', :repository_scm => 'Git'
+      assert_response :success
+      assert_template 'new'
+      assert_kind_of Repository::Git, assigns(:repository)
+      assert assigns(:repository).new_record?
+    end
+
     def test_browse_root
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
@@ -308,6 +313,26 @@ class RepositoriesGitControllerTest < ActionController::TestCase
       end
     end
 
+    def test_save_diff_type
+      @request.session[:user_id] = 1 # admin
+      user = User.find(1)
+      get :diff,
+          :id   => PRJ_ID,
+          :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7'
+      assert_response :success
+      assert_template 'diff'
+      user.reload
+      assert_equal "inline", user.pref[:diff_type]
+      get :diff,
+          :id   => PRJ_ID,
+          :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7',
+          :type => 'sbs'
+      assert_response :success
+      assert_template 'diff'
+      user.reload
+      assert_equal "sbs", user.pref[:diff_type]
+    end
+
     def test_annotate
       get :annotate, :id => PRJ_ID, :path => ['sources', 'watchers_controller.rb']
       assert_response :success
@@ -418,7 +443,9 @@ class RepositoriesGitControllerTest < ActionController::TestCase
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository
@@ -426,27 +453,19 @@ class RepositoriesGitControllerTest < ActionController::TestCase
 
     def test_destroy_invalid_repository
       @request.session[:user_id] = 1 # admin
-      assert_equal 0, @repository.changesets.count
-      @repository.fetch_changesets
-      @project.reload
-      assert_equal NUM_REV, @repository.changesets.count
-
-      get :destroy, :id => PRJ_ID
-      assert_response 302
-      @project.reload
-      assert_nil @project.repository
-
-      @repository = Repository::Git.create(
+      @project.repository.destroy
+      @repository = Repository::Git.create!(
                       :project       => @project,
                       :url           => "/invalid",
                       :path_encoding => 'ISO-8859-1'
                       )
-      assert @repository
       @repository.fetch_changesets
       @repository.reload
       assert_equal 0, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository

@@ -702,7 +702,6 @@ pt-BR:
   text_tip_issue_begin_day: tarefa inicia neste dia
   text_tip_issue_end_day: tarefa termina neste dia
   text_tip_issue_begin_end_day: tarefa inicia e termina neste dia
-  text_project_identifier_info: 'Letras minúsculas (a-z), números e hífens permitidos.<br />Uma vez salvo, o identificador não poderá ser alterado.'
   text_caracters_maximum: "máximo %{count} caracteres"
   text_caracters_minimum: "deve ter ao menos %{count} caracteres."
   text_length_between: "deve ter entre %{min} e %{max} caracteres."
@@ -1000,23 +999,25 @@ pt-BR:
   setting_issue_group_assignment: Allow issue assignment to groups
   label_diff: diff
   text_git_repository_note: Repository is bare and local (e.g. /gitrepo, c:\gitrepo)
+
   description_query_sort_criteria_direction: Sort direction
-  description_project_scope: Search scope
-  description_filter: Filter
-  description_user_mail_notification: Mail notification settings
-  description_date_from: Enter start date
-  description_message_content: Message content
-  description_available_columns: Available Columns
-  description_date_range_interval: Choose range by selecting start and end date
-  description_issue_category_reassign: Choose issue category
+  description_project_scope: Escopo da pesquisa
+  description_filter: Filtro
+  description_user_mail_notification: Configuração de notificações por e-mail
+  description_date_from: Digita a data inicial
+  description_message_content: Conteúdo da mensagem
+  description_available_columns: Colunas disponíveis
+  description_date_range_interval: Escolha um período selecionando a data de início e fim
+  description_issue_category_reassign: Escolha uma categoria de tarefas
   description_search: Searchfield
-  description_notes: Notes
-  description_date_range_list: Choose range from list
-  description_choose_project: Projects
-  description_date_to: Enter end date
+  description_notes: Notas
+  description_date_range_list: Escolha um período a partira da lista
+  description_choose_project: Projetos
+  description_date_to: Digite a data final
   description_query_sort_criteria_attribute: Sort attribute
-  description_wiki_subpages_reassign: Choose new parent page
-  description_selected_columns: Selected Columns
+  description_wiki_subpages_reassign: Escolha uma nova página pai
+  description_selected_columns: Colunas selecionadas
+
   label_parent_revision: Parent
   label_child_revision: Child
   error_scm_annotate_big_text_file: The entry cannot be annotated, as it exceeds the maximum text file size.
@@ -1027,3 +1028,21 @@ pt-BR:
   button_export: Export
   label_export_options: "%{export_format} export options"
   error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})
+  notice_failed_to_save_time_entries: "Failed to save %{count} time entrie(s) on %{total} selected: %{ids}."
+  label_x_issues:
+    zero:  0 tarefa
+    one:   1 tarefa
+    other: "%{count} tarefas"
+  label_repository_new: New repository
+  field_repository_is_default: Main repository
+  label_copy_attachments: Copy attachments
+  label_item_position: "%{position}/%{count}"
+  label_completed_versions: Completed versions
+  text_project_identifier_info: Only lower case letters (a-z), numbers, dashes and underscores are allowed.<br />Once saved, the identifier cannot be changed.
+  field_multiple: Multiple values
+  setting_commit_cross_project_ref: Allow issues of all the other projects to be referenced and fixed
+  text_issue_conflict_resolution_add_notes: Add my notes and discard my other changes
+  text_issue_conflict_resolution_overwrite: Apply my changes anyway (previous notes will be kept but some changes may be overwritten)
+  notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
+  text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
+  permission_manage_related_issues: Manage related issues

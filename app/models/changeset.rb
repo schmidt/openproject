@@ -34,7 +34,7 @@ class Changeset < ActiveRecord::Base
   acts_as_event :title => Proc.new {|o| "#{l(:label_revision)} #{o.format_identifier}" + (o.short_comments.blank? ? '' : (': ' + o.short_comments))},
                 :description => :long_comments,
                 :datetime => :committed_on,
-                :url => Proc.new {|o| {:controller => 'repositories', :action => 'revision', :id => o.repository.project, :rev => o.identifier}}
+                :url => Proc.new {|o| {:controller => 'repositories', :action => 'revision', :id => o.repository.project, :repository_id => o.repository.identifier_param, :rev => o.identifier}}
 
   acts_as_searchable :columns => 'comments',
                      :include => {:repository => :project},
@@ -184,14 +184,14 @@ class Changeset < ActiveRecord::Base
                   :from_revision => change[:from_revision])
   end
 
-  private
-
   # Finds an issue that can be referenced by the commit message
-  # i.e. an issue that belong to the repository project, a subproject or a parent project
   def find_referenced_issue_by_id(id)
     return nil if id.blank?
     issue = Issue.find_by_id(id.to_i, :include => :project)
-    if issue
+    if Setting.commit_cross_project_ref?
+      # all issues can be referenced/fixed
+    elsif issue
+      # issue that belong to the repository project, a subproject or a parent project only
       unless issue.project &&
                 (project == issue.project || project.is_ancestor_of?(issue.project) ||
                  project.is_descendant_of?(issue.project))
@@ -200,6 +200,8 @@ class Changeset < ActiveRecord::Base
     end
     issue
   end
+
+  private
 
   def fix_issue(issue)
     status = IssueStatus.find_by_id(Setting.commit_fix_status_id.to_i)

@@ -16,12 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'repositories_controller'
-
-# Re-raise errors caught by the controller.
-class RepositoriesController; def rescue_action(e) raise e end; end
 
 class RepositoriesBazaarControllerTest < ActionController::TestCase
+  tests RepositoriesController
+
   fixtures :projects, :users, :roles, :members, :member_roles,
            :repositories, :enabled_modules
 
@@ -29,9 +27,6 @@ class RepositoriesBazaarControllerTest < ActionController::TestCase
   PRJ_ID = 3
 
   def setup
-    @controller = RepositoriesController.new
-    @request    = ActionController::TestRequest.new
-    @response   = ActionController::TestResponse.new
     User.current = nil
     @project = Project.find(PRJ_ID)
     @repository = Repository::Bazaar.create(
@@ -42,6 +37,16 @@ class RepositoriesBazaarControllerTest < ActionController::TestCase
   end
 
   if File.directory?(REPOSITORY_PATH)
+    def test_get_new
+      @request.session[:user_id] = 1
+      @project.repository.destroy
+      get :new, :project_id => 'subproject1', :repository_scm => 'Bazaar'
+      assert_response :success
+      assert_template 'new'
+      assert_kind_of Repository::Bazaar, assigns(:repository)
+      assert assigns(:repository).new_record?
+    end
+
     def test_browse_root
       get :show, :id => PRJ_ID
       assert_response :success
@@ -151,10 +156,11 @@ class RepositoriesBazaarControllerTest < ActionController::TestCase
       @request.session[:user_id] = 1 # admin
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
-      @project.reload
       assert @repository.changesets.count > 0
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository
@@ -162,26 +168,18 @@ class RepositoriesBazaarControllerTest < ActionController::TestCase
 
     def test_destroy_invalid_repository
       @request.session[:user_id] = 1 # admin
-      assert_equal 0, @repository.changesets.count
-      @repository.fetch_changesets
-      @project.reload
-      assert @repository.changesets.count > 0
-
-      get :destroy, :id => PRJ_ID
-      assert_response 302
-      @project.reload
-      assert_nil @project.repository
-
-      @repository = Repository::Bazaar.create(
+      @project.repository.destroy
+      @repository = Repository::Bazaar.create!(
                     :project      => @project,
                     :url          => "/invalid",
                     :log_encoding => 'UTF-8')
-      assert @repository
       @repository.fetch_changesets
       @repository.reload
       assert_equal 0, @repository.changesets.count
 
-      get :destroy, :id => PRJ_ID
+      assert_difference 'Repository.count', -1 do
+        delete :destroy, :id => @repository.id
+      end
       assert_response 302
       @project.reload
       assert_nil @project.repository

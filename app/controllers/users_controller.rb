@@ -38,23 +38,17 @@ class UsersController < ApplicationController
       @limit = per_page_option
     end
 
-    scope = User
-    scope = scope.in_group(params[:group_id].to_i) if params[:group_id].present?
+    @status = params[:status] || 1
 
-    @status = params[:status] ? params[:status].to_i : 1
-    c = ARCondition.new(@status == 0 ? "status <> 0" : ["status = ?", @status])
+    scope = User.logged.status(@status)
+    scope = scope.like(params[:name]) if params[:name].present?
+    scope = scope.in_group(params[:group_id]) if params[:group_id].present?
 
-    unless params[:name].blank?
-      name = "%#{params[:name].strip.downcase}%"
-      c << ["LOWER(login) LIKE ? OR LOWER(firstname) LIKE ? OR LOWER(lastname) LIKE ? OR LOWER(mail) LIKE ?", name, name, name, name]
-    end
-
-    @user_count = scope.count(:conditions => c.conditions)
+    @user_count = scope.count
     @user_pages = Paginator.new self, @user_count, @limit, params['page']
     @offset ||= @user_pages.current.offset
     @users =  scope.find :all,
                         :order => sort_clause,
-                        :conditions => c.conditions,
                         :limit  =>  @limit,
                         :offset =>  @offset
 
@@ -192,9 +186,10 @@ class UsersController < ApplicationController
     end
   end
 
+  verify :method => [:post, :put], :only => :edit_membership, :render => {:nothing => true, :status => :method_not_allowed }
   def edit_membership
     @membership = Member.edit_membership(params[:membership_id], params[:membership], @user)
-    @membership.save if request.post?
+    @membership.save
     respond_to do |format|
       if @membership.valid?
         format.html { redirect_to :controller => 'users', :action => 'edit', :id => @user, :tab => 'memberships' }
@@ -214,9 +209,10 @@ class UsersController < ApplicationController
     end
   end
 
+  verify :method => :delete, :only => :destroy_membership, :render => {:nothing => true, :status => :method_not_allowed }
   def destroy_membership
     @membership = Member.find(params[:membership_id])
-    if request.post? && @membership.deletable?
+    if @membership.deletable?
       @membership.destroy
     end
     respond_to do |format|

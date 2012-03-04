@@ -8,10 +8,10 @@ nl:
       default: "%d-%m-%Y"
       short: "%e %b"
       long: "%d %B, %Y"
-      
+
     day_names: [zondag, maandag, dinsdag, woensdag, donderdag, vrijdag, zaterdag]
     abbr_day_names: [zo, ma, di, wo, do, vr, za]
-      
+
     # Don't forget the nil at the beginning; there's no such thing as a 0th month
     month_names: [~, januari, februari, maart, april, mei, juni, juli, augustus, september, oktober, november, december]
     abbr_month_names: [~, jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, dec]
@@ -29,7 +29,7 @@ nl:
       long: "%d %B, %Y %H:%M"
     am: "am"
     pm: "pm"
-      
+
   datetime:
     distance_in_words:
       half_a_minute: "halve minuut"
@@ -72,27 +72,27 @@ nl:
       separator: "."
       delimiter: ""
       precision: 3
-    human: 
-      format: 
+    human:
+      format:
         precision: 1
         delimiter: ""
-      storage_units: 
+      storage_units:
         format: "%n %u"
-        units: 
+        units:
           kb: KB
           tb: TB
           gb: GB
-          byte: 
+          byte:
             one: Byte
             other: Bytes
           mb: MB
-        
+
 # Used in array.to_sentence.
   support:
     array:
       sentence_connector: "en"
       skip_last_comma: false
-      
+
   activerecord:
     errors:
       template:
@@ -126,7 +126,7 @@ nl:
         cant_link_an_issue_with_a_descendant: "Een issue kan niet gelinked worden met een subtask"
 
   actionview_instancetag_blank_option: Selecteer
-  
+
   button_activate: Activeer
   button_add: Voeg toe
   button_annotate: Annoteer
@@ -715,7 +715,7 @@ nl:
   setting_gravatar_enabled: Gebruik Gravatar gebruikersiconen
   setting_host_name: Hostnaam
   setting_issue_list_default_columns: Standaardkolommen getoond op de lijst met issues
-  setting_issues_export_limit: Max aantal te exporteren issues 
+  setting_issues_export_limit: Max aantal te exporteren issues
   setting_login_required: Authenticatie vereist
   setting_mail_from: Afzender e-mail adres
   setting_mail_handler_api_enabled: Schakel WS in voor inkomende mail.
@@ -760,7 +760,7 @@ nl:
   text_no_configuration_data: "Rollen, trackers, issue statussen en workflows zijn nog niet geconfigureerd.\nHet is ten zeerste aangeraden om de standaard configuratie in te laden. U kunt deze aanpassen nadat deze is ingeladen."
   text_plugin_assets_writable: Plugin assets directory beschrijfbaar
   text_project_destroy_confirmation: Weet u zeker dat u dit project en alle gerelateerde gegevens wilt verwijderen?
-  text_project_identifier_info: 'kleine letters (a-z), cijfers en liggende streepjes toegestaan.<br />Eenmaal bewaard kan de identificatiecode niet meer worden gewijzigd.'
+  text_project_identifier_info: 'Alleen kleine letter (a-z), cijfers, streepjes en liggende streepjes zijn toegestaan.<br />Eenmaal opgeslagen kan de identifier niet worden gewijzigd.'
   text_reassign_time_entries: 'Gerapporteerde uren opnieuw toewijzen:'
   text_regexp_info: bv. ^[A-Z0-9]+$
   text_repository_usernames_mapping: "Koppel de Redminegebruikers aan gebruikers in de repository log.\nGebruikers met dezelfde Redmine en repository gebruikersnaam of email worden automatisch gekoppeld."
@@ -783,7 +783,7 @@ nl:
   text_custom_field_possible_values_info: 'Per lijn een waarde'
   label_display: Toon
   field_editable: Bewerkbaar
-  setting_repository_log_display_limit: Max aantal revisies zichbaar 
+  setting_repository_log_display_limit: Max aantal revisies zichbaar
   setting_file_max_size_displayed: Max grootte van tekst bestanden inline zichtbaar
   field_watcher: Watcher
   setting_openid: Sta OpenID login en registratie toe
@@ -988,3 +988,20 @@ nl:
   button_export: Export
   label_export_options: "%{export_format} export options"
   error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})
+  notice_failed_to_save_time_entries: "Failed to save %{count} time entrie(s) on %{total} selected: %{ids}."
+  label_x_issues:
+    zero:  0 issue
+    one:   1 issue
+    other: "%{count} issues"
+  label_repository_new: New repository
+  field_repository_is_default: Main repository
+  label_copy_attachments: Copy attachments
+  label_item_position: "%{position}/%{count}"
+  label_completed_versions: Completed versions
+  field_multiple: Multiple values
+  setting_commit_cross_project_ref: Allow issues of all the other projects to be referenced and fixed
+  text_issue_conflict_resolution_add_notes: Add my notes and discard my other changes
+  text_issue_conflict_resolution_overwrite: Apply my changes anyway (previous notes will be kept but some changes may be overwritten)
+  notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
+  text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
+  permission_manage_related_issues: Manage related issues

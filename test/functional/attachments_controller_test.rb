@@ -32,8 +32,12 @@ class AttachmentsControllerTest < ActionController::TestCase
     @controller = AttachmentsController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
-    Attachment.storage_path = "#{Rails.root}/test/fixtures/files"
     User.current = nil
+    set_fixtures_attachments_directory
+  end
+
+  def teardown
+    set_tmp_attachments_directory
   end
 
   def test_show_diff
@@ -89,6 +93,21 @@ class AttachmentsControllerTest < ActionController::TestCase
       end
     end
     set_tmp_attachments_directory
+  end
+
+  def test_save_diff_type
+    @request.session[:user_id] = 1 # admin
+    user = User.find(1)
+    get :show, :id => 5
+    assert_response :success
+    assert_template 'diff'
+    user.reload
+    assert_equal "inline", user.pref[:diff_type]
+    get :show, :id => 5, :type => 'sbs'
+    assert_response :success
+    assert_template 'diff'
+    user.reload
+    assert_equal "sbs", user.pref[:diff_type]
   end
 
   def test_show_text_file
