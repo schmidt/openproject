@@ -17,15 +17,12 @@
 
 class BoardsController < ApplicationController
   default_search_scope :messages
-  before_filter :find_project, :find_board_if_available, :authorize
+  before_filter :find_project_by_project_id, :find_board_if_available, :authorize
   accept_rss_auth :index, :show
 
-  helper :messages
-  include MessagesHelper
   helper :sort
   include SortHelper
   helper :watchers
-  include WatchersHelper
 
   def index
     @boards = @project.boards
@@ -62,20 +59,31 @@ class BoardsController < ApplicationController
     end
   end
 
-  verify :method => :post, :only => [ :destroy ], :redirect_to => { :action => :index }
-
   def new
-    @board = Board.new(params[:board])
-    @board.project = @project
-    if request.post? && @board.save
+    @board = @project.boards.build
+    @board.safe_attributes = params[:board]
+  end
+
+  def create
+    @board = @project.boards.build
+    @board.safe_attributes = params[:board]
+    if @board.save
       flash[:notice] = l(:notice_successful_create)
       redirect_to_settings_in_projects
+    else
+      render :action => 'new'
     end
   end
 
   def edit
-    if request.post? && @board.update_attributes(params[:board])
+  end
+
+  def update
+    @board.safe_attributes = params[:board]
+    if @board.save
       redirect_to_settings_in_projects
+    else
+      render :action => 'edit'
     end
   end
 
@@ -87,12 +95,6 @@ class BoardsController < ApplicationController
 private
   def redirect_to_settings_in_projects
     redirect_to :controller => 'projects', :action => 'settings', :id => @project, :tab => 'boards'
-  end
-
-  def find_project
-    @project = Project.find(params[:project_id])
-  rescue ActiveRecord::RecordNotFound
-    render_404
   end
 
   def find_board_if_available

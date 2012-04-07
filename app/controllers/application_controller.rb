@@ -43,6 +43,30 @@ class ApplicationController < ActionController::Base
     end
   end
 
+  # FIXME: Remove this when all of Rack and Rails have learned how to
+  # properly use encodings
+  before_filter :params_filter
+
+  def params_filter
+    if RUBY_VERSION >= '1.9' && defined?(Rails) && Rails::VERSION::MAJOR < 3
+      self.utf8nize!(params)
+    end
+  end
+
+  def utf8nize!(obj)
+    if obj.frozen?
+      obj
+    elsif obj.is_a? String
+      obj.respond_to?(:force_encoding) ? obj.force_encoding("UTF-8") : obj
+    elsif obj.is_a? Hash
+      obj.each {|k, v| obj[k] = self.utf8nize!(v)}
+    elsif obj.is_a? Array
+      obj.each {|v| self.utf8nize!(v)}
+    else
+      obj
+    end
+  end
+
   before_filter :user_setup, :check_if_login_required, :set_localization
   filter_parameter_logging :password
 
@@ -236,20 +260,11 @@ class ApplicationController < ActionController::Base
     render_404
   end
 
-  # Check if project is unique before bulk operations
-  def check_project_uniqueness
-    unless @project
-      # TODO: let users bulk edit/move/destroy issues from different projects
-      render_error 'Can not bulk edit/move/destroy issues from different projects'
-      return false
-    end
-  end
-
   # make sure that the user is a member of the project (or admin) if project is private
   # used as a before_filter for actions that do not require any particular permission on the project
   def check_project_privacy
     if @project && @project.active?
-      if @project.is_public? || User.current.member_of?(@project) || User.current.admin?
+      if @project.visible?
         true
       else
         deny_access
@@ -492,16 +507,13 @@ class ApplicationController < ActionController::Base
   end
 
   # Renders API response on validation failure
-  def render_validation_errors(object)
-    options = { :status => :unprocessable_entity, :layout => false }
-    options.merge!(case params[:format]
-      when 'xml';  { :xml =>  object.errors }
-      when 'json'; { :json => {'errors' => object.errors} } # ActiveResource client compliance
-      else
-        raise "Unknown format #{params[:format]} in #render_validation_errors"
-      end
-    )
-    render options
+  def render_validation_errors(objects)
+    if objects.is_a?(Array)
+      @error_messages = objects.map {|object| object.errors.full_messages}.flatten
+    else
+      @error_messages = objects.errors.full_messages
+    end
+    render :template => 'common/error_messages.api', :status => :unprocessable_entity, :layout => false
   end
 
   # Overrides #default_template so that the api template

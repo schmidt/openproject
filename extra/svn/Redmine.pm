@@ -49,7 +49,7 @@ Authen::Simple::LDAP (and IO::Socket::SSL if LDAPS is used):
 
      PerlAccessHandler Apache::Authn::Redmine::access_handler
      PerlAuthenHandler Apache::Authn::Redmine::authen_handler
-  
+
      ## for mysql
      RedmineDSN "DBI:mysql:database=databasename;host=my.db.server"
      ## for postgres
@@ -82,6 +82,15 @@ and you will have to use this reposman.rb command line to create repository :
 
   reposman.rb --redmine my.redmine.server --svn-dir /var/svn --owner www-data -u http://svn.server/svn-private/
 
+=head1 REPOSITORIES NAMING
+
+A projet repository must be named with the projet identifier. In case
+of multiple repositories for the same project, use the project identifier
+and the repository identifier separated with a dot:
+
+  /var/svn/foo
+  /var/svn/foo.otherrepo
+
 =head1 MIGRATION FROM OLDER RELEASES
 
 If you use an older reposman.rb (r860 or before), you need to change
@@ -99,7 +108,7 @@ use strict;
 use warnings FATAL => 'all', NONFATAL => 'redefine';
 
 use DBI;
-use Digest::SHA1;
+use Digest::SHA;
 # optional module for LDAP authentication
 my $CanUseLDAPAuth = eval("use Authen::Simple::LDAP; 1");
 
@@ -144,7 +153,7 @@ my @directives = (
   },
 );
 
-sub RedmineDSN { 
+sub RedmineDSN {
   my ($self, $parms, $arg) = @_;
   $self->{RedmineDSN} = $arg;
   my $query = "SELECT 
@@ -164,12 +173,12 @@ sub RedmineDSN {
 
 sub RedmineDbUser { set_val('RedmineDbUser', @_); }
 sub RedmineDbPass { set_val('RedmineDbPass', @_); }
-sub RedmineDbWhereClause { 
+sub RedmineDbWhereClause {
   my ($self, $parms, $arg) = @_;
   $self->{RedmineQuery} = trim($self->{RedmineQuery}.($arg ? $arg : "")." ");
 }
 
-sub RedmineCacheCredsMax { 
+sub RedmineCacheCredsMax {
   my ($self, $parms, $arg) = @_;
   if ($arg) {
     $self->{RedmineCachePool} = APR::Pool->new;
@@ -216,10 +225,10 @@ sub access_handler {
 
 sub authen_handler {
   my $r = shift;
-  
+
   my ($res, $redmine_pass) =  $r->get_basic_auth_pw();
   return $res unless $res == OK;
-  
+
   if (is_member($r->user, $redmine_pass, $r)) {
       return OK;
   } else {
@@ -246,7 +255,7 @@ sub is_authentication_forced {
   }
   $sth->finish();
   undef $sth;
-  
+
   $dbh->disconnect();
   undef $dbh;
 
@@ -256,7 +265,7 @@ sub is_authentication_forced {
 sub is_public_project {
     my $project_id = shift;
     my $r = shift;
-    
+
     if (is_authentication_forced($r)) {
       return 0;
     }
@@ -283,12 +292,12 @@ sub is_public_project {
 
 sub anonymous_role_allows_browse_repository {
   my $r = shift;
-  
+
   my $dbh = connect_database($r);
   my $sth = $dbh->prepare(
       "SELECT permissions FROM roles WHERE builtin = 2;"
   );
-  
+
   $sth->execute();
   my $ret = 0;
   if (my @row = $sth->fetchrow_array) {
@@ -300,7 +309,7 @@ sub anonymous_role_allows_browse_repository {
   undef $sth;
   $dbh->disconnect();
   undef $dbh;
-  
+
   $ret;
 }
 
@@ -327,8 +336,8 @@ sub is_member {
   my $dbh         = connect_database($r);
   my $project_id  = get_project_identifier($r);
 
-  my $pass_digest = Digest::SHA1::sha1_hex($redmine_pass);
-  
+  my $pass_digest = Digest::SHA::sha1_hex($redmine_pass);
+
   my $access_mode = defined $read_only_methods{$r->method} ? "R" : "W";
 
   my $cfg = Apache2::Module::get_config(__PACKAGE__, $r->server, $r->per_dir_config);
@@ -346,7 +355,7 @@ sub is_member {
 
       unless ($auth_source_id) {
 	  			my $method = $r->method;
-          my $salted_password = Digest::SHA1::sha1_hex($salt.$pass_digest);
+          my $salted_password = Digest::SHA::sha1_hex($salt.$pass_digest);
 					if ($hashed_password eq $salted_password && (($access_mode eq "R" && $permissions =~ /:browse_repository/) || $permissions =~ /:commit_access/) ) {
               $ret = 1;
               last;
@@ -397,15 +406,15 @@ sub is_member {
 
 sub get_project_identifier {
     my $r = shift;
-    
+
     my $location = $r->location;
-    my ($identifier) = $r->uri =~ m{$location/*([^/]+)};
+    my ($identifier) = $r->uri =~ m{$location/*([^/.]+)};
     $identifier;
 }
 
 sub connect_database {
     my $r = shift;
-    
+
     my $cfg = Apache2::Module::get_config(__PACKAGE__, $r->server, $r->per_dir_config);
     return DBI->connect($cfg->{RedmineDSN}, $cfg->{RedmineDbUser}, $cfg->{RedmineDbPass});
 }

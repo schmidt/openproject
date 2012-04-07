@@ -190,7 +190,7 @@ ja:
   notice_email_error: "メール送信中にエラーが発生しました (%{value})"
   notice_feeds_access_key_reseted: RSSアクセスキーを初期化しました。
   notice_api_access_key_reseted: APIアクセスキーを初期化しました。
-  notice_failed_to_save_issues: "%{total}件のうち%{count}件のチケットが保存できませんでした: %{ids}."
+  notice_failed_to_save_issues: "全%{total}件中%{count}件のチケットが保存できませんでした: %{ids}."
   notice_failed_to_save_members: "メンバーの保存に失敗しました: %{errors}."
   notice_no_issue_selected: "チケットが選択されていません! 更新対象のチケットを選択してください。"
   notice_account_pending: アカウントは作成済みで、管理者の承認待ちです。
@@ -349,8 +349,8 @@ ja:
   setting_default_language: 既定の言語
   setting_login_required: 認証が必要
   setting_self_registration: ユーザは自分で登録できる
-  setting_attachment_max_size: 添付ファイルの最大サイズ
-  setting_issues_export_limit: 出力するチケット数の上限
+  setting_attachment_max_size: 添付ファイルサイズの上限
+  setting_issues_export_limit: エクスポートするチケット数の上限
   setting_mail_from: 送信元メールアドレス
   setting_bcc_recipients: ブラインドカーボンコピーで受信(bcc)
   setting_plain_text_mail: プレインテキストのみ(HTMLなし)
@@ -376,7 +376,7 @@ ja:
   setting_per_page_options: ページ毎の表示件数
   setting_user_format: ユーザ名の表示書式
   setting_activity_days_default: プロジェクトの活動ページに表示される日数
-  setting_display_subprojects_issues: デフォルトでサブプロジェクトのチケットをメインプロジェクトに表示する
+  setting_display_subprojects_issues: サブプロジェクトのチケットをメインプロジェクトに表示する
   setting_enabled_scm: 使用するバージョン管理システム
   setting_mail_handler_body_delimiters: "メール本文から一致する行以降を切り取る"
   setting_mail_handler_api_enabled: 受信メール用のWebサービスを有効にする
@@ -385,7 +385,7 @@ ja:
   setting_gravatar_enabled: Gravatarのアイコンを使用する
   setting_gravatar_default: デフォルトのGravatarアイコン
   setting_diff_max_lines_displayed: 差分の表示行数の上限
-  setting_file_max_size_displayed: テキストファイルのインライン表示行数の上限
+  setting_file_max_size_displayed: 画面表示するテキストファイルサイズの上限
   setting_repository_log_display_limit: ファイルのリビジョン表示数の上限
   setting_openid: OpenIDによるログインと登録
   setting_password_min_length: パスワードの最低必要文字数
@@ -421,9 +421,9 @@ ja:
   permission_save_queries: クエリの保存
   permission_view_gantt: ガントチャートの閲覧
   permission_view_calendar: カレンダーの閲覧
-  permission_view_issue_watchers: ウォッチ一覧の閲覧
-  permission_add_issue_watchers: ウォッチの追加
-  permission_delete_issue_watchers: ウォッチの削除
+  permission_view_issue_watchers: ウォッチャー一覧の閲覧
+  permission_add_issue_watchers: ウォッチャーの追加
+  permission_delete_issue_watchers: ウォッチャーの削除
   permission_log_time: 変更履歴の記入
   permission_view_time_entries: 変更履歴の閲覧
   permission_edit_time_entries: 変更履歴の編集
@@ -439,7 +439,7 @@ ja:
   permission_rename_wiki_pages: Wikiページ名の変更
   permission_delete_wiki_pages: Wikiページの削除
   permission_view_wiki_pages: Wikiの閲覧
-  permission_export_wiki_pages: Wikiページを他の形式に出力
+  permission_export_wiki_pages: Wikiページを他の形式にエクスポート
   permission_view_wiki_edits: Wiki履歴の閲覧
   permission_edit_wiki_pages: Wikiページの編集
   permission_delete_wiki_pages_attachments: 添付ファイルの削除
@@ -583,7 +583,7 @@ ja:
   label_version_plural: バージョン
   label_confirmation: 確認
   label_close_versions: 完了したバージョンを終了にする
-  label_export_to: '他の形式に出力:'
+  label_export_to: '他の形式にエクスポート:'
   label_read: 読む...
   label_public_projects: 公開プロジェクト
   label_open_issues: 未完了
@@ -680,7 +680,7 @@ ja:
   label_latest_revision_plural: 最新リビジョン
   label_view_revisions: リビジョンを見る
   label_view_all_revisions: すべてのリビジョンを見る
-  label_max_size: 最大サイズ
+  label_max_size: サイズの上限
   label_sort_highest: 一番上へ
   label_sort_higher: 上へ
   label_sort_lower: 下へ
@@ -878,7 +878,7 @@ ja:
   button_change_password: パスワード変更
   button_copy: コピー
   button_copy_and_follow: コピー後表示
-  button_annotate: 注釈
+  button_annotate: アノテート
   button_update: 更新
   button_configure: 設定
   button_quote: 引用
@@ -911,7 +911,6 @@ ja:
   text_tip_issue_begin_day: この日に開始するタスク
   text_tip_issue_end_day: この日に終了するタスク
   text_tip_issue_begin_end_day: この日のうちに開始して終了するタスク
-  text_project_identifier_info: '英小文字(a-z)と数字とダッシュ(-)が使えます。<br />一度保存すると、識別子は変更できません。'
   text_caracters_maximum: "最大%{count}文字です。"
   text_caracters_minimum: "最低%{count}文字の長さが必要です"
   text_length_between: "長さは%{min}から%{max}文字までです。"
@@ -1012,27 +1011,47 @@ ja:
   notice_issue_successful_create: チケット %{id} が作成されました。
   label_between: 次の範囲内
   setting_issue_group_assignment: グループへのチケット割り当てを許可
-  description_query_sort_criteria_direction: Sort direction
-  description_project_scope: Search scope
+  description_query_sort_criteria_direction: 順序
+  description_project_scope: 検索範囲
   description_filter: Filter
-  description_user_mail_notification: Mail notification settings
-  description_date_from: Enter start date
-  description_message_content: Message content
-  description_available_columns: Available Columns
-  description_date_range_interval: Choose range by selecting start and end date
-  description_issue_category_reassign: Choose issue category
-  description_search: Searchfield
-  description_notes: Notes
-  description_date_range_list: Choose range from list
-  description_choose_project: Projects
-  description_date_to: Enter end date
-  description_query_sort_criteria_attribute: Sort attribute
-  description_wiki_subpages_reassign: Choose new parent page
-  description_selected_columns: Selected Columns
-  error_scm_annotate_big_text_file: The entry cannot be annotated, as it exceeds the maximum text file size.
-  setting_default_issue_start_date_to_creation_date: Use current date as start date for new issues
-  button_edit_section: Edit this section
-  description_all_columns: All Columns
-  button_export: Export
-  label_export_options: "%{export_format} export options"
-  error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})
+  description_user_mail_notification: メール通知の設定
+  description_date_from: 開始日
+  description_message_content: 内容
+  description_available_columns: 利用できる項目
+  description_date_range_interval: 日付で指定
+  description_issue_category_reassign: 新しいカテゴリを選択してください
+  description_search: 検索キーワード
+  description_notes: 注記
+  description_date_range_list: 一覧から選択
+  description_choose_project: プロジェクト
+  description_date_to: 終了日
+  description_query_sort_criteria_attribute: 項目
+  description_wiki_subpages_reassign: 新しい親ページを選択してください
+  description_selected_columns: 選択された項目
+  error_scm_annotate_big_text_file: テキストファイルサイズの上限を超えているためアノテートできません。
+  setting_default_issue_start_date_to_creation_date: 現在の日付を新しいチケットの開始日とする
+  button_edit_section: このセクションを編集
+  description_all_columns: すべての項目
+  button_export: エクスポート
+  label_export_options: "%{export_format} エクスポート設定"
+  error_attachment_too_big: このファイルはアップロードできません。添付ファイルサイズの上限(%{max_size})を超えています。
+  notice_failed_to_save_time_entries: "全%{total}件中%{count}件の作業時間が保存できませんでした: %{ids}."
+  label_x_issues:
+    zero:  0 チケット
+    one:   1 チケット
+    other: "%{count} チケット"
+  label_repository_new: 新しいリポジトリ
+  field_repository_is_default: メインリポジトリ
+  label_copy_attachments: 添付ファイルをコピー
+  label_item_position: "%{position}/%{count}"
+  label_completed_versions: 完了したバージョン
+  text_project_identifier_info: アルファベット小文字(a-z)・数字・ハイフン・アンダースコアが使えます。<br />識別子は後で変更することはできません。
+  field_multiple: 複数選択可
+  setting_commit_cross_project_ref: 異なるプロジェクトのチケットの参照/修正を許可
+  text_issue_conflict_resolution_add_notes: 自分の編集内容を破棄し注記のみ追加
+  text_issue_conflict_resolution_overwrite: 自分の編集内容の保存を強行 (他のユーザの更新内容は注記を除き上書きされます)
+  notice_issue_update_conflict: このチケットを編集中に他のユーザが更新しました。
+  text_issue_conflict_resolution_cancel: 自分の編集内容を破棄し %{link} を再表示
+  permission_manage_related_issues: 関連するチケットの管理
+  field_ldap_filter: LDAPフィルタ
+  label_search_for_watchers: ウォッチャーを検索して追加
