@@ -21,6 +21,9 @@ class RolesControllerTest < ActionController::TestCase
   fixtures :roles, :users, :members, :member_roles, :workflows, :trackers
 
   def setup
+    @controller = RolesController.new
+    @request    = ActionController::TestRequest.new
+    @response   = ActionController::TestResponse.new
     User.current = nil
     @request.session[:user_id] = 1 # admin
   end
@@ -82,6 +85,11 @@ class RolesControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'edit'
     assert_equal Role.find(1), assigns(:role)
+  end
+
+  def test_edit_invalid_should_respond_with_404
+    get :edit, :id => 999
+    assert_response 404
   end
 
   def test_update

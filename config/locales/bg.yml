@@ -1,3 +1,4 @@
+# Bulgarian translation by Ivan Cenov i_cenov@botevgrad.com
 bg:
   # Text direction: Left-to-Right (ltr) or Right-to-Left (rtl)
   direction: ltr
@@ -321,6 +322,7 @@ bg:
   field_cvs_module: Модул
   field_repository_is_default: Главно хранилище
   field_multiple: Избор на повече от една стойност
+  field_ldap_filter: LDAP филтър
 
   setting_app_title: Заглавие
   setting_app_subtitle: Описание
@@ -843,6 +845,7 @@ bg:
   label_copy_attachments: Копиране на прикачените файлове
   label_item_position: "%{position}/%{count}"
   label_completed_versions: Завършени версии
+  label_search_for_watchers: Търсене на потребители за наблюдатели
 
   button_login: Вход
   button_submit: Прикачване

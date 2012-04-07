@@ -23,7 +23,7 @@ class VersionsController < ApplicationController
   before_filter :find_project, :only => [:index, :new, :create, :close_completed]
   before_filter :authorize
 
-  accept_api_auth :index, :create, :update, :destroy
+  accept_api_auth :index, :show, :create, :update, :destroy
 
   helper :custom_fields
   helper :projects
@@ -45,14 +45,13 @@ class VersionsController < ApplicationController
         end
 
         @issues_by_version = {}
-        unless @selected_tracker_ids.empty?
-          @versions.each do |version|
-            issues = version.fixed_issues.visible.find(:all,
-                                                       :include => [:project, :status, :tracker, :priority],
-                                                       :conditions => {:tracker_id => @selected_tracker_ids, :project_id => project_ids},
-                                                       :order => "#{Project.table_name}.lft, #{Tracker.table_name}.position, #{Issue.table_name}.id")
-            @issues_by_version[version] = issues
-          end
+        if @selected_tracker_ids.any? && @versions.any?
+          issues = Issue.visible.all(
+            :include => [:project, :status, :tracker, :priority, :fixed_version],
+            :conditions => {:tracker_id => @selected_tracker_ids, :project_id => project_ids, :fixed_version_id => @versions.map(&:id)},
+            :order => "#{Project.table_name}.lft, #{Tracker.table_name}.position, #{Issue.table_name}.id"
+          )
+          @issues_by_version = issues.group_by(&:fixed_version)
         end
         @versions.reject! {|version| !project_ids.include?(version.project_id) && @issues_by_version[version].blank?}
       }
@@ -74,7 +73,8 @@ class VersionsController < ApplicationController
   end
 
   def new
-    @version = @project.versions.build(params[:version])
+    @version = @project.versions.build
+    @version.safe_attributes = params[:version]
 
     respond_to do |format|
       format.html
@@ -93,7 +93,7 @@ class VersionsController < ApplicationController
     if params[:version]
       attributes = params[:version].dup
       attributes.delete('sharing') unless attributes.nil? || @version.allowed_sharings.include?(attributes['sharing'])
-      @version.attributes = attributes
+      @version.safe_attributes = attributes
     end
 
     if request.post?
@@ -108,7 +108,7 @@ class VersionsController < ApplicationController
               page << 'hideModal();'
               # IE doesn't support the replace_html rjs method for select box options
               page.replace "issue_fixed_version_id",
-                content_tag('select', '<option></option>' + version_options_for_select(@project.shared_versions.open, @version), :id => 'issue_fixed_version_id', :name => 'issue[fixed_version_id]')
+                content_tag('select', content_tag('option') + version_options_for_select(@project.shared_versions.open, @version), :id => 'issue_fixed_version_id', :name => 'issue[fixed_version_id]')
             }
           end
           format.api do
@@ -137,7 +137,8 @@ class VersionsController < ApplicationController
     if request.put? && params[:version]
       attributes = params[:version].dup
       attributes.delete('sharing') unless @version.allowed_sharings.include?(attributes['sharing'])
-      if @version.update_attributes(attributes)
+      @version.safe_attributes = attributes
+      if @version.save
         respond_to do |format|
           format.html {
             flash[:notice] = l(:notice_successful_update)
@@ -161,7 +162,6 @@ class VersionsController < ApplicationController
     redirect_to :controller => 'projects', :action => 'settings', :tab => 'versions', :id => @project
   end
 
-  verify :method => :delete, :only => :destroy, :render => {:nothing => true, :status => :method_not_allowed }
   def destroy
     if @version.fixed_issues.empty?
       @version.destroy

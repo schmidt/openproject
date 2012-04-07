@@ -324,13 +324,13 @@ class User < Principal
   # Find a user account by matching the exact login and then a case-insensitive
   # version.  Exact matches will be given priority.
   def self.find_by_login(login)
-    # force string comparison to be case sensitive on MySQL
-    type_cast = (ActiveRecord::Base.connection.adapter_name == 'MySQL') ? 'BINARY' : ''
-
     # First look for an exact match
-    user = first(:conditions => ["#{type_cast} login = ?", login])
-    # Fail over to case-insensitive if none was found
-    user ||= first(:conditions => ["#{type_cast} LOWER(login) = ?", login.to_s.downcase])
+    user = all(:conditions => {:login => login}).detect {|u| u.login == login}
+    unless user
+      # Fail over to case-insensitive if none was found
+      user = first(:conditions => ["LOWER(login) = ?", login.to_s.downcase])
+    end
+    user
   end
 
   def self.find_by_rss_key(key)
@@ -610,7 +610,7 @@ class User < Principal
 
   # Returns a 128bits random salt as a hex string (32 chars long)
   def self.generate_salt
-    ActiveSupport::SecureRandom.hex(16)
+    Redmine::Utils.random_hex(16)
   end
 
 end

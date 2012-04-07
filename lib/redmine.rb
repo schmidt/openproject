@@ -13,13 +13,13 @@ require 'redmine/wiki_formatting'
 require 'redmine/scm/base'
 
 begin
-  require_library_or_gem 'RMagick' unless Object.const_defined?(:Magick)
+  require 'RMagick' unless Object.const_defined?(:Magick)
 rescue LoadError
   # RMagick is not available
 end
 
 if RUBY_VERSION < '1.9'
-  require 'faster_csv'
+  require 'fastercsv'
 else
   require 'csv'
   FCSV = CSV
@@ -67,13 +67,13 @@ Redmine::AccessControl.map do |map|
                                   :journals => [:index, :diff],
                                   :queries => :index,
                                   :reports => [:issue_report, :issue_report_details]}
-    map.permission :add_issues, {:issues => [:new, :create, :update_form]}
-    map.permission :edit_issues, {:issues => [:edit, :update, :bulk_edit, :bulk_update, :update_form], :journals => [:new]}
+    map.permission :add_issues, {:issues => [:new, :create, :update_form], :attachments => :upload}
+    map.permission :edit_issues, {:issues => [:edit, :update, :bulk_edit, :bulk_update, :update_form], :journals => [:new], :attachments => :upload}
     map.permission :manage_issue_relations, {:issue_relations => [:index, :show, :create, :destroy]}
     map.permission :manage_subtasks, {}
     map.permission :set_issues_private, {}
     map.permission :set_own_issues_private, {}, :require => :loggedin
-    map.permission :add_issue_notes, {:issues => [:edit, :update], :journals => [:new]}
+    map.permission :add_issue_notes, {:issues => [:edit, :update], :journals => [:new], :attachments => :upload}
     map.permission :edit_issue_notes, {:journals => :edit}, :require => :loggedin
     map.permission :edit_own_issue_notes, {:journals => :edit}, :require => :loggedin
     map.permission :move_issues, {:issues => [:bulk_edit, :bulk_update]}, :require => :loggedin
@@ -182,7 +182,7 @@ Redmine::MenuManager.map :admin_menu do |menu|
             :html => {:class => 'custom_fields'}
   menu.push :enumerations, {:controller => 'enumerations'}
   menu.push :settings, {:controller => 'settings'}
-  menu.push :ldap_authentication, {:controller => 'ldap_auth_sources', :action => 'index'},
+  menu.push :ldap_authentication, {:controller => 'auth_sources', :action => 'index'},
             :html => {:class => 'server_authentication'}
   menu.push :plugins, {:controller => 'admin', :action => 'plugins'}, :last => true
   menu.push :info, {:controller => 'admin', :action => 'info'}, :caption => :label_information_plural, :last => true

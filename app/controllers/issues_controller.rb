@@ -20,8 +20,7 @@ class IssuesController < ApplicationController
   default_search_scope :issues
 
   before_filter :find_issue, :only => [:show, :edit, :update]
-  before_filter :find_issues, :only => [:bulk_edit, :bulk_update, :move, :perform_move, :destroy]
-  before_filter :check_project_uniqueness, :only => [:move, :perform_move]
+  before_filter :find_issues, :only => [:bulk_edit, :bulk_update, :destroy]
   before_filter :find_project, :only => [:new, :create]
   before_filter :authorize, :except => [:index]
   before_filter :find_optional_project, :only => [:index]
@@ -53,10 +52,6 @@ class IssuesController < ApplicationController
   helper :timelog
   helper :gantt
   include Redmine::Export::PDF
-
-  verify :method => :post, :only => :create, :render => {:nothing => true, :status => :method_not_allowed }
-  verify :method => :post, :only => :bulk_update, :render => {:nothing => true, :status => :method_not_allowed }
-  verify :method => :put, :only => :update, :render => {:nothing => true, :status => :method_not_allowed }
 
   def index
     retrieve_query
@@ -149,8 +144,8 @@ class IssuesController < ApplicationController
 
   def create
     call_hook(:controller_issues_new_before_save, { :params => params, :issue => @issue })
+    @issue.save_attachments(params[:attachments] || (params[:issue] && params[:issue][:uploads]))
     if @issue.save
-      attachments = Attachment.attach_files(@issue, params[:attachments])
       call_hook(:controller_issues_new_after_save, { :params => params, :issue => @issue})
       respond_to do |format|
         format.html {
@@ -181,6 +176,7 @@ class IssuesController < ApplicationController
 
   def update
     return unless update_issue_from_params
+    @issue.save_attachments(params[:attachments] || (params[:issue] && params[:issue][:uploads]))
     saved = false
     begin
       saved = @issue.save_issue_with_child_records(params, @time_entry)
@@ -221,7 +217,7 @@ class IssuesController < ApplicationController
     if User.current.allowed_to?(:move_issues, @projects)
       @allowed_projects = Issue.allowed_target_projects_on_move
       if params[:issue]
-        @target_project = @allowed_projects.detect {|p| p.id.to_s == params[:issue][:project_id]}
+        @target_project = @allowed_projects.detect {|p| p.id.to_s == params[:issue][:project_id].to_s}
         if @target_project
           target_projects = [@target_project]
         end
@@ -233,6 +229,8 @@ class IssuesController < ApplicationController
     @custom_fields = target_projects.map{|p|p.all_issue_custom_fields}.reduce(:&)
     @assignables = target_projects.map(&:assignable_users).reduce(:&)
     @trackers = target_projects.map(&:trackers).reduce(:&)
+    @versions = target_projects.map {|p| p.shared_versions.open}.reduce(:&)
+    @categories = target_projects.map {|p| p.issue_categories}.reduce(:&)
 
     @safe_attributes = @issues.map(&:safe_attribute_names).reduce(:&)
     render :layout => false if request.xhr?
@@ -273,7 +271,6 @@ class IssuesController < ApplicationController
     end
   end
 
-  verify :method => :delete, :only => :destroy, :render => { :nothing => true, :status => :method_not_allowed }
   def destroy
     @hours = TimeEntry.sum(:hours, :conditions => ['issue_id IN (?)', @issues]).to_f
     if @hours > 0
@@ -410,6 +407,7 @@ private
 
     @priorities = IssuePriority.active
     @allowed_statuses = @issue.new_statuses_allowed_to(User.current, true)
+    @available_watchers = (@issue.project.users.sort + @issue.watcher_users).uniq
   end
 
   def check_for_default_issue_status

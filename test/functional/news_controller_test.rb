@@ -46,6 +46,11 @@ class NewsControllerTest < ActionController::TestCase
     assert_not_nil assigns(:newss)
   end
 
+  def test_index_with_invalid_project_should_respond_with_404
+    get :index, :project_id => 999
+    assert_response 404
+  end
+
   def test_show
     get :show, :id => 1
     assert_response :success
@@ -117,8 +122,7 @@ class NewsControllerTest < ActionController::TestCase
     assert_template 'new'
     assert_not_nil assigns(:news)
     assert assigns(:news).new_record?
-    assert_tag :tag => 'div', :attributes => { :id => 'errorExplanation' },
-                              :content => /1 error/
+    assert_error_tag :content => /title can't be blank/i
   end
 
   def test_get_edit
@@ -148,6 +152,14 @@ class NewsControllerTest < ActionController::TestCase
     end
     attachment = Attachment.first(:order => 'id DESC')
     assert_equal News.find(1), attachment.container
+  end
+
+  def test_update_with_failure
+    @request.session[:user_id] = 2
+    put :update, :id => 1, :news => { :description => '' }
+    assert_response :success
+    assert_template 'edit'
+    assert_error_tag :content => /description can't be blank/i
   end
 
   def test_destroy

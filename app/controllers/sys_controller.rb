@@ -37,9 +37,10 @@ class SysController < ActionController::Base
       render :nothing => true, :status => 409
     else
       logger.info "Repository for #{project.name} was reported to be created by #{request.remote_ip}."
-      project.repository = Repository.factory(params[:vendor], params[:repository])
-      if project.repository && project.repository.save
-        render :xml => project.repository.to_xml(:only => [:id, :url]), :status => 201
+      repository = Repository.factory(params[:vendor], params[:repository])
+      repository.project = project
+      if repository.save
+        render :xml => {repository.class.name.underscore.gsub('/', '-') => {:id => repository.id, :url => repository.url}}, :status => 201
       else
         render :nothing => true, :status => 422
       end
@@ -48,10 +49,18 @@ class SysController < ActionController::Base
 
   def fetch_changesets
     projects = []
+    scope = Project.active.has_module(:repository)
     if params[:id]
-      projects << Project.active.has_module(:repository).find(params[:id])
+      project = nil
+      if params[:id].to_s =~ /^\d*$/
+        project = scope.find(params[:id])
+      else
+        project = scope.find_by_identifier(params[:id])
+      end
+      raise ActiveRecord::RecordNotFound unless project
+      projects << project
     else
-      projects = Project.active.has_module(:repository).all
+      projects = scope.all
     end
     projects.each do |project|
       project.repositories.each do |repository|

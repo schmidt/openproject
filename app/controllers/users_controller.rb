@@ -86,7 +86,6 @@ class UsersController < ApplicationController
     @auth_sources = AuthSource.find(:all)
   end
 
-  verify :method => :post, :only => :create, :render => {:nothing => true, :status => :method_not_allowed }
   def create
     @user = User.new(:language => Setting.default_language, :mail_notification => Setting.default_notification_option)
     @user.safe_attributes = params[:user]
@@ -94,11 +93,9 @@ class UsersController < ApplicationController
     @user.login = params[:user][:login]
     @user.password, @user.password_confirmation = params[:user][:password], params[:user][:password_confirmation] unless @user.auth_source_id
 
-    # TODO: Similar to My#account
-    @user.pref.attributes = params[:pref]
-    @user.pref[:no_self_notified] = (params[:no_self_notified] == '1')
-
     if @user.save
+      @user.pref.attributes = params[:pref]
+      @user.pref[:no_self_notified] = (params[:no_self_notified] == '1')
       @user.pref.save
       @user.notified_project_ids = (@user.mail_notification == 'selected' ? params[:notified_project_ids] : [])
 
@@ -131,7 +128,6 @@ class UsersController < ApplicationController
     @membership ||= Member.new
   end
 
-  verify :method => :put, :only => :update, :render => {:nothing => true, :status => :method_not_allowed }
   def update
     @user.admin = params[:user][:admin] if params[:user][:admin]
     @user.login = params[:user][:login] if params[:user][:login]
@@ -177,7 +173,6 @@ class UsersController < ApplicationController
     redirect_to :controller => 'users', :action => 'edit', :id => @user
   end
 
-  verify :method => :delete, :only => :destroy, :render => {:nothing => true, :status => :method_not_allowed }
   def destroy
     @user.destroy
     respond_to do |format|
@@ -186,7 +181,6 @@ class UsersController < ApplicationController
     end
   end
 
-  verify :method => [:post, :put], :only => :edit_membership, :render => {:nothing => true, :status => :method_not_allowed }
   def edit_membership
     @membership = Member.edit_membership(params[:membership_id], params[:membership], @user)
     @membership.save
@@ -209,7 +203,6 @@ class UsersController < ApplicationController
     end
   end
 
-  verify :method => :delete, :only => :destroy_membership, :render => {:nothing => true, :status => :method_not_allowed }
   def destroy_membership
     @membership = Member.find(params[:membership_id])
     if @membership.deletable?

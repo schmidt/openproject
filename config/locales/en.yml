@@ -321,6 +321,7 @@ en:
   field_cvs_module: Module
   field_repository_is_default: Main repository
   field_multiple: Multiple values
+  field_ldap_filter: LDAP filter
 
   setting_app_title: Application title
   setting_app_subtitle: Application subtitle
@@ -841,8 +842,9 @@ en:
   label_child_revision: Child
   label_export_options: "%{export_format} export options"
   label_copy_attachments: Copy attachments
-  label_item_position: %{position} of %{count}
+  label_item_position: "%{position} of %{count}"
   label_completed_versions: Completed versions
+  label_search_for_watchers: Search for watchers to add
 
   button_login: Login
   button_submit: Submit

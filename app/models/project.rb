@@ -37,7 +37,7 @@ class Project < ActiveRecord::Base
 
   has_many :enabled_modules, :dependent => :delete_all
   has_and_belongs_to_many :trackers, :order => "#{Tracker.table_name}.position"
-  has_many :issues, :dependent => :destroy, :order => "#{Issue.table_name}.created_on DESC", :include => [:status, :tracker]
+  has_many :issues, :dependent => :destroy, :include => [:status, :tracker]
   has_many :issue_changes, :through => :issues, :source => :journals
   has_many :versions, :dependent => :destroy, :order => "#{Version.table_name}.effective_date DESC, #{Version.table_name}.name DESC"
   has_many :time_entries, :dependent => :delete_all
@@ -270,6 +270,19 @@ class Project < ActiveRecord::Base
     else
       super
     end
+  end
+
+  def reload(*args)
+    @shared_versions = nil
+    @rolled_up_versions = nil
+    @rolled_up_trackers = nil
+    @all_issue_custom_fields = nil
+    @all_time_entry_custom_fields = nil
+    @to_param = nil
+    @allowed_parents = nil
+    @allowed_permissions = nil
+    @actions_allowed = nil
+    super
   end
 
   def to_param

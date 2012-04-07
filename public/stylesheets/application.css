@@ -239,6 +239,16 @@ table.attributes td { vertical-align: top; }
 
 table.boards a.board, h3.comments { background: url(../images/comment.png) no-repeat 0% 50%; padding-left: 20px; }
 
+table.query-columns {
+    border-collapse: collapse;
+    border: 0;
+}
+
+table.query-columns td.buttons {
+    vertical-align: middle;
+    text-align: center;
+}
+
 td.center {text-align:center;}
 
 h3.version { background: url(../images/package.png) no-repeat 0% 50%; padding-left: 20px; }
@@ -254,6 +264,12 @@ div.projects h3 { background: url(../images/projects.png) no-repeat 0% 50%; padd
 #watchers a.delete {opacity: 0.4;}
 #watchers a.delete:hover {opacity: 1;}
 #watchers img.gravatar {margin: 0 4px 2px 0;}
+
+span#watchers_inputs {overflow:auto; display:block;}
+span.search_for_watchers {display:block;}
+span.search_for_watchers, span.add_attachment {font-size:80%; line-height:2.5em;}
+span.search_for_watchers a, span.add_attachment a {padding-left:16px; background: url(../images/bullet_add.png) no-repeat 0 50%; }
+
 
 .highlight { background-color: #FCFD8D;}
 .highlight.token-1 { background-color: #faa;}
@@ -331,6 +347,8 @@ div#issue-changesets {float:right; width:45%; margin-left: 1em; margin-bottom: 1
 div#issue-changesets div.changeset { padding: 4px;}
 div#issue-changesets div.changeset { border-bottom: 1px solid #ddd; }
 div#issue-changesets p { margin-top: 0; margin-bottom: 1em;}
+
+.journal ul.details img {margin:0 0 -3px 4px; vertical-middle:base;}
 
 div#activity dl, #search-results { margin-left: 2em; }
 div#activity dd, #search-results dd { margin-bottom: 1em; padding-left: 18px; font-size: 0.9em; }
@@ -958,6 +976,7 @@ padding-bottom: 3px;
 .icon-zoom-in { background-image: url(../images/zoom_in.png); }
 .icon-zoom-out { background-image: url(../images/zoom_out.png); }
 .icon-passwd { background-image: url(../images/textfield_key.png); }
+.icon-test { background-image: url(../images/bullet_go.png); }
 
 .icon-file { background-image: url(../images/files/default.png); }
 .icon-file.text-plain { background-image: url(../images/files/text.png); }

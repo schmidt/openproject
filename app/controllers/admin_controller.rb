@@ -63,7 +63,7 @@ class AdminController < ApplicationController
     # Force ActionMailer to raise delivery errors so we can catch it
     ActionMailer::Base.raise_delivery_errors = true
     begin
-      @test = Mailer.deliver_test(User.current)
+      @test = Mailer.deliver_test_email(User.current)
       flash[:notice] = l(:notice_email_sent, User.current.mail)
     rescue Exception => e
       flash[:error] = l(:notice_email_error, e.message)
@@ -79,7 +79,7 @@ class AdminController < ApplicationController
           User.find(:first,
                     :conditions => ["login=? and hashed_password=?", 'admin', User.hash_password('admin')]).nil?],
       [:text_file_repository_writable, File.writable?(Attachment.storage_path)],
-      [:text_plugin_assets_writable,   File.writable?(Engines.public_directory)],
+      [:text_plugin_assets_writable,   File.writable?(Redmine::Plugin.public_directory)],
       [:text_rmagick_available,        Object.const_defined?(:Magick)]
     ]
   end
