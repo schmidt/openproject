@@ -30,7 +30,7 @@ class NewsTest < ActiveSupport::TestCase
   def test_create_should_send_email_notification
     ActionMailer::Base.deliveries.clear
     Setting.notified_events << 'news_added'
-    news = Project.find(:first).news.new(valid_news)
+    news = Project.find(1).news.new(valid_news)
 
     assert news.save
     assert_equal 1, ActionMailer::Base.deliveries.size
@@ -70,5 +70,20 @@ class NewsTest < ActiveSupport::TestCase
     # Make sure we have a bunch of news stories
     10.times { projects(:projects_001).news.create(valid_news) }
     assert_equal 5, News.latest(users(:users_004)).size
+  end
+
+  def test_attachments_should_be_visible
+    assert News.find(1).attachments_visible?(User.anonymous)
+  end
+
+  def test_attachments_should_be_deletable_with_manage_news_permission
+    manager = User.find(2)
+    assert News.find(1).attachments_deletable?(manager)
+  end
+
+  def test_attachments_should_not_be_deletable_without_manage_news_permission
+    manager = User.find(2)
+    Role.find_by_name('Manager').remove_permission!(:manage_news)
+    assert !News.find(1).attachments_deletable?(manager)
   end
 end

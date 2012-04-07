@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Version < ActiveRecord::Base
+  include Redmine::SafeAttributes
   after_update :update_issues_from_sharing_change
   belongs_to :project
   has_many :fixed_issues, :class_name => 'Issue', :foreign_key => 'fixed_version_id', :dependent => :nullify
@@ -38,6 +39,15 @@ class Version < ActiveRecord::Base
   named_scope :visible, lambda {|*args| { :include => :project,
                                           :conditions => Project.allowed_to_condition(args.first || User.current, :view_issues) } }
 
+  safe_attributes 'name', 
+    'description',
+    'effective_date',
+    'due_date',
+    'wiki_page_title',
+    'status',
+    'sharing',
+    'custom_field_values'
+
   # Returns true if +user+ or current user is allowed to view the version
   def visible?(user=User.current)
     user.allowed_to?(:view_issues, self.project)
@@ -56,6 +66,10 @@ class Version < ActiveRecord::Base
     effective_date
   end
 
+  def due_date=(arg)
+    self.effective_date=(arg)
+  end
+
   # Returns the total estimated time for this version
   # (sum of leaves estimated_hours)
   def estimated_hours
@@ -64,7 +78,7 @@ class Version < ActiveRecord::Base
 
   # Returns the total reported time for this version
   def spent_hours
-    @spent_hours ||= TimeEntry.sum(:hours, :include => :issue, :conditions => ["#{Issue.table_name}.fixed_version_id = ?", id]).to_f
+    @spent_hours ||= TimeEntry.sum(:hours, :joins => :issue, :conditions => ["#{Issue.table_name}.fixed_version_id = ?", id]).to_f
   end
 
   def closed?
@@ -119,17 +133,20 @@ class Version < ActiveRecord::Base
 
   # Returns assigned issues count
   def issues_count
-    @issue_count ||= fixed_issues.count
+    load_issue_counts
+    @issue_count
   end
 
   # Returns the total amount of open issues for this version.
   def open_issues_count
-    @open_issues_count ||= Issue.count(:all, :conditions => ["fixed_version_id = ? AND is_closed = ?", self.id, false], :include => :status)
+    load_issue_counts
+    @open_issues_count
   end
 
   # Returns the total amount of closed issues for this version.
   def closed_issues_count
-    @closed_issues_count ||= Issue.count(:all, :conditions => ["fixed_version_id = ? AND is_closed = ?", self.id, true], :include => :status)
+    load_issue_counts
+    @closed_issues_count
   end
 
   def wiki_page
@@ -190,6 +207,21 @@ class Version < ActiveRecord::Base
 
   private
 
+  def load_issue_counts
+    unless @issue_count
+      @open_issues_count = 0
+      @closed_issues_count = 0
+      fixed_issues.count(:all, :group => :status).each do |status, count|
+        if status.is_closed?
+          @closed_issues_count += count
+        else
+          @open_issues_count += count
+        end
+      end
+      @issue_count = @open_issues_count + @closed_issues_count
+    end
+  end
+
   # Update the issue's fixed versions. Used if a version's sharing changes.
   def update_issues_from_sharing_change
     if sharing_changed?
@@ -229,8 +261,8 @@ class Version < ActiveRecord::Base
         ratio = open ? 'done_ratio' : 100
 
         done = fixed_issues.sum("COALESCE(estimated_hours, #{estimated_average}) * #{ratio}",
-                                  :include => :status,
-                                  :conditions => ["is_closed = ?", !open]).to_f
+                                  :joins => :status,
+                                  :conditions => ["#{IssueStatus.table_name}.is_closed = ?", !open]).to_f
         progress = done / (estimated_average * issues_count)
       end
       progress

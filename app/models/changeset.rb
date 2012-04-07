@@ -31,10 +31,10 @@ class Changeset < ActiveRecord::Base
                           :join_table => "#{table_name_prefix}changeset_parents#{table_name_suffix}",
                           :association_foreign_key => 'changeset_id', :foreign_key => 'parent_id'
 
-  acts_as_event :title => Proc.new {|o| "#{l(:label_revision)} #{o.format_identifier}" + (o.short_comments.blank? ? '' : (': ' + o.short_comments))},
+  acts_as_event :title => Proc.new {|o| o.title},
                 :description => :long_comments,
                 :datetime => :committed_on,
-                :url => Proc.new {|o| {:controller => 'repositories', :action => 'revision', :id => o.repository.project, :rev => o.identifier}}
+                :url => Proc.new {|o| {:controller => 'repositories', :action => 'revision', :id => o.repository.project, :repository_id => o.repository.identifier_param, :rev => o.identifier}}
 
   acts_as_searchable :columns => 'comments',
                      :include => {:repository => :project},
@@ -151,12 +151,26 @@ class Changeset < ActiveRecord::Base
     @long_comments || split_comments.last
   end
 
-  def text_tag
-    if scmid?
+  def text_tag(ref_project=nil)
+    tag = if scmid?
       "commit:#{scmid}"
     else
       "r#{revision}"
     end
+    if repository && repository.identifier.present?
+      tag = "#{repository.identifier}|#{tag}"
+    end
+    if ref_project && project && ref_project != project
+      tag = "#{project.identifier}:#{tag}" 
+    end
+    tag
+  end
+
+  # Returns the title used for the changeset in the activity/search results
+  def title
+    repo = (repository && repository.identifier.present?) ? " (#{repository.identifier})" : ''
+    comm = short_comments.blank? ? '' : (': ' + short_comments)
+    "#{l(:label_revision)} #{format_identifier}#{repo}#{comm}"
   end
 
   # Returns the previous changeset
@@ -184,14 +198,14 @@ class Changeset < ActiveRecord::Base
                   :from_revision => change[:from_revision])
   end
 
-  private
-
   # Finds an issue that can be referenced by the commit message
-  # i.e. an issue that belong to the repository project, a subproject or a parent project
   def find_referenced_issue_by_id(id)
     return nil if id.blank?
     issue = Issue.find_by_id(id.to_i, :include => :project)
-    if issue
+    if Setting.commit_cross_project_ref?
+      # all issues can be referenced/fixed
+    elsif issue
+      # issue that belong to the repository project, a subproject or a parent project only
       unless issue.project &&
                 (project == issue.project || project.is_ancestor_of?(issue.project) ||
                  project.is_descendant_of?(issue.project))
@@ -200,6 +214,8 @@ class Changeset < ActiveRecord::Base
     end
     issue
   end
+
+  private
 
   def fix_issue(issue)
     status = IssueStatus.find_by_id(Setting.commit_fix_status_id.to_i)
@@ -213,7 +229,7 @@ class Changeset < ActiveRecord::Base
     # don't change the status is the issue is closed
     return if issue.status && issue.status.is_closed?
 
-    journal = issue.init_journal(user || User.anonymous, ll(Setting.default_language, :text_status_changed_by_changeset, text_tag))
+    journal = issue.init_journal(user || User.anonymous, ll(Setting.default_language, :text_status_changed_by_changeset, text_tag(issue.project)))
     issue.status = status
     unless Setting.commit_fix_done_ratio.blank?
       issue.done_ratio = Setting.commit_fix_done_ratio.to_i
@@ -232,7 +248,7 @@ class Changeset < ActiveRecord::Base
       :hours => hours,
       :issue => issue,
       :spent_on => commit_date,
-      :comments => l(:text_time_logged_by_changeset, :value => text_tag,
+      :comments => l(:text_time_logged_by_changeset, :value => text_tag(issue.project),
                      :locale => Setting.default_language)
       )
     time_entry.activity = log_time_activity unless log_time_activity.nil?

@@ -19,14 +19,16 @@ class UserPreference < ActiveRecord::Base
   belongs_to :user
   serialize :others
 
-  attr_protected :others
+  attr_protected :others, :user_id
 
-  def initialize(attributes = nil)
+  before_save :set_others_hash
+  
+  def initialize(attributes=nil, *args)
     super
     self.others ||= {}
   end
 
-  def before_save
+  def set_others_hash
     self.others ||= {}
   end
 

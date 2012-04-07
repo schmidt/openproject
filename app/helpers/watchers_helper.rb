@@ -1,3 +1,5 @@
+# encoding: utf-8
+#
 # Redmine - project management software
 # Copyright (C) 2006-2011  Jean-Philippe Lang
 #
@@ -57,8 +59,16 @@ module WatchersHelper
                                   :style => "vertical-align: middle",
                                   :class => "delete")
       end
-      "<li>#{ s }</li>"
+      content_tag :li, s.html_safe
     end
-    lis.empty? ? "" : "<ul>#{ lis.join("\n") }</ul>"
+    (lis.empty? ? "" : "<ul>#{ lis.join("\n") }</ul>").html_safe
+  end
+
+  def watchers_checkboxes(object, users, checked=nil)
+    users.map do |user|
+      c = checked.nil? ? object.watched_by?(user) : checked
+      tag = check_box_tag 'issue[watcher_user_ids][]', user.id, c, :id => nil
+      content_tag 'label', "#{tag} #{h(user)}", :id => "issue_watcher_user_ids_#{user.id}", :class => "floating"
+    end.join
   end
 end
