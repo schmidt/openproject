@@ -206,15 +206,15 @@ module Redmine
           self.class.logger
         end
 
-        def shellout(cmd, &block)
-          self.class.shellout(cmd, &block)
+        def shellout(cmd, options = {}, &block)
+          self.class.shellout(cmd, options, &block)
         end
 
         def self.logger
           Rails.logger
         end
 
-        def self.shellout(cmd, &block)
+        def self.shellout(cmd, options = {}, &block)
           if logger && logger.debug?
             logger.debug "Shelling out: #{strip_credential(cmd)}"
           end
@@ -223,13 +223,10 @@ module Redmine
             cmd = "#{cmd} 2>>#{shell_quote(Rails.root.join('log/scm.stderr.log').to_s)}"
           end
           begin
-            if RUBY_VERSION < '1.9'
-              mode = "r+"
-            else
-              mode = "r+:ASCII-8BIT"
-            end
+            mode = "r+"
             IO.popen(cmd, mode) do |io|
-              io.close_write
+              io.set_encoding("ASCII-8BIT") if io.respond_to?(:set_encoding)
+              io.close_write unless options[:write_stdin]
               block.call(io) if block_given?
             end
           ## If scm command does not exist,

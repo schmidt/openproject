@@ -18,6 +18,8 @@
 require File.expand_path('../../../test_helper', __FILE__)
 
 class ApplicationHelperTest < ActionView::TestCase
+  include ERB::Util
+
   fixtures :projects, :roles, :enabled_modules, :users,
            :repositories, :changesets,
            :trackers, :issue_statuses, :issues, :versions, :documents,
@@ -227,6 +229,8 @@ RAW
   def test_redmine_links
     issue_link = link_to('#3', {:controller => 'issues', :action => 'show', :id => 3},
                                :class => 'issue status-1 priority-1 overdue', :title => 'Error 281 when updating a recipe (New)')
+    note_link = link_to('#3', {:controller => 'issues', :action => 'show', :id => 3, :anchor => 'note-14'},
+                               :class => 'issue status-1 priority-1 overdue', :title => 'Error 281 when updating a recipe (New)')
 
     changeset_link = link_to('r1', {:controller => 'repositories', :action => 'revision', :id => 'ecookbook', :rev => 1},
                                    :class => 'changeset', :title => 'My very first commit')
@@ -253,6 +257,9 @@ RAW
     to_test = {
       # tickets
       '#3, [#3], (#3) and #3.'      => "#{issue_link}, [#{issue_link}], (#{issue_link}) and #{issue_link}.",
+      # ticket notes
+      '#3-14'                       => note_link,
+      '#3#note-14'                  => note_link,
       # changesets
       'r1'                          => changeset_link,
       'r1.'                         => "#{changeset_link}.",
@@ -292,15 +299,6 @@ RAW
       'project#3'                   => link_to('eCookbook Subproject 1', project_url, :class => 'project'),
       'project:subproject1'         => link_to('eCookbook Subproject 1', project_url, :class => 'project'),
       'project:"eCookbook subProject 1"'        => link_to('eCookbook Subproject 1', project_url, :class => 'project'),
-      # escaping
-      '!#3.'                        => '#3.',
-      '!r1'                         => 'r1',
-      '!document#1'                 => 'document#1',
-      '!document:"Test document"'   => 'document:"Test document"',
-      '!version#2'                  => 'version#2',
-      '!version:1.0'                => 'version:1.0',
-      '!version:"1.0"'              => 'version:"1.0"',
-      '!source:/some/file'          => 'source:/some/file',
       # not found
       '#0123456789'                 => '#0123456789',
       # invalid expressions
@@ -310,6 +308,23 @@ RAW
     }
     @project = Project.find(1)
     to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text), "#{text} failed" }
+  end
+
+  def test_escaped_redmine_links_should_not_be_parsed
+    to_test = [
+      '#3.',
+      '#3-14.',
+      '#3#-note14.',
+      'r1',
+      'document#1',
+      'document:"Test document"',
+      'version#2',
+      'version:1.0',
+      'version:"1.0"',
+      'source:/some/file'
+    ]
+    @project = Project.find(1)
+    to_test.each { |text| assert_equal "<p>#{text}</p>", textilizable("!" + text), "#{text} failed" }
   end
 
   def test_cross_project_redmine_links
@@ -927,7 +942,7 @@ RAW
   def test_default_formatter
     with_settings :text_formatting => 'unknown' do
       text = 'a *link*: http://www.example.net/'
-      assert_equal '<p>a *link*: <a href="http://www.example.net/">http://www.example.net/</a></p>', textilizable(text)
+      assert_equal '<p>a *link*: <a class="external" href="http://www.example.net/">http://www.example.net/</a></p>', textilizable(text)
     end
   end
 

@@ -148,6 +148,14 @@ class RepositoriesControllerTest < ActionController::TestCase
     assert_equal "1", assigns(:changeset).revision
   end
 
+  def test_revision_should_not_change_the_project_menu_link
+    get :revision, :id => 1, :rev => 1
+    assert_response :success
+
+    assert_tag 'a', :attributes => {:href => '/projects/ecookbook/repository', :class => /repository/},
+      :ancestor => {:attributes => {:id => 'main-menu'}}
+  end
+
   def test_revision_with_before_nil_and_afer_normal
     get :revision, {:id => 1, :rev => 1}
     assert_response :success
@@ -163,7 +171,7 @@ class RepositoriesControllerTest < ActionController::TestCase
   def test_add_related_issue
     @request.session[:user_id] = 2
     assert_difference 'Changeset.find(103).issues.size' do
-      post :add_related_issue, :id => 1, :rev => 4, :issue_id => 2
+      post :add_related_issue, :id => 1, :rev => 4, :issue_id => 2, :format => 'js'
       assert_response :success
     end
     assert_select_rjs :replace_html, 'related-issues'
@@ -173,7 +181,7 @@ class RepositoriesControllerTest < ActionController::TestCase
   def test_add_related_issue_with_invalid_issue_id
     @request.session[:user_id] = 2
     assert_no_difference 'Changeset.find(103).issues.size' do
-      post :add_related_issue, :id => 1, :rev => 4, :issue_id => 9999
+      post :add_related_issue, :id => 1, :rev => 4, :issue_id => 9999, :format => 'js'
       assert_response :success
     end
     assert_include 'alert("Issue is invalid")', @response.body
@@ -185,7 +193,7 @@ class RepositoriesControllerTest < ActionController::TestCase
 
     @request.session[:user_id] = 2
     assert_difference 'Changeset.find(103).issues.size', -1 do
-      delete :remove_related_issue, :id => 1, :rev => 4, :issue_id => 2
+      delete :remove_related_issue, :id => 1, :rev => 4, :issue_id => 2, :format => 'js'
       assert_response :success
     end
     assert_select_rjs :remove, 'related-issue-2'

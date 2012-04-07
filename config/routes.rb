@@ -44,8 +44,10 @@ ActionController::Routing::Routes.draw do |map|
   map.auto_complete_issues '/issues/auto_complete', :controller => 'auto_completes',
                            :action => 'issues', :conditions => { :method => :get }
   # TODO: would look nicer as /issues/:id/preview
-  map.preview_issue '/issues/preview/:id', :controller => 'previews',
-                    :action => 'issue'
+  map.preview_new_issue '/issues/preview/new/:project_id', :controller => 'previews',
+                        :action => 'issue'
+  map.preview_edit_issue '/issues/preview/edit/:id', :controller => 'previews',
+                         :action => 'issue'
   map.issues_context_menu '/issues/context_menu',
                           :controller => 'context_menus', :action => 'issues'
 
@@ -121,6 +123,8 @@ ActionController::Routing::Routes.draw do |map|
   map.connect 'watchers/new', :controller=> 'watchers', :action => 'new',
               :conditions => {:method => :get}
   map.connect 'watchers', :controller=> 'watchers', :action => 'create',
+              :conditions => {:method => :post}
+  map.connect 'watchers/append', :controller=> 'watchers', :action => 'append',
               :conditions => {:method => :post}
   map.connect 'watchers/destroy', :controller=> 'watchers', :action => 'destroy',
               :conditions => {:method => :post}
@@ -262,7 +266,12 @@ ActionController::Routing::Routes.draw do |map|
       repository_views.connect 'projects/:id/repository/:repository_id/raw/*path',
                                :action => 'entry', :format => 'raw'
       repository_views.connect 'projects/:id/repository/:repository_id/:action/*path',
-                               :requirements => { :action => /(browse|show|entry|changes|annotate|diff)/ }
+                               :requirements => { :action => /(browse|entry|changes|annotate|diff)/ }
+      repository_views.connect 'projects/:id/repository/:repository_id/show/*path',
+                               :requirements => { :path => /.+/ }
+
+      repository_views.connect 'projects/:id/repository/:repository_id/revision',
+                               :action => 'revision'
 
       repository_views.connect 'projects/:id/repository/revisions',
                                :action => 'revisions'
@@ -290,13 +299,12 @@ ActionController::Routing::Routes.draw do |map|
       repository_views.connect 'projects/:id/repository/:action/*path',
                                :requirements => { :action => /(browse|show|entry|changes|annotate|diff)/ }
 
+      repository_views.connect 'projects/:id/repository/revision',
+                               :action => 'revision'
+
       repository_views.connect 'projects/:id/repository/:repository_id',
                                :action => 'show'
     end
-
-    repositories.connect 'projects/:id/repository/revision',
-                         :action => 'revision',
-                         :conditions => {:method => [:get, :post]}
   end
 
   # additional routes for having the file name at the end of url
@@ -349,37 +357,7 @@ ActionController::Routing::Routes.draw do |map|
   map.connect 'admin/default_configuration', :controller => 'admin',
               :action => 'default_configuration', :conditions => {:method => :post}
 
-  # Used by AuthSourcesControllerTest
-  # TODO : refactor *AuthSourcesController to remove these routes
-  map.connect 'auth_sources', :controller => 'auth_sources',
-              :action => 'index', :conditions => {:method => :get}
-  map.connect 'auth_sources/new', :controller => 'auth_sources',
-              :action => 'new', :conditions => {:method => :get}
-  map.connect 'auth_sources/create', :controller => 'auth_sources',
-              :action => 'create', :conditions => {:method => :post}
-  map.connect 'auth_sources/destroy/:id', :controller => 'auth_sources',
-              :action => 'destroy', :id => /\d+/, :conditions => {:method => :post}
-  map.connect 'auth_sources/test_connection/:id', :controller => 'auth_sources',
-              :action => 'test_connection', :conditions => {:method => :get}
-  map.connect 'auth_sources/edit/:id', :controller => 'auth_sources',
-              :action => 'edit', :id => /\d+/, :conditions => {:method => :get}
-  map.connect 'auth_sources/update/:id', :controller => 'auth_sources',
-              :action => 'update', :id => /\d+/, :conditions => {:method => :post}
-
-  map.connect 'ldap_auth_sources', :controller => 'ldap_auth_sources',
-              :action => 'index', :conditions => {:method => :get}
-  map.connect 'ldap_auth_sources/new', :controller => 'ldap_auth_sources',
-              :action => 'new', :conditions => {:method => :get}
-  map.connect 'ldap_auth_sources/create', :controller => 'ldap_auth_sources',
-              :action => 'create', :conditions => {:method => :post}
-  map.connect 'ldap_auth_sources/destroy/:id', :controller => 'ldap_auth_sources',
-              :action => 'destroy', :id => /\d+/, :conditions => {:method => :post}
-  map.connect 'ldap_auth_sources/test_connection/:id', :controller => 'ldap_auth_sources',
-              :action => 'test_connection', :conditions => {:method => :get}
-  map.connect 'ldap_auth_sources/edit/:id', :controller => 'ldap_auth_sources',
-              :action => 'edit', :id => /\d+/, :conditions => {:method => :get}
-  map.connect 'ldap_auth_sources/update/:id', :controller => 'ldap_auth_sources',
-              :action => 'update', :id => /\d+/, :conditions => {:method => :post}
+  map.resources :auth_sources, :member => {:test_connection => :get}
 
   map.connect 'workflows', :controller => 'workflows',
               :action => 'index', :conditions => {:method => :get}
@@ -406,6 +384,8 @@ ActionController::Routing::Routes.draw do |map|
                 :action => 'fetch_changesets',
                 :conditions => {:method => :get}
   end
+
+  map.connect 'uploads.:format', :controller => 'attachments', :action => 'upload', :conditions => {:method => :post}
 
   map.connect 'robots.txt', :controller => 'welcome',
               :action => 'robots', :conditions => {:method => :get}

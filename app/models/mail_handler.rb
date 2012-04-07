@@ -367,11 +367,11 @@ class MailHandler < ActionMailer::Base
     user.lastname = '-' if user.lastname.blank?
 
     password_length = [Setting.password_min_length.to_i, 10].max
-    user.password = ActiveSupport::SecureRandom.hex(password_length / 2 + 1)
+    user.password = Redmine::Utils.random_hex(password_length / 2 + 1)
     user.language = Setting.default_language
 
     unless user.valid?
-      user.login = "user#{ActiveSupport::SecureRandom.hex(6)}" unless user.errors[:login].blank?
+      user.login = "user#{Redmine::Utils.random_hex(6)}" unless user.errors[:login].blank?
       user.firstname = "-" unless user.errors[:firstname].blank?
       user.lastname  = "-" unless user.errors[:lastname].blank?
     end
@@ -384,7 +384,7 @@ class MailHandler < ActionMailer::Base
   def create_user_from_email
     addr = email.from_addrs.to_a.first
     if addr && !addr.spec.blank?
-      user = self.class.new_user_from_attributes(addr.spec, addr.name)
+      user = self.class.new_user_from_attributes(addr.spec, TMail::Unquoter.unquote_and_convert_to(addr.name, 'utf-8'))
       if user.save
         user
       else

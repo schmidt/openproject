@@ -55,10 +55,20 @@ class BoardsControllerTest < ActionController::TestCase
     assert_not_nil assigns(:topics)
   end
 
+  def test_show_with_permission_should_display_the_new_message_form
+    @request.session[:user_id] = 2
+    get :show, :project_id => 1, :id => 1
+    assert_response :success
+    assert_template 'show'
+
+    assert_tag 'form', :attributes => {:id => 'message-form'}
+    assert_tag 'input', :attributes => {:name => 'message[subject]'}
+  end
+
   def test_show_atom
     get :show, :project_id => 1, :id => 1, :format => 'atom'
     assert_response :success
-    assert_template 'common/feed.atom'
+    assert_template 'common/feed'
     assert_not_nil assigns(:board)
     assert_not_nil assigns(:project)
     assert_not_nil assigns(:messages)
@@ -110,6 +120,14 @@ class BoardsControllerTest < ActionController::TestCase
     end
     assert_redirected_to '/projects/ecookbook/settings/boards'
     assert_equal 'Testing', Board.find(2).name
+  end
+
+  def test_update_position
+    @request.session[:user_id] = 2
+    put :update, :project_id => 1, :id => 2, :board => { :move_to => 'highest'}
+    assert_redirected_to '/projects/ecookbook/settings/boards'
+    board = Board.find(2)
+    assert_equal 1, board.position
   end
 
   def test_update_with_failure

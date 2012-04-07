@@ -118,13 +118,12 @@ class TimelogController < ApplicationController
 
   def new
     @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => User.current.today)
-    @time_entry.attributes = params[:time_entry]
+    @time_entry.safe_attributes = params[:time_entry]
   end
 
-  verify :method => :post, :only => :create, :render => {:nothing => true, :status => :method_not_allowed }
   def create
     @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => User.current.today)
-    @time_entry.attributes = params[:time_entry]
+    @time_entry.safe_attributes = params[:time_entry]
 
     call_hook(:controller_timelog_edit_before_save, { :params => params, :time_entry => @time_entry })
 
@@ -153,12 +152,11 @@ class TimelogController < ApplicationController
   end
 
   def edit
-    @time_entry.attributes = params[:time_entry]
+    @time_entry.safe_attributes = params[:time_entry]
   end
 
-  verify :method => :put, :only => :update, :render => {:nothing => true, :status => :method_not_allowed }
   def update
-    @time_entry.attributes = params[:time_entry]
+    @time_entry.safe_attributes = params[:time_entry]
 
     call_hook(:controller_timelog_edit_before_save, { :params => params, :time_entry => @time_entry })
 
@@ -189,7 +187,7 @@ class TimelogController < ApplicationController
     unsaved_time_entry_ids = []
     @time_entries.each do |time_entry|
       time_entry.reload
-      time_entry.attributes = attributes
+      time_entry.safe_attributes = attributes
       call_hook(:controller_time_entries_bulk_edit_before_save, { :params => params, :time_entry => time_entry })
       unless time_entry.save
         # Keep unsaved time_entry ids to display them in flash error
@@ -200,32 +198,31 @@ class TimelogController < ApplicationController
     redirect_back_or_default({:controller => 'timelog', :action => 'index', :project_id => @projects.first})
   end
 
-  verify :method => :delete, :only => :destroy, :render => {:nothing => true, :status => :method_not_allowed }
   def destroy
-    @time_entries.each do |t|
-      begin
+    destroyed = TimeEntry.transaction do
+      @time_entries.each do |t|
         unless t.destroy && t.destroyed?
-          respond_to do |format|
-            format.html {
-              flash[:error] = l(:notice_unable_delete_time_entry)
-              redirect_to :back
-            }
-            format.api  { render_validation_errors(t) }
-          end
-          return
+          raise ActiveRecord::Rollback
         end
-      rescue ::ActionController::RedirectBackError
-        redirect_to :action => 'index', :project_id => @projects.first
-        return
       end
     end
 
     respond_to do |format|
       format.html {
-        flash[:notice] = l(:notice_successful_delete)
+        if destroyed
+          flash[:notice] = l(:notice_successful_delete)
+        else
+          flash[:error] = l(:notice_unable_delete_time_entry)
+        end
         redirect_back_or_default(:action => 'index', :project_id => @projects.first)
       }
-      format.api  { head :ok }
+      format.api  {
+        if destroyed
+          head :ok
+        else
+          render_validation_errors(@time_entries)
+        end
+      }
     end
   end
 

@@ -82,6 +82,15 @@ and you will have to use this reposman.rb command line to create repository :
 
   reposman.rb --redmine my.redmine.server --svn-dir /var/svn --owner www-data -u http://svn.server/svn-private/
 
+=head1 REPOSITORIES NAMING
+
+A projet repository must be named with the projet identifier. In case
+of multiple repositories for the same project, use the project identifier
+and the repository identifier separated with a dot:
+
+  /var/svn/foo
+  /var/svn/foo.otherrepo
+
 =head1 MIGRATION FROM OLDER RELEASES
 
 If you use an older reposman.rb (r860 or before), you need to change
@@ -99,7 +108,7 @@ use strict;
 use warnings FATAL => 'all', NONFATAL => 'redefine';
 
 use DBI;
-use Digest::SHA1;
+use Digest::SHA;
 # optional module for LDAP authentication
 my $CanUseLDAPAuth = eval("use Authen::Simple::LDAP; 1");
 
@@ -327,7 +336,7 @@ sub is_member {
   my $dbh         = connect_database($r);
   my $project_id  = get_project_identifier($r);
 
-  my $pass_digest = Digest::SHA1::sha1_hex($redmine_pass);
+  my $pass_digest = Digest::SHA::sha1_hex($redmine_pass);
 
   my $access_mode = defined $read_only_methods{$r->method} ? "R" : "W";
 
@@ -346,7 +355,7 @@ sub is_member {
 
       unless ($auth_source_id) {
 	  			my $method = $r->method;
-          my $salted_password = Digest::SHA1::sha1_hex($salt.$pass_digest);
+          my $salted_password = Digest::SHA::sha1_hex($salt.$pass_digest);
 					if ($hashed_password eq $salted_password && (($access_mode eq "R" && $permissions =~ /:browse_repository/) || $permissions =~ /:commit_access/) ) {
               $ret = 1;
               last;
@@ -399,7 +408,7 @@ sub get_project_identifier {
     my $r = shift;
 
     my $location = $r->location;
-    my ($identifier) = $r->uri =~ m{$location/*([^/]+)};
+    my ($identifier) = $r->uri =~ m{$location/*([^/.]+)};
     $identifier;
 }
 

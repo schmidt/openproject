@@ -272,8 +272,8 @@ class MailHandlerTest < ActiveSupport::TestCase
       email = ActionMailer::Base.deliveries.first
       assert_not_nil email
       assert email.subject.include?('account activation')
-      login = email.body.match(/\* Login: (.*)$/)[1]
-      password = email.body.match(/\* Password: (.*)$/)[1]
+      login = mail_body(email).match(/\* Login: (.*)$/)[1].strip
+      password = mail_body(email).match(/\* Password: (.*)$/)[1].strip
       assert_equal issue.author, User.try_to_login(login, password)
     end
   end
@@ -574,6 +574,25 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert user.valid?
     assert user.login =~ /^user[a-f0-9]+$/
     assert_equal 'foo+bar@example.net', user.mail
+  end
+
+  def test_new_user_with_utf8_encoded_fullname_should_be_decoded
+    assert_difference 'User.count' do
+      issue = submit_email(
+                'fullname_of_sender_as_utf8_encoded.eml',
+                :issue => {:project => 'ecookbook'},
+                :unknown_user => 'create'
+              )
+    end
+
+    user = User.first(:order => 'id DESC')
+    assert_equal "foo@example.org", user.mail
+    str1 = "\xc3\x84\xc3\xa4"
+    str2 = "\xc3\x96\xc3\xb6"
+    str1.force_encoding('UTF-8') if str1.respond_to?(:force_encoding)
+    str2.force_encoding('UTF-8') if str2.respond_to?(:force_encoding)
+    assert_equal str1, user.firstname
+    assert_equal str2, user.lastname
   end
 
   private

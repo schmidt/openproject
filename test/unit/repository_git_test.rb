@@ -20,6 +20,8 @@ require File.expand_path('../../test_helper', __FILE__)
 class RepositoryGitTest < ActiveSupport::TestCase
   fixtures :projects, :repositories, :enabled_modules, :users, :roles
 
+  include Redmine::I18n
+
   REPOSITORY_PATH = Rails.root.join('tmp/test/git_repository').to_s
   REPOSITORY_PATH.gsub!(/\//, "\\") if Redmine::Platform.mswin?
 
@@ -43,25 +45,52 @@ class RepositoryGitTest < ActiveSupport::TestCase
   JRUBY_SKIP     = (RUBY_PLATFORM == 'java')
   JRUBY_SKIP_STR = "TODO: This test fails in JRuby"
 
+  def setup
+    @project = Project.find(3)
+    @repository = Repository::Git.create(
+                        :project       => @project,
+                        :url           => REPOSITORY_PATH,
+                        :path_encoding => 'ISO-8859-1'
+                        )
+    assert @repository
+    @char_1        = CHAR_1_HEX.dup
+    if @char_1.respond_to?(:force_encoding)
+      @char_1.force_encoding('UTF-8')
+    end
+  end
+
+  def test_blank_path_to_repository_error_message
+    set_language_if_valid 'en'
+    repo = Repository::Git.new(
+                          :project      => @project,
+                          :identifier   => 'test'
+                        )
+    assert !repo.save
+    assert_include "Path to repository can't be blank",
+                   repo.errors.full_messages
+  end
+
+  def test_blank_path_to_repository_error_message_fr
+    set_language_if_valid 'fr'
+    str = "Chemin du d\xc3\xa9p\xc3\xb4t doit \xc3\xaatre renseign\xc3\xa9(e)"
+    str.force_encoding('UTF-8') if str.respond_to?(:force_encoding)
+    repo = Repository::Git.new(
+                          :project      => @project,
+                          :url          => "",
+                          :identifier   => 'test',
+                          :path_encoding => ''
+                        )
+    assert !repo.save
+    assert_include str, repo.errors.full_messages
+  end
+
   if File.directory?(REPOSITORY_PATH)
-    def setup
+    def test_scm_available
       klass = Repository::Git
       assert_equal "Git", klass.scm_name
       assert klass.scm_adapter_class
       assert_not_equal "", klass.scm_command
       assert_equal true, klass.scm_available
-
-      @project = Project.find(3)
-      @repository = Repository::Git.create(
-                        :project       => @project,
-                        :url           => REPOSITORY_PATH,
-                        :path_encoding => 'ISO-8859-1'
-                        )
-      assert @repository
-      @char_1        = CHAR_1_HEX.dup
-      if @char_1.respond_to?(:force_encoding)
-        @char_1.force_encoding('UTF-8')
-      end
     end
 
     def test_fetch_changesets_from_scratch
@@ -74,18 +103,18 @@ class RepositoryGitTest < ActiveSupport::TestCase
       assert_equal NUM_REV, @repository.changesets.count
       assert_equal 39, @repository.changes.count
 
-      commit = @repository.changesets.find(:first, :order => 'committed_on ASC')
+      commit = @repository.changesets.find_by_revision("7234cb2750b63f47bff735edc50a1c0a433c2518")
+      assert_equal "7234cb2750b63f47bff735edc50a1c0a433c2518", commit.scmid
       assert_equal "Initial import.\nThe repository contains 3 files.", commit.comments
       assert_equal "jsmith <jsmith@foo.bar>", commit.committer
       assert_equal User.find_by_login('jsmith'), commit.user
       # TODO: add a commit with commit time <> author time to the test repository
       assert_equal "2007-12-14 09:22:52".to_time, commit.committed_on
       assert_equal "2007-12-14".to_date, commit.commit_date
-      assert_equal "7234cb2750b63f47bff735edc50a1c0a433c2518", commit.revision
-      assert_equal "7234cb2750b63f47bff735edc50a1c0a433c2518", commit.scmid
       assert_equal 3, commit.changes.count
       change = commit.changes.sort_by(&:path).first
       assert_equal "README", change.path
+      assert_equal nil, change.from_path
       assert_equal "A", change.action
 
       assert_equal NUM_HEAD, @repository.extra_info["heads"].size
@@ -162,14 +191,14 @@ class RepositoryGitTest < ActiveSupport::TestCase
       @project.reload
       assert_equal NUM_REV - 5, @repository.changesets.count
 
-      extra_info_heads << "abcd1234efgh"
+      extra_info_heads << "1234abcd5678"
       h = {}
       h["heads"] = extra_info_heads
       @repository.merge_extra_info(h)
       @repository.save
       @project.reload
       h1 = @repository.extra_info["heads"].dup
-      assert h1.index("abcd1234efgh")
+      assert h1.index("1234abcd5678")
       assert_equal 5, h1.size
 
       @repository.fetch_changesets
@@ -212,9 +241,12 @@ class RepositoryGitTest < ActiveSupport::TestCase
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
       assert_not_nil @repository.extra_info
-      @repository.write_attribute(:extra_info, nil)
+      h = {}
+      h["heads"] = []
+      h["branches"] = {}
+      h["db_consistent"] = {}
+      @repository.merge_extra_info(h)
       @repository.save
-      assert_nil @repository.extra_info
       assert_equal NUM_REV, @repository.changesets.count
       @repository.fetch_changesets
       @project.reload

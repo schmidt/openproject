@@ -38,6 +38,10 @@ class AttachmentTest < ActiveSupport::TestCase
     set_tmp_attachments_directory
   end
 
+  def test_container_for_new_attachment_should_be_nil
+    assert_nil Attachment.new.container
+  end
+
   def test_create
     a = Attachment.new(:container => Issue.find(1),
                        :file => uploaded_test_file("testfile.txt", "text/plain"),
@@ -140,6 +144,16 @@ class AttachmentTest < ActiveSupport::TestCase
     assert_equal 'cbb5b0f30978ba03731d61f9f6d10011', Attachment.disk_filename("test_accentué.ça")[13..-1]
   end
 
+  def test_prune_should_destroy_old_unattached_attachments
+    Attachment.create!(:file => uploaded_test_file("testfile.txt", ""), :author_id => 1, :created_on => 2.days.ago)
+    Attachment.create!(:file => uploaded_test_file("testfile.txt", ""), :author_id => 1, :created_on => 2.days.ago)
+    Attachment.create!(:file => uploaded_test_file("testfile.txt", ""), :author_id => 1)
+
+    assert_difference 'Attachment.count', -2 do
+      Attachment.prune
+    end
+  end
+
   context "Attachmnet.attach_files" do
     should "attach the file" do
       issue = Issue.first
@@ -164,7 +178,7 @@ class AttachmentTest < ActiveSupport::TestCase
     should "add unsaved files to the object as unsaved attachments" do
       # Max size of 0 to force Attachment creation failures
       with_settings(:attachment_max_size => 0) do
-        @project = Project.generate!
+        @project = Project.find(1)
         response = Attachment.attach_files(@project, {
                                              '1' => {'file' => mock_file, 'description' => 'test'},
                                              '2' => {'file' => mock_file, 'description' => 'test'}

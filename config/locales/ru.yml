@@ -1120,9 +1120,11 @@ ru:
   error_attachment_too_big: This file cannot be uploaded because it exceeds the maximum allowed file size (%{max_size})
   notice_failed_to_save_time_entries: "Failed to save %{count} time entrie(s) on %{total} selected: %{ids}."
   label_x_issues:
-    zero:  0 Задача
+    zero:  0 Задач
     one:   1 Задача
-    other: "%{count} Задачи"
+    few:   "%{count} Задач"
+    many:  "%{count} Задач"
+    other: "%{count} Задач"
   label_repository_new: New repository
   field_repository_is_default: Main repository
   label_copy_attachments: Copy attachments
@@ -1136,3 +1138,5 @@ ru:
   notice_issue_update_conflict: The issue has been updated by an other user while you were editing it.
   text_issue_conflict_resolution_cancel: Discard all my changes and redisplay %{link}
   permission_manage_related_issues: Manage related issues
+  field_ldap_filter: LDAP filter
+  label_search_for_watchers: Search for watchers to add
