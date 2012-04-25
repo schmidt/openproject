@@ -15,12 +15,30 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-desc 'Removes uploaded files left unattached after one day.'
-
 namespace :redmine do
   namespace :attachments do
+    desc 'Removes uploaded files left unattached after one day.'
     task :prune => :environment do
       Attachment.prune
     end
+  end
+
+  namespace :tokens do
+    desc 'Removes expired tokens.'
+    task :prune => :environment do
+      Token.destroy_expired
+    end
+  end
+
+  namespace :watchers do
+    desc 'Removes watchers from what they can no longer view.'
+    task :prune => :environment do
+      Watcher.prune
+    end
+  end
+
+  desc 'Fetch changesets from the repositories'
+  task :fetch_changesets => :environment do
+    Repository.fetch_changesets
   end
 end

@@ -225,12 +225,19 @@ class IssuesController < ApplicationController
     end
     target_projects ||= @projects
 
-    @available_statuses = @issues.map(&:new_statuses_allowed_to).reduce(:&)
+    if @copy
+      @available_statuses = [IssueStatus.default]
+    else
+      @available_statuses = @issues.map(&:new_statuses_allowed_to).reduce(:&)
+    end
     @custom_fields = target_projects.map{|p|p.all_issue_custom_fields}.reduce(:&)
     @assignables = target_projects.map(&:assignable_users).reduce(:&)
     @trackers = target_projects.map(&:trackers).reduce(:&)
     @versions = target_projects.map {|p| p.shared_versions.open}.reduce(:&)
     @categories = target_projects.map {|p| p.issue_categories}.reduce(:&)
+    if @copy
+      @attachments_present = @issues.detect {|i| i.attachments.any?}.present?
+    end
 
     @safe_attributes = @issues.map(&:safe_attribute_names).reduce(:&)
     render :layout => false if request.xhr?
@@ -246,7 +253,7 @@ class IssuesController < ApplicationController
     @issues.each do |issue|
       issue.reload
       if @copy
-        issue = issue.copy
+        issue = issue.copy({}, :attachments => params[:copy_attachments].present?)
       end
       journal = issue.init_journal(User.current, params[:notes])
       issue.safe_attributes = attributes
@@ -348,8 +355,6 @@ private
   # from the params
   # TODO: Refactor, not everything in here is needed by #edit
   def update_issue_from_params
-    @allowed_statuses = @issue.new_statuses_allowed_to(User.current)
-    @priorities = IssuePriority.active
     @edit_allowed = User.current.allowed_to?(:edit_issues, @project)
     @time_entry = TimeEntry.new(:issue => @issue, :project => @issue.project)
     @time_entry.attributes = params[:time_entry]
@@ -371,6 +376,8 @@ private
       end
     end
     @issue.safe_attributes = issue_attributes
+    @priorities = IssuePriority.active
+    @allowed_statuses = @issue.new_statuses_allowed_to(User.current)
     true
   end
 
@@ -420,7 +427,16 @@ private
   def parse_params_for_bulk_issue_attributes(params)
     attributes = (params[:issue] || {}).reject {|k,v| v.blank?}
     attributes.keys.each {|k| attributes[k] = '' if attributes[k] == 'none'}
-    attributes[:custom_field_values].reject! {|k,v| v.blank?} if attributes[:custom_field_values]
+    if custom = attributes[:custom_field_values]
+      custom.reject! {|k,v| v.blank?}
+      custom.keys.each do |k|
+        if custom[k].is_a?(Array)
+          custom[k] << '' if custom[k].delete('__none__')
+        else
+          custom[k] = '' if custom[k] == '__none__'
+        end
+      end
+    end
     attributes
   end
 end
