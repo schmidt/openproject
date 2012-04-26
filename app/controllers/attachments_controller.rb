@@ -88,9 +88,7 @@ class AttachmentsController < ApplicationController
     end
     # Make sure association callbacks are called
     @attachment.container.attachments.delete(@attachment)
-    redirect_to :back
-  rescue ::ActionController::RedirectBackError
-    redirect_to :controller => 'projects', :action => 'show', :id => @project
+    redirect_to_referer_or project_path(@project)
   end
 
 private
