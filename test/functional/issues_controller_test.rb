@@ -305,6 +305,15 @@ class IssuesControllerTest < ActionController::TestCase
     assert_response :success
   end
 
+  def test_index_should_omit_page_param_in_export_links
+    get :index, :page => 2
+    assert_response :success
+    assert_select 'a.atom[href=/issues.atom]'
+    assert_select 'a.csv[href=/issues.csv]'
+    assert_select 'a.pdf[href=/issues.pdf]'
+    assert_select 'form#csv-export-form[action=/issues.csv]'
+  end
+
   def test_index_csv
     get :index, :format => 'csv'
     assert_response :success
@@ -1160,6 +1169,42 @@ class IssuesControllerTest < ActionController::TestCase
     assert_not_nil assigns(:issue)
   end
 
+  def test_show_export_to_pdf_with_ancestors
+    issue = Issue.generate!(:project_id => 1, :author_id => 2, :tracker_id => 1, :subject => 'child', :parent_issue_id => 1)
+
+    get :show, :id => issue.id, :format => 'pdf'
+    assert_response :success
+    assert_equal 'application/pdf', @response.content_type
+    assert @response.body.starts_with?('%PDF')
+  end
+
+  def test_show_export_to_pdf_with_descendants
+    c1 = Issue.generate!(:project_id => 1, :author_id => 2, :tracker_id => 1, :subject => 'child', :parent_issue_id => 1)
+    c2 = Issue.generate!(:project_id => 1, :author_id => 2, :tracker_id => 1, :subject => 'child', :parent_issue_id => 1)
+    c3 = Issue.generate!(:project_id => 1, :author_id => 2, :tracker_id => 1, :subject => 'child', :parent_issue_id => c1.id)
+
+    get :show, :id => 1, :format => 'pdf'
+    assert_response :success
+    assert_equal 'application/pdf', @response.content_type
+    assert @response.body.starts_with?('%PDF')
+  end
+
+  def test_show_export_to_pdf_with_journals
+    get :show, :id => 1, :format => 'pdf'
+    assert_response :success
+    assert_equal 'application/pdf', @response.content_type
+    assert @response.body.starts_with?('%PDF')
+  end
+
+  def test_show_export_to_pdf_with_changesets
+    Issue.find(3).changesets = Changeset.find_all_by_id(100, 101, 102)
+
+    get :show, :id => 3, :format => 'pdf'
+    assert_response :success
+    assert_equal 'application/pdf', @response.content_type
+    assert @response.body.starts_with?('%PDF')
+  end
+
   def test_get_new
     @request.session[:user_id] = 2
     get :new, :project_id => 1, :tracker_id => 1
@@ -1361,6 +1406,22 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal 1, issue.project_id
     assert_equal 2, issue.tracker_id
     assert_equal 'This is the test_new issue', issue.subject
+  end
+
+  def test_update_new_form_should_propose_transitions_based_on_initial_status
+    @request.session[:user_id] = 2
+    Workflow.delete_all
+    Workflow.create!(:role_id => 1, :tracker_id => 1, :old_status_id => 1, :new_status_id => 2)
+    Workflow.create!(:role_id => 1, :tracker_id => 1, :old_status_id => 1, :new_status_id => 5)
+    Workflow.create!(:role_id => 1, :tracker_id => 1, :old_status_id => 5, :new_status_id => 4)
+
+    xhr :post, :new, :project_id => 1,
+                     :issue => {:tracker_id => 1,
+                                :status_id => 5,
+                                :subject => 'This is an issue'}
+
+    assert_equal 5, assigns(:issue).status_id
+    assert_equal [1,2,5], assigns(:allowed_statuses).map(&:id).sort
   end
 
   def test_post_create
@@ -2171,6 +2232,23 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal 'This is the test_new issue', issue.subject
   end
 
+  def test_update_edit_form_should_propose_transitions_based_on_initial_status
+    @request.session[:user_id] = 2
+    Workflow.delete_all
+    Workflow.create!(:role_id => 1, :tracker_id => 2, :old_status_id => 2, :new_status_id => 1)
+    Workflow.create!(:role_id => 1, :tracker_id => 2, :old_status_id => 2, :new_status_id => 5)
+    Workflow.create!(:role_id => 1, :tracker_id => 2, :old_status_id => 5, :new_status_id => 4)
+
+    xhr :put, :new, :project_id => 1,
+                    :id => 2,
+                    :issue => {:tracker_id => 2,
+                               :status_id => 5,
+                               :subject => 'This is an issue'}
+
+    assert_equal 5, assigns(:issue).status_id
+    assert_equal [1,2,5], assigns(:allowed_statuses).map(&:id).sort
+  end
+
   def test_update_edit_form_with_project_change
     @request.session[:user_id] = 2
     xhr :put, :new, :project_id => 1,
@@ -2665,7 +2743,7 @@ class IssuesControllerTest < ActionController::TestCase
       :attributes => {:name => "issue[custom_field_values][#{field.id}]"},
       :children => {
         :only => {:tag => 'option'},
-        :count => Project.find(1).users.count + 1
+        :count => Project.find(1).users.count + 2 # "no change" + "none" options
       }
   end
 
@@ -2681,7 +2759,7 @@ class IssuesControllerTest < ActionController::TestCase
       :attributes => {:name => "issue[custom_field_values][#{field.id}]"},
       :children => {
         :only => {:tag => 'option'},
-        :count => Project.find(1).shared_versions.count + 1
+        :count => Project.find(1).shared_versions.count + 2 # "no change" + "none" options
       }
   end
 
@@ -2698,7 +2776,7 @@ class IssuesControllerTest < ActionController::TestCase
       :attributes => {:name => "issue[custom_field_values][1][]"},
       :children => {
         :only => {:tag => 'option'},
-        :count => 3
+        :count => field.possible_values.size + 1 # "none" options
       }
   end
 
@@ -2924,6 +3002,17 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal '777', journal.details.first.value
   end
 
+  def test_bulk_update_custom_field_to_blank
+    @request.session[:user_id] = 2
+    post :bulk_update, :ids => [1, 3], :notes => 'Bulk editing custom field',
+                                     :issue => {:priority_id => '',
+                                                :assigned_to_id => '',
+                                                :custom_field_values => {'1' => '__none__'}}
+    assert_response 302
+    assert_equal '', Issue.find(1).custom_field_value(1)
+    assert_equal '', Issue.find(3).custom_field_value(1)
+  end
+
   def test_bulk_update_multi_custom_field
     field = CustomField.find(1)
     field.update_attribute :multiple, true
@@ -2940,6 +3029,20 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal ['MySQL', 'Oracle'], Issue.find(3).custom_field_value(1).sort
     # the custom field is not associated with the issue tracker
     assert_nil Issue.find(2).custom_field_value(1)
+  end
+
+  def test_bulk_update_multi_custom_field_to_blank
+    field = CustomField.find(1)
+    field.update_attribute :multiple, true
+
+    @request.session[:user_id] = 2
+    post :bulk_update, :ids => [1, 3], :notes => 'Bulk editing multi custom field',
+                                     :issue => {:priority_id => '',
+                                                :assigned_to_id => '',
+                                                :custom_field_values => {'1' => ['__none__']}}
+    assert_response 302
+    assert_equal [''], Issue.find(1).custom_field_value(1)
+    assert_equal [''], Issue.find(3).custom_field_value(1)
   end
 
   def test_bulk_update_unassign
@@ -2990,6 +3093,19 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal 'Failed to save 1 issue(s) on 2 selected: #2.', flash[:error]
   end
 
+  def test_get_bulk_copy
+    @request.session[:user_id] = 2
+    get :bulk_edit, :ids => [1, 2, 3], :copy => '1'
+    assert_response :success
+    assert_template 'bulk_edit'
+
+    issues = assigns(:issues)
+    assert_not_nil issues
+    assert_equal [1, 2, 3], issues.map(&:id).sort
+
+    assert_select 'input[name=copy_attachments]'
+  end
+
   def test_bulk_copy_to_another_project
     @request.session[:user_id] = 2
     assert_difference 'Issue.count', 2 do
@@ -2998,27 +3114,41 @@ class IssuesControllerTest < ActionController::TestCase
       end
     end
     assert_redirected_to '/projects/ecookbook/issues'
+
+    copies = Issue.all(:order => 'id DESC', :limit => issues.size)
+    copies.each do |copy|
+      assert_equal 2, copy.project_id
+    end
   end
 
   def test_bulk_copy_should_allow_not_changing_the_issue_attributes
     @request.session[:user_id] = 2
-    issue_before_move = Issue.find(1)
-    assert_difference 'Issue.count', 1 do
-      assert_no_difference 'Project.find(1).issues.count' do
-        post :bulk_update, :ids => [1], :copy => '1', 
-             :issue => {
-               :project_id => '2', :tracker_id => '', :assigned_to_id => '',
-               :status_id => '', :start_date => '', :due_date => ''
-             }
-      end
+    issues = [
+      Issue.create!(:project_id => 1, :tracker_id => 1, :status_id => 1, :priority_id => 2, :subject => 'issue 1', :author_id => 1, :assigned_to_id => nil),
+      Issue.create!(:project_id => 2, :tracker_id => 3, :status_id => 2, :priority_id => 1, :subject => 'issue 2', :author_id => 2, :assigned_to_id => 3)
+    ]
+
+    assert_difference 'Issue.count', issues.size do
+      post :bulk_update, :ids => issues.map(&:id), :copy => '1', 
+           :issue => {
+             :project_id => '', :tracker_id => '', :assigned_to_id => '',
+             :status_id => '', :start_date => '', :due_date => ''
+           }
     end
-    issue_after_move = Issue.first(:order => 'id desc', :conditions => {:project_id => 2})
-    assert_equal issue_before_move.tracker_id, issue_after_move.tracker_id
-    assert_equal issue_before_move.status_id, issue_after_move.status_id
-    assert_equal issue_before_move.assigned_to_id, issue_after_move.assigned_to_id
+
+    copies = Issue.all(:order => 'id DESC', :limit => issues.size)
+    issues.each do |orig|
+      copy = copies.detect {|c| c.subject == orig.subject}
+      assert_not_nil copy
+      assert_equal orig.project_id, copy.project_id
+      assert_equal orig.tracker_id, copy.tracker_id
+      assert_equal orig.status_id, copy.status_id
+      assert_equal orig.assigned_to_id, copy.assigned_to_id
+      assert_equal orig.priority_id, copy.priority_id
+    end
   end
 
- def test_bulk_copy_should_allow_changing_the_issue_attributes
+  def test_bulk_copy_should_allow_changing_the_issue_attributes
     # Fixes random test failure with Mysql
     # where Issue.all(:limit => 2, :order => 'id desc', :conditions => {:project_id => 2})
     # doesn't return the expected results
@@ -3030,7 +3160,7 @@ class IssuesControllerTest < ActionController::TestCase
         post :bulk_update, :ids => [1, 2], :copy => '1', 
              :issue => {
                :project_id => '2', :tracker_id => '', :assigned_to_id => '4',
-               :status_id => '3', :start_date => '2009-12-01', :due_date => '2009-12-31'
+               :status_id => '1', :start_date => '2009-12-01', :due_date => '2009-12-31'
              }
       end
     end
@@ -3040,7 +3170,7 @@ class IssuesControllerTest < ActionController::TestCase
     copied_issues.each do |issue|
       assert_equal 2, issue.project_id, "Project is incorrect"
       assert_equal 4, issue.assigned_to_id, "Assigned to is incorrect"
-      assert_equal 3, issue.status_id, "Status is incorrect"
+      assert_equal 1, issue.status_id, "Status is incorrect"
       assert_equal '2009-12-01', issue.start_date.to_s, "Start date is incorrect"
       assert_equal '2009-12-31', issue.due_date.to_s, "Due date is incorrect"
     end
@@ -3062,6 +3192,36 @@ class IssuesControllerTest < ActionController::TestCase
     journal = issue.journals.first
     assert_equal 0, journal.details.size
     assert_equal 'Copying one issue', journal.notes
+  end
+
+  def test_bulk_copy_should_allow_not_copying_the_attachments
+    attachment_count = Issue.find(3).attachments.size
+    assert attachment_count > 0
+    @request.session[:user_id] = 2
+
+    assert_difference 'Issue.count', 1 do
+      assert_no_difference 'Attachment.count' do
+        post :bulk_update, :ids => [3], :copy => '1',
+             :issue => {
+               :project_id => ''
+             }
+      end
+    end
+  end
+
+  def test_bulk_copy_should_allow_copying_the_attachments
+    attachment_count = Issue.find(3).attachments.size
+    assert attachment_count > 0
+    @request.session[:user_id] = 2
+
+    assert_difference 'Issue.count', 1 do
+      assert_difference 'Attachment.count', attachment_count do
+        post :bulk_update, :ids => [3], :copy => '1', :copy_attachments => '1',
+             :issue => {
+               :project_id => ''
+             }
+      end
+    end
   end
 
   def test_bulk_copy_to_another_project_should_follow_when_needed
