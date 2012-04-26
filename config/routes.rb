@@ -78,6 +78,8 @@ ActionController::Routing::Routes.draw do |map|
 
   map.connect 'my/account', :controller => 'my', :action => 'account',
               :conditions => {:method => [:get, :post]}
+  map.connect 'my/account/destroy', :controller => 'my', :action => 'destroy',
+              :conditions => {:method => [:get, :post]}
   map.connect 'my/page', :controller => 'my', :action => 'page',
               :conditions => {:method => :get}
   # Redirects to my/page
@@ -339,6 +341,7 @@ ActionController::Routing::Routes.draw do |map|
   map.resources :roles, :except => :show, :collection => {:permissions => [:get, :post]}
   map.resources :enumerations, :except => :show
 
+  map.connect 'projects/:id/search', :controller => 'search', :action => 'index', :conditions => {:method => :get}
   map.connect 'search', :controller => 'search', :action => 'index', :conditions => {:method => :get}
 
   map.connect 'mail_handler', :controller => 'mail_handler',
