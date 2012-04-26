@@ -359,7 +359,7 @@ class Mailer < ActionMailer::Base
 
     issues_by_assignee = scope.all(:include => [:status, :assigned_to, :project, :tracker]).group_by(&:assigned_to)
     issues_by_assignee.each do |assignee, issues|
-      deliver_reminder(assignee, issues, days) if assignee && assignee.active?
+      deliver_reminder(assignee, issues, days) if assignee.is_a?(User) && assignee.active?
     end
   end
 
@@ -370,6 +370,17 @@ class Mailer < ActionMailer::Base
     yield
   ensure
     ActionMailer::Base.perform_deliveries = was_enabled
+  end
+
+  # Sends emails synchronously in the given block
+  def self.with_synched_deliveries(&block)
+    saved_method = ActionMailer::Base.delivery_method
+    if m = saved_method.to_s.match(%r{^async_(.+)$})
+      ActionMailer::Base.delivery_method = m[1].to_sym
+    end
+    yield
+  ensure
+    ActionMailer::Base.delivery_method = saved_method
   end
 
   private

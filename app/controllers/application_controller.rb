@@ -126,6 +126,15 @@ class ApplicationController < ActionController::Base
     end
   end
 
+  # Logs out current user
+  def logout_user
+    if User.current.logged?
+      cookies.delete :autologin
+      Token.delete_all(["user_id = ? AND action = ?", User.current.id, 'autologin'])
+      self.logged_user = nil
+    end
+  end
+
   # check if login is globally required to access the application
   def check_if_login_required
     # no check needed if user is already logged in
@@ -298,6 +307,19 @@ class ApplicationController < ActionController::Base
     false
   end
 
+  # Redirects to the request referer if present, redirects to args or call block otherwise.
+  def redirect_to_referer_or(*args, &block)
+    redirect_to :back
+  rescue ::ActionController::RedirectBackError
+    if args.any?
+      redirect_to *args
+    elsif block_given?
+      block.call
+    else
+      raise "#redirect_to_referer_or takes arguments or a block"
+    end
+  end
+
   def render_403(options={})
     @project = nil
     render_error({:message => :notice_not_authorized, :status => 403}.merge(options))
@@ -362,18 +384,6 @@ class ApplicationController < ActionController::Base
     @title = options[:title] || Setting.app_title
     render :template => "common/feed.atom", :layout => false,
            :content_type => 'application/atom+xml'
-  end
-
-  # TODO: remove in Redmine 1.4
-  def self.accept_key_auth(*actions)
-    ActiveSupport::Deprecation.warn "ApplicationController.accept_key_auth is deprecated and will be removed in Redmine 1.4. Use accept_rss_auth (or accept_api_auth) instead."
-    accept_rss_auth(*actions)
-  end
-
-  # TODO: remove in Redmine 1.4
-  def accept_key_auth_actions
-    ActiveSupport::Deprecation.warn "ApplicationController.accept_key_auth_actions is deprecated and will be removed in Redmine 1.4. Use accept_rss_auth (or accept_api_auth) instead."
-    self.class.accept_rss_auth
   end
 
   def self.accept_rss_auth(*actions)
