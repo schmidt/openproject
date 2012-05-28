@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -35,9 +35,9 @@ class Enumeration < ActiveRecord::Base
   validates_uniqueness_of :name, :scope => [:type, :project_id]
   validates_length_of :name, :maximum => 30
 
-  named_scope :shared, :conditions => { :project_id => nil }
-  named_scope :active, :conditions => { :active => true }
-  named_scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
+  scope :shared, :conditions => { :project_id => nil }
+  scope :active, :conditions => { :active => true }
+  scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
 
   def self.default
     # Creates a fake default scope so Enumeration.default will check
