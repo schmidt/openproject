@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -66,7 +66,8 @@ class AccountTest < ActionController::IntegrationTest
     assert_template 'my/page'
     assert_equal user.id, session[:user_id]
     assert_not_nil user.reload.last_login_on
-    assert user.last_login_on.utc > 10.second.ago.utc
+    seconds_ago = 10.second.ago.utc
+    assert user.last_login_on.utc > 10.second.ago.utc, "#{user.last_login_on.utc} was not > #{seconds_ago}"
   end
 
   def test_lost_password

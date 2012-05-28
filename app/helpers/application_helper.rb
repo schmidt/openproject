@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -220,7 +220,7 @@ module ApplicationHelper
   def render_flash_messages
     s = ''
     flash.each do |k,v|
-      s << (content_tag('div', v.html_safe, :class => "flash #{k}"))
+      s << content_tag('div', v.html_safe, :class => "flash #{k}", :id => "flash_#{k}")
     end
     s.html_safe
   end
@@ -369,7 +369,8 @@ module ApplicationHelper
   end
 
   def to_path_param(path)
-    path.to_s.split(%r{[/\\]}).select {|p| !p.blank?}
+    str = path.to_s.split(%r{[/\\]}).select{|p| !p.blank?}.join("/")
+    str.blank? ? nil : str
   end
 
   def pagination_links_full(paginator, count=nil, options={})
@@ -398,7 +399,7 @@ module ApplicationHelper
 
     unless count.nil?
       html << " (#{paginator.current.first_item}-#{paginator.current.last_item}/#{count})"
-      if per_page_links != false && links = per_page_links(paginator.items_per_page)
+      if per_page_links != false && links = per_page_links(paginator.items_per_page, count)
 	      html << " | #{links}"
       end
     end
@@ -406,11 +407,23 @@ module ApplicationHelper
     html.html_safe
   end
 
-  def per_page_links(selected=nil)
-    links = Setting.per_page_options_array.collect do |n|
+  def per_page_links(selected=nil, item_count=nil)
+    values = Setting.per_page_options_array
+    if item_count && values.any?
+      if item_count > values.first
+        max = values.detect {|value| value >= item_count} || item_count
+      else
+        max = item_count
+      end
+      values = values.select {|value| value <= max || value == selected}
+    end
+    if values.empty? || (values.size == 1 && values.first == selected)
+      return nil
+    end
+    links = values.collect do |n|
       n == selected ? n : link_to_content_update(n, params.merge(:per_page => n))
     end
-    links.size > 1 ? l(:label_display_per_page, links.join(', ')) : nil
+    l(:label_display_per_page, links.join(', '))
   end
 
   def reorder_links(name, url, method = :post)
@@ -947,8 +960,8 @@ module ApplicationHelper
   def labelled_remote_form_for(*args, &proc)
     args << {} unless args.last.is_a?(Hash)
     options = args.last
-    options.merge!({:builder => Redmine::Views::LabelledFormBuilder})
-    remote_form_for(*args, &proc)
+    options.merge!({:builder => Redmine::Views::LabelledFormBuilder, :remote => true})
+    form_for(*args, &proc)
   end
 
   def error_messages_for(*objects)
@@ -1045,6 +1058,59 @@ module ApplicationHelper
     end
   end
 
+  # Overrides Rails' stylesheet_link_tag with themes and plugins support.
+  # Examples:
+  #   stylesheet_link_tag('styles') # => picks styles.css from the current theme or defaults
+  #   stylesheet_link_tag('styles', :plugin => 'foo) # => picks styles.css from plugin's assets
+  #
+  def stylesheet_link_tag(*sources)
+    options = sources.last.is_a?(Hash) ? sources.pop : {}
+    plugin = options.delete(:plugin)
+    sources = sources.map do |source|
+      if plugin
+        "/plugin_assets/#{plugin}/stylesheets/#{source}"
+      elsif current_theme && current_theme.stylesheets.include?(source)
+        current_theme.stylesheet_path(source)
+      else
+        source
+      end
+    end
+    super sources, options
+  end
+
+  # Overrides Rails' image_tag with themes and plugins support.
+  # Examples:
+  #   image_tag('image.png') # => picks image.png from the current theme or defaults
+  #   image_tag('image.png', :plugin => 'foo) # => picks image.png from plugin's assets
+  #
+  def image_tag(source, options={})
+    if plugin = options.delete(:plugin)
+      source = "/plugin_assets/#{plugin}/images/#{source}"
+    elsif current_theme && current_theme.images.include?(source)
+      source = current_theme.image_path(source)
+    end
+    super source, options
+  end
+
+  # Overrides Rails' javascript_include_tag with plugins support
+  # Examples:
+  #   javascript_include_tag('scripts') # => picks scripts.js from defaults
+  #   javascript_include_tag('scripts', :plugin => 'foo) # => picks scripts.js from plugin's assets
+  #
+  def javascript_include_tag(*sources)
+    options = sources.last.is_a?(Hash) ? sources.pop : {}
+    if plugin = options.delete(:plugin)
+      sources = sources.map do |source|
+        if plugin
+          "/plugin_assets/#{plugin}/javascripts/#{source}"
+        else
+          source
+        end
+      end
+    end
+    super sources, options
+  end
+
   def content_for(name, content = nil, &block)
     @has_content ||= {}
     @has_content[name] = true
@@ -1053,6 +1119,14 @@ module ApplicationHelper
 
   def has_content?(name)
     (@has_content && @has_content[name]) || false
+  end
+
+  def sidebar_content?
+    has_content?(:sidebar) || view_layouts_base_sidebar_hook_response.present?
+  end
+
+  def view_layouts_base_sidebar_hook_response
+    @view_layouts_base_sidebar_hook_response ||= call_hook(:view_layouts_base_sidebar)
   end
 
   def email_delivery_enabled?

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -126,8 +126,8 @@ class Query < ActiveRecord::Base
                                  :list_subprojects => [ "*", "!*", "=" ],
                                  :date => [ "=", ">=", "<=", "><", "<t+", ">t+", "t+", "t", "w", ">t-", "<t-", "t-", "!*", "*" ],
                                  :date_past => [ "=", ">=", "<=", "><", ">t-", "<t-", "t-", "t", "w", "!*", "*" ],
-                                 :string => [ "=", "~", "!", "!~" ],
-                                 :text => [  "~", "!~" ],
+                                 :string => [ "=", "~", "!", "!~", "!*", "*" ],
+                                 :text => [  "~", "!~", "!*", "*" ],
                                  :integer => [ "=", ">=", "<=", "><", "!*", "*" ],
                                  :float => [ "=", ">=", "<=", "><", "!*", "*" ] }
 
@@ -153,7 +153,7 @@ class Query < ActiveRecord::Base
   ]
   cattr_reader :available_columns
 
-  named_scope :visible, lambda {|*args|
+  scope :visible, lambda {|*args|
     user = args.shift || User.current
     base = Project.allowed_to_condition(user, :view_issues, *args)
     user_id = user.logged? ? user.id : 0
@@ -564,7 +564,7 @@ class Query < ActiveRecord::Base
     r = nil
     if grouped?
       begin
-        # Rails will raise an (unexpected) RecordNotFound if there's only a nil group value
+        # Rails3 will raise an (unexpected) RecordNotFound if there's only a nil group value
         r = Issue.visible.count(:group => group_by_statement, :include => [:status, :project], :conditions => statement)
       rescue ActiveRecord::RecordNotFound
         r = {nil => issue_count}
