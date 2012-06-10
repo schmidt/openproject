@@ -44,19 +44,10 @@ class Attachment < ActiveRecord::Base
                                                         "LEFT JOIN #{Project.table_name} ON #{Document.table_name}.project_id = #{Project.table_name}.id"}
 
   cattr_accessor :storage_path
-  @@storage_path = Redmine::Configuration['attachments_storage_path'] || "#{Rails.root}/files"
+  @@storage_path = Redmine::Configuration['attachments_storage_path'] || File.join(Rails.root, "files")
 
   before_save :files_to_final_location
   after_destroy :delete_from_disk
-
-  def container_with_blank_type_check
-    if container_type.blank?
-      nil
-    else
-      container_without_blank_type_check
-    end
-  end
-  alias_method_chain :container, :blank_type_check unless method_defined?(:container_without_blank_type_check)
 
   # Returns an unsaved copy of the attachment
   def copy(attributes=nil)
@@ -110,10 +101,15 @@ class Attachment < ActiveRecord::Base
       logger.info("Saving attachment '#{self.diskfile}' (#{@temp_file.size} bytes)")
       md5 = Digest::MD5.new
       File.open(diskfile, "wb") do |f|
-        buffer = ""
-        while (buffer = @temp_file.read(8192))
-          f.write(buffer)
-          md5.update(buffer)
+        if @temp_file.respond_to?(:read)
+          buffer = ""
+          while (buffer = @temp_file.read(8192))
+            f.write(buffer)
+            md5.update(buffer)
+          end
+        else
+          f.write(@temp_file)
+          md5.update(@temp_file)
         end
       end
       self.digest = md5.hexdigest
@@ -134,7 +130,7 @@ class Attachment < ActiveRecord::Base
 
   # Returns file's location on disk
   def diskfile
-    "#{@@storage_path}/#{self.disk_filename}"
+    File.join(self.class.storage_path, disk_filename.to_s)
   end
 
   def increment_download
