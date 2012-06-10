@@ -1,17 +1,8 @@
-# Patches active_support/core_ext/load_error.rb to support 1.9.3 LoadError message
-if RUBY_VERSION >= '1.9.3'
-  MissingSourceFile::REGEXPS << [/^cannot load such file -- (.+)$/i, 1] 
-end
-
 require 'active_record'
 
 module ActiveRecord
   class Base
     include Redmine::I18n
-    def self.named_scope(*args)
-      scope(*args)
-    end
-
     # Translate attribute names for validation errors display
     def self.human_attribute_name(attr, *args)
       l("field_#{attr.to_s.gsub(/_id$/, '')}", :default => attr)
@@ -54,26 +45,39 @@ end
 
 ActionView::Base.field_error_proc = Proc.new{ |html_tag, instance| "#{html_tag}" }
 
-module AsynchronousMailer
-  # Adds :async_smtp and :async_sendmail delivery methods
-  # to perform email deliveries asynchronously
-  %w(smtp sendmail).each do |type|
-    define_method("perform_delivery_async_#{type}") do |mail|
+require 'mail'
+
+module DeliveryMethods
+  class AsyncSMTP < ::Mail::SMTP
+    def deliver!(*args)
       Thread.start do
-        send "perform_delivery_#{type}", mail
+        super *args
       end
     end
   end
 
-  # Adds a delivery method that writes emails in tmp/emails for testing purpose
-  def perform_delivery_tmp_file(mail)
-    dest_dir = File.join(Rails.root, 'tmp', 'emails')
-    Dir.mkdir(dest_dir) unless File.directory?(dest_dir)
-    File.open(File.join(dest_dir, mail.message_id.gsub(/[<>]/, '') + '.eml'), 'wb') {|f| f.write(mail.encoded) }
+  class AsyncSendmail < ::Mail::Sendmail
+    def deliver!(*args)
+      Thread.start do
+        super *args
+      end
+    end
+  end
+
+  class TmpFile
+    def initialize(*args); end
+
+    def deliver!(mail)
+      dest_dir = File.join(Rails.root, 'tmp', 'emails')
+      Dir.mkdir(dest_dir) unless File.directory?(dest_dir)
+      File.open(File.join(dest_dir, mail.message_id.gsub(/[<>]/, '') + '.eml'), 'wb') {|f| f.write(mail.encoded) }
+    end
   end
 end
 
-ActionMailer::Base.send :include, AsynchronousMailer
+ActionMailer::Base.add_delivery_method :async_smtp, DeliveryMethods::AsyncSMTP
+ActionMailer::Base.add_delivery_method :async_sendmail, DeliveryMethods::AsyncSendmail
+ActionMailer::Base.add_delivery_method :tmp_file, DeliveryMethods::TmpFile
 
 module ActionController
   module MimeResponds
@@ -81,6 +85,19 @@ module ActionController
       def api(&block)
         any(:xml, :json, &block)
       end
+    end
+  end
+end
+
+module ActionController
+  class Base
+    # Displays an explicit message instead of a NoMethodError exception
+    # when trying to start Redmine with an old session_store.rb
+    # TODO: remove it in a later version
+    def self.session=(*args)
+      $stderr.puts "Please remove config/initializers/session_store.rb and run `rake generate_secret_token`.\n" +
+        "Setting the session secret with ActionController.session= is no longer supported in Rails 3."
+      exit 1
     end
   end
 end

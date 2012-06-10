@@ -23,12 +23,12 @@ RedmineApp::Application.routes.draw do
   match 'account/register', :to => 'account#register', :via => [:get, :post]
   match 'account/lost_password', :to => 'account#lost_password', :via => [:get, :post]
   match 'account/activate', :to => 'account#activate', :via => :get
-  
+
   match '/news/preview', :controller => 'previews', :action => 'news', :as => 'preview_news'
   match '/issues/preview/new/:project_id', :to => 'previews#issue', :as => 'preview_new_issue'
   match '/issues/preview/edit/:id', :to => 'previews#issue', :as => 'preview_edit_issue'
   match '/issues/preview', :to => 'previews#issue', :as => 'preview_issue'
-  
+
   match 'projects/:id/wiki', :to => 'wikis#edit', :via => :post
   match 'projects/:id/wiki/destroy', :to => 'wikis#destroy', :via => [:get, :post]
 
@@ -36,7 +36,7 @@ RedmineApp::Application.routes.draw do
   get 'boards/:board_id/topics/:id', :to => 'messages#show'
   match 'boards/:board_id/topics/quote/:id', :to => 'messages#quote', :via => [:get, :post]
   get 'boards/:board_id/topics/:id/edit', :to => 'messages#edit'
-  
+
   post 'boards/:board_id/topics/preview', :to => 'messages#preview'
   post 'boards/:board_id/topics/:id/replies', :to => 'messages#reply'
   post 'boards/:board_id/topics/:id/edit', :to => 'messages#edit'
@@ -181,7 +181,7 @@ RedmineApp::Application.routes.draw do
   resources :news, :only => [:index, :show, :edit, :update, :destroy]
   match '/news/:id/comments', :to => 'comments#create', :via => :post
   match '/news/:id/comments/:comment_id', :to => 'comments#destroy', :via => :delete
-  
+
   resources :versions, :only => [:show, :edit, :update, :destroy] do
     post 'status_by', :on => :member
   end
@@ -202,7 +202,7 @@ RedmineApp::Application.routes.draw do
   match '/time_entries/:id', :to => 'timelog#destroy', :via => :delete, :id => /\d+/
   # TODO: delete /time_entries for bulk deletion
   match '/time_entries/destroy', :to => 'timelog#destroy', :via => :delete
-  
+
   # TODO: port to be part of the resources route(s)
   match 'projects/:id/settings/:tab', :to => 'projects#settings', :via => :get
 
@@ -213,33 +213,47 @@ RedmineApp::Application.routes.draw do
   # repositories routes
   get 'projects/:id/repository/:repository_id/statistics', :to => 'repositories#stats'
   get 'projects/:id/repository/:repository_id/graph', :to => 'repositories#graph'
-  match 'projects/:id/repository/:repository_id/committers', :to => 'repositories#committers', :via => [:get, :post]
+
+  get 'projects/:id/repository/:repository_id/changes(/*path(.:ext))',
+      :to => 'repositories#changes'
 
   get 'projects/:id/repository/:repository_id/revisions/:rev', :to => 'repositories#revision'
   get 'projects/:id/repository/:repository_id/revision', :to => 'repositories#revision'
   post   'projects/:id/repository/:repository_id/revisions/:rev/issues', :to => 'repositories#add_related_issue'
   delete 'projects/:id/repository/:repository_id/revisions/:rev/issues/:issue_id', :to => 'repositories#remove_related_issue'
   get 'projects/:id/repository/:repository_id/revisions', :to => 'repositories#revisions'
-  get 'projects/:id/repository/:repository_id/revisions/:rev/:format(/*path(.:ext))', :to => 'repositories#entry', :format => /raw/
-  get 'projects/:id/repository/:repository_id/revisions/:rev/:action(/*path(.:ext))', :controller => 'repositories', :action => /(browse|show|entry|changes|annotate|diff)/
+  get 'projects/:id/repository/:repository_id/revisions/:rev/:action(/*path(.:ext))',
+      :controller => 'repositories',
+      :constraints => {
+            :action => /(browse|show|entry|raw|annotate|diff)/,
+            :rev    => /[a-z0-9\.\-_]+/
+          }
 
   get 'projects/:id/repository/statistics', :to => 'repositories#stats'
   get 'projects/:id/repository/graph', :to => 'repositories#graph'
-  match 'projects/:id/repository/committers', :to => 'repositories#committers', :via => [:get, :post]
+
+  get 'projects/:id/repository/changes(/*path(.:ext))',
+      :to => 'repositories#changes'
 
   get 'projects/:id/repository/revisions', :to => 'repositories#revisions'
   get 'projects/:id/repository/revisions/:rev', :to => 'repositories#revision'
   get 'projects/:id/repository/revision', :to => 'repositories#revision'
   post   'projects/:id/repository/revisions/:rev/issues', :to => 'repositories#add_related_issue'
   delete 'projects/:id/repository/revisions/:rev/issues/:issue_id', :to => 'repositories#remove_related_issue'
-  get 'projects/:id/repository/revisions/:rev/:format(/*path(.:ext))', :to => 'repositories#entry', :format => /raw/
-  get 'projects/:id/repository/revisions/:rev/:action(/*path(.:ext))', :controller => 'repositories', :action => /(browse|show|entry|changes|annotate|diff)/
-  get 'projects/:id/repository/:repository_id/:format(/*path(.:ext))', :to => 'repositories#entry', :format => /raw/
-  get 'projects/:id/repository/:repository_id/:action(/*path(.:ext))', :controller => 'repositories', :action => /(browse|show|entry|changes|annotate|diff)/
-  get 'projects/:id/repository/:repository_id', :to => 'repositories#show', :path => nil
+  get 'projects/:id/repository/revisions/:rev/:action(/*path(.:ext))',
+      :controller => 'repositories',
+      :constraints => {
+            :action => /(browse|show|entry|raw|annotate|diff)/,
+            :rev    => /[a-z0-9\.\-_]+/
+          }
+  get 'projects/:id/repository/:repository_id/:action(/*path(.:ext))',
+      :controller => 'repositories',
+      :action => /(browse|show|entry|raw|changes|annotate|diff)/
+  get 'projects/:id/repository/:action(/*path(.:ext))',
+      :controller => 'repositories',
+      :action => /(browse|show|entry|raw|changes|annotate|diff)/
 
-  get 'projects/:id/repository/:format(/*path(.:ext))', :to => 'repositories#entry', :format => /raw/
-  get 'projects/:id/repository/:action(/*path(.:ext))', :controller => 'repositories', :action => /(browse|show|entry|changes|annotate|diff)/
+  get 'projects/:id/repository/:repository_id', :to => 'repositories#show', :path => nil
   get 'projects/:id/repository', :to => 'repositories#show', :path => nil
 
   # additional routes for having the file name at the end of url

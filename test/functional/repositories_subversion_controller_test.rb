@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -67,6 +67,9 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       assert_tag 'input', :attributes => {:name => 'rev'}
       assert_tag 'a', :content => 'Statistics'
       assert_tag 'a', :content => 'Atom'
+      assert_tag :tag => 'a',
+                 :attributes => {:href => '/projects/subproject1/repository'},
+                 :content => 'root'
     end
 
     def test_show_non_default
@@ -213,9 +216,8 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       @repository.fetch_changesets
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
-      get :entry, :id => PRJ_ID,
-          :path => repository_path_hash(['subversion_test', 'helloworld.c'])[:param],
-          :format => 'raw'
+      get :raw, :id => PRJ_ID,
+          :path => repository_path_hash(['subversion_test', 'helloworld.c'])[:param]
       assert_response :success
       assert_equal 'attachment; filename="helloworld.c"', @response.headers['Content-Disposition']
     end
