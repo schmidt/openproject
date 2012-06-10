@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,9 +34,9 @@ class Version < ActiveRecord::Base
   validates_inclusion_of :status, :in => VERSION_STATUSES
   validates_inclusion_of :sharing, :in => VERSION_SHARINGS
 
-  named_scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
-  named_scope :open, :conditions => {:status => 'open'}
-  named_scope :visible, lambda {|*args| { :include => :project,
+  scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
+  scope :open, :conditions => {:status => 'open'}
+  scope :visible, lambda {|*args| { :include => :project,
                                           :conditions => Project.allowed_to_condition(args.first || User.current, :view_issues) } }
 
   safe_attributes 'name', 

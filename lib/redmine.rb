@@ -34,15 +34,15 @@ Redmine::Scm::Base.add "Git"
 Redmine::Scm::Base.add "Filesystem"
 
 Redmine::CustomFieldFormat.map do |fields|
-  fields.register Redmine::CustomFieldFormat.new('string', :label => :label_string, :order => 1)
-  fields.register Redmine::CustomFieldFormat.new('text', :label => :label_text, :order => 2)
-  fields.register Redmine::CustomFieldFormat.new('int', :label => :label_integer, :order => 3)
-  fields.register Redmine::CustomFieldFormat.new('float', :label => :label_float, :order => 4)
-  fields.register Redmine::CustomFieldFormat.new('list', :label => :label_list, :order => 5)
-  fields.register Redmine::CustomFieldFormat.new('date', :label => :label_date, :order => 6)
-  fields.register Redmine::CustomFieldFormat.new('bool', :label => :label_boolean, :order => 7)
-  fields.register Redmine::CustomFieldFormat.new('user', :label => :label_user, :only => %w(Issue TimeEntry Version Project), :edit_as => 'list', :order => 8)
-  fields.register Redmine::CustomFieldFormat.new('version', :label => :label_version, :only => %w(Issue TimeEntry Version Project), :edit_as => 'list', :order => 9)
+  fields.register 'string'
+  fields.register 'text'
+  fields.register 'int', :label => :label_integer
+  fields.register 'float'
+  fields.register 'list'
+  fields.register 'date'
+  fields.register 'bool', :label => :label_boolean
+  fields.register 'user', :only => %w(Issue TimeEntry Version Project), :edit_as => 'list'
+  fields.register 'version', :only => %w(Issue TimeEntry Version Project), :edit_as => 'list'
 end
 
 # Permissions
@@ -125,7 +125,7 @@ Redmine::AccessControl.map do |map|
 
   map.project_module :repository do |map|
     map.permission :manage_repository, {:repositories => [:new, :create, :edit, :update, :committers, :destroy]}, :require => :member
-    map.permission :browse_repository, :repositories => [:show, :browse, :entry, :annotate, :changes, :diff, :stats, :graph]
+    map.permission :browse_repository, :repositories => [:show, :browse, :entry, :raw, :annotate, :changes, :diff, :stats, :graph]
     map.permission :view_changesets, :repositories => [:show, :revisions, :revision]
     map.permission :commit_access, {}
     map.permission :manage_related_issues, {:repositories => [:add_related_issue, :remove_related_issue]}
