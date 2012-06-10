@@ -314,7 +314,7 @@ module ApplicationHelper
     s = ''
     if projects.any?
       ancestors = []
-      projects.sort_by(&:lft).each do |project|
+      Project.project_tree(projects) do |project, level|
         if (ancestors.empty? || project.is_descendant_of?(ancestors.last))
           s << "<ul>\n"
         else
@@ -453,7 +453,7 @@ module ApplicationHelper
   end
 
   def link_to_project_ancestors(project)
-    if @project
+    if project && !project.new_record?
       ancestors = (project.root? ? [] : project.ancestors.visible)
       ancestors << project
       ancestors.collect do |p|
@@ -724,7 +724,7 @@ module ApplicationHelper
   #     identifier:version:1.0.0
   #     identifier:source:some/file
   def parse_redmine_links(text, project, obj, attr, only_path, options)
-    text.gsub!(%r{([\s\(,\-\[\>]|^)(!)?(([a-z0-9\-]+):)?(attachment|document|version|commit|source|export|message|project)?((#|r)(\d+)|(:)([^"\s<>][^\s<>]*?|"[^"]+?"))(?=(?=[[:punct:]]\W)|,|\s|\]|<|$)}) do |m|
+    text.gsub!(%r{([\s\(,\-\[\>]|^)(!)?(([a-z0-9\-]+):)?(attachment|document|version|commit|source|export|message|project)?((#+|r)(\d+)|(:)([^"\s<>][^\s<>]*?|"[^"]+?"))(?=(?=[[:punct:]]\W)|,|\s|\]|<|$)}) do |m|
       leading, esc, project_prefix, project_identifier, prefix, sep, identifier = $1, $2, $3, $4, $5, $7 || $9, $8 || $10
       link = nil
       if project_identifier
@@ -765,6 +765,16 @@ module ApplicationHelper
             if p = Project.visible.find_by_id(oid)
               link = link_to_project(p, {:only_path => only_path}, :class => 'project')
             end
+          end
+        elsif sep == '##'
+          oid = identifier.to_i
+          if issue = Issue.visible.find_by_id(oid, :include => :status)
+            link = issue_quick_info(issue)
+          end
+        elsif sep == '###'
+          oid = identifier.to_i
+          if issue = Issue.visible.find_by_id(oid, :include => :status)
+            link = issue_quick_info_with_description(issue)
           end
         elsif sep == ':'
           # removes the double quotes if any
@@ -874,8 +884,17 @@ module ApplicationHelper
   end
 
   def lang_options_for_select(blank=true)
+    auto = if (blank && (valid_languages - all_languages) == (all_languages - valid_languages))
+            [["(auto)", ""]]
+           else
+            []
+          end
+    auto + valid_languages.collect{|lang| [ ll(lang.to_s, :general_lang_name), lang.to_s]}.sort{|x,y| x.last <=> y.last }
+  end
+
+  def all_lang_options_for_select(blank=true)
     (blank ? [["(auto)", ""]] : []) +
-      valid_languages.collect{|lang| [ ll(lang.to_s, :general_lang_name), lang.to_s]}.sort{|x,y| x.last <=> y.last }
+      all_languages.collect{|lang| [ ll(lang.to_s, :general_lang_name), lang.to_s]}.sort{|x,y| x.last <=> y.last }
   end
 
   def label_tag_for(name, option_tags = nil, options = {})
