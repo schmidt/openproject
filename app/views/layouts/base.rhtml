@@ -20,9 +20,9 @@
 <%= javascript_include_tag 'jquery-ui.min.js' %>
 <%= javascript_include_tag 'jquery.menu_expand.js' %>
 <%= javascript_include_tag 'breadcrumb.js' %>
-<%= javascript_include_tag 'chosen.js'%>
-<%= stylesheet_link_tag 'chosen'%>
-<%= stylesheet_link_tag 'project_select'%>
+<%= javascript_include_tag 'select2.js' %>
+<%= stylesheet_link_tag 'select2'%>
+<%= stylesheet_link_tag 'project_select_select2'%>
 <% if User.current.impaired? && accessibility_css_enabled? %>
   <%= stylesheet_link_tag 'accessibility' %>
 <% end %>
@@ -63,7 +63,12 @@
             <% unless User.current.impaired? %>
               <ul style="display:none;" class="limit-width-topmenu">
                   <li><%= link_to l(:label_project_view_all), :controller => 'projects', :action => 'index' %></li>
-                  <li><%= render_project_jump_box Project.visible, :id => "project-search", :class => "chzn-select", :'data-placeholder' => "Enter Project Name..." %></li>
+                  <li id="project-search-container">
+                    <%= render_project_jump_box Project.visible,
+                          { :id => "project-search",
+                            :class => "select2-select",
+                            :'data-placeholder' => "Enter Project Name..." } %>
+                  </li>
               </ul>
             <% end %>
           </li>

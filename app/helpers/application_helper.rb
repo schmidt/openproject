@@ -279,7 +279,7 @@ module ApplicationHelper
         { :value => url_for(:controller => 'projects', :action => 'show', :id => p, :jump => current_menu_item) }
       end
       html_options[:class] ||= ""
-      html_options[:class] << " chzn-select "
+      html_options[:class] << " select2-select "
       select_tag "", option_tags, html_options.merge({
         :onchange => "if (this.value != \'\') { window.location = this.value; }",
         :title => l(:label_jump_to_a_project)
