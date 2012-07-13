@@ -1,0 +1,5 @@
+<% if principals.size > 20 %>
+  <p><%= l('members_autocompleter.to_many_principals_to_display')%></p>
+<%else%>
+  <%= principals_check_box_tags 'member[user_ids][]', principals %>
+<%end%>

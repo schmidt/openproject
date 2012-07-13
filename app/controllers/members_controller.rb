@@ -40,7 +40,7 @@ class MembersController < ApplicationController
         format.js {
           render(:update) {|page|
             page.replace_html "tab-content-members", :partial => 'projects/settings/members'
-            page << 'hideOnLoad()'
+            page << 'hideOnLoad(); init_members_cb();'
             members.each {|member| page.visual_effect(:highlight, "member-#{member.id}") }
           }
         }
