@@ -28,28 +28,31 @@ namespace :localizator do
   desc "Generate a YAML file with missing translations"
   task :compare, [:locale, :base_locale] => :environment do |t, args|
     args.with_defaults(:locale => 'new_locale', :base_locale => I18n.default_locale.to_s)
-    dl, tl = args[:base_locale], args[:locale]
-    puts "Comparing #{tl} against #{dl}"
-    filename = "#{Rails.root}/config/locales/#{tl}-missing.yml"
-    if File.exists?(filename)
-      puts "File 'config/locales/#{tl}-missing.yml' exists."
-      # we don't use the automatic merge feature at the moment
-      # puts "Merge it first with 'rake localizer:merge[#{tl}]' or delete it"
-    else
-      translations = {}
-      I18n.load_path.each do |file|
-        tree = YAML::parse(File.open(file))
-        translations.deep_merge!(tree.transform)
-      end
-      missing_translations = {tl => Localizator::Helpers::locale_diff(translations[dl], translations[tl])}
-      if missing_translations[tl].any?
-        File.open(filename, 'w') do |f|
-          f.puts missing_translations.to_yaml
-        end
-        puts "Created 'config/locales/#{tl}-missing.yml' with missing translations."
-        puts "Edit and merge it back" # with 'rake localizer:merge[#{tl}]'"
+    dl = args[:base_locale]
+    tls = (args[:locale] == '*') ? I18n.available_locales : [args[:locale]]
+    tls.each do |tl|
+      puts "Comparing #{tl} against #{dl}"
+      filename = "#{Rails.root}/config/locales/#{tl}-missing.yml"
+      if File.exists?(filename)
+        puts "File 'config/locales/#{tl}-missing.yml' exists."
+        # we don't use the automatic merge feature at the moment
+        # puts "Merge it first with 'rake localizer:merge[#{tl}]' or delete it"
       else
-        puts "All keys in locale '#{dl}' are translated!"
+        translations = {}
+        I18n.load_path.each do |file|
+          tree = YAML::parse(File.open(file))
+          translations.deep_merge!(tree.transform)
+        end
+        missing_translations = {tl => Localizator::Helpers::locale_diff(translations[dl], translations[tl])}
+        if missing_translations[tl].any?
+          File.open(filename, 'w') do |f|
+            f.puts missing_translations.to_yaml
+          end
+          puts "Created 'config/locales/#{tl}-missing.yml' with missing translations."
+          puts "Edit and merge it back" # with 'rake localizer:merge[#{tl}]'"
+        else
+          puts "All keys in locale '#{dl}' are translated!"
+        end
       end
     end
   end
@@ -133,7 +136,13 @@ end
 # Once done you can add the translatios into your main locale file
 # ('config/locales/nl.yml')
 #
-# TODO: The following might be available in the future:
+# In order to compare all locales to a single base locale use an asterix as the source
+#
+#   [noglob] rake localizator:compare[*,en] => Comparing all locales against en
+#
+# ==== TODO ====
+#
+# The following might be available in the future:
 #
 #     [noglob] rake localizator:merge[nl]
 #
