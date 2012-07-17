@@ -123,7 +123,7 @@ end
 # If you don't want to compare against your default locale you can pass
 # another in as the second parameter
 #
-#     [noglob] rake localizator:compare[nl, de] => Comparing nl against de
+#     [noglob] rake localizator:compare[nl,de] => Comparing nl against de
 #
 # It will generate a new file in 'config/locales/nl-missing.yml' with the
 # missing keys which need to be translated.
