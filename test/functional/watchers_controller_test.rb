@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -51,6 +51,22 @@ class WatchersControllerTest < ActionController::TestCase
     end
   end
 
+  def test_watch_invalid_class_should_respond_with_404
+    @request.session[:user_id] = 3
+    assert_no_difference('Watcher.count') do
+      xhr :post, :watch, :object_type => 'foo', :object_id => '1'
+      assert_response 404
+    end
+  end
+
+  def test_watch_invalid_object_should_respond_with_404
+    @request.session[:user_id] = 3
+    assert_no_difference('Watcher.count') do
+      xhr :post, :watch, :object_type => 'issue', :object_id => '999'
+      assert_response 404
+    end
+  end
+
   def test_unwatch
     @request.session[:user_id] = 3
     assert_difference('Watcher.count', -1) do
@@ -68,10 +84,19 @@ class WatchersControllerTest < ActionController::TestCase
     assert_select_rjs :replace_html, 'ajax-modal'
   end
 
-  def test_new_for_new_record
+  def test_new_for_new_record_with_id
     @request.session[:user_id] = 2
     xhr :get, :new, :project_id => 1
     assert_response :success
+    assert_equal Project.find(1), assigns(:project)
+    assert_select_rjs :replace_html, 'ajax-modal'
+  end
+
+  def test_new_for_new_record_with_identifier
+    @request.session[:user_id] = 2
+    xhr :get, :new, :project_id => 'ecookbook'
+    assert_response :success
+    assert_equal Project.find(1), assigns(:project)
     assert_select_rjs :replace_html, 'ajax-modal'
   end
 

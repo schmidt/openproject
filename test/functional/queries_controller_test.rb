@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -140,7 +140,7 @@ class QueriesControllerTest < ActionController::TestCase
 
   def test_create_with_failure
     @request.session[:user_id] = 2
-    assert_no_difference 'Query.count' do
+    assert_no_difference '::Query.count' do
       post :create, :project_id => 'ecookbook', :query => {:name => ''}
     end
     assert_response :success

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -201,6 +201,11 @@ class RepositoriesControllerTest < ActionController::TestCase
   end
 
   def test_graph_commits_per_month
+    # Make sure there's some data to display
+    latest = Project.find(1).repository.changesets.maximum(:commit_date)
+    assert_not_nil latest
+    Date.stubs(:today).returns(latest.to_date + 10)
+
     get :graph, :id => 1, :graph => 'commits_per_month'
     assert_response :success
     assert_equal 'image/svg+xml', @response.content_type

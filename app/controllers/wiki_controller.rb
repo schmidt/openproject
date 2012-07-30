@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -162,6 +162,8 @@ class WikiController < ApplicationController
   rescue ActiveRecord::StaleObjectError, Redmine::WikiFormatting::StaleSectionError
     # Optimistic locking exception
     flash.now[:error] = l(:notice_locking_conflict)
+    render :action => 'edit'
+  rescue ActiveRecord::RecordNotSaved
     render :action => 'edit'
   end
 

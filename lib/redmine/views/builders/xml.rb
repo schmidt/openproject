@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -15,6 +15,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'builder'
+
 module Redmine
   module Views
     module Builders
@@ -29,7 +31,7 @@ module Redmine
         end
 
         def method_missing(sym, *args, &block)
-          if args.size == 1 && args.first.is_a?(Time)
+          if args.size == 1 && args.first.is_a?(::Time)
             __send__ sym, args.first.xmlschema, &block
           else
             super

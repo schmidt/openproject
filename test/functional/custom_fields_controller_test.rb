@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -35,6 +35,16 @@ class CustomFieldsControllerTest < ActionController::TestCase
     get :index
     assert_response :success
     assert_template 'index'
+  end
+
+  def test_new
+    custom_field_classes.each do |klass|
+      get :new, :type => klass.name
+      assert_response :success
+      assert_template 'new'
+      assert_kind_of klass, assigns(:custom_field)
+      assert_tag :select, :attributes => {:name => 'custom_field[field_format]'}
+    end
   end
 
   def test_new_issue_custom_field
@@ -134,5 +144,12 @@ class CustomFieldsControllerTest < ActionController::TestCase
     assert_redirected_to '/custom_fields?tab=IssueCustomField'
     assert_nil CustomField.find_by_id(1)
     assert_nil CustomValue.find_by_custom_field_id(1)
+  end
+
+  def custom_field_classes
+    files = Dir.glob(File.join(Rails.root, 'app/models/*_custom_field.rb')).map {|f| File.basename(f).sub(/\.rb$/, '') }
+    classes = files.map(&:classify).map(&:constantize)
+    assert classes.size > 0
+    classes
   end
 end

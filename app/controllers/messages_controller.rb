@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -95,10 +95,11 @@ class MessagesController < ApplicationController
   # Delete a messages
   def destroy
     (render_403; return false) unless @message.destroyable_by?(User.current)
+    r = @message.to_param
     @message.destroy
     redirect_to @message.parent.nil? ?
       { :controller => 'boards', :action => 'show', :project_id => @project, :id => @board } :
-      { :action => 'show', :id => @message.parent, :r => @message }
+      { :action => 'show', :id => @message.parent, :r => r }
   end
 
   def quote

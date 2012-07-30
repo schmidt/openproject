@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@ class Redmine::WikiFormatting::MacrosTest < ActionView::TestCase
   include ApplicationHelper
   include ActionView::Helpers::TextHelper
   include ActionView::Helpers::SanitizeHelper
+  include ERB::Util
   extend ActionView::Helpers::SanitizeHelper::ClassMethods
 
   fixtures :projects, :roles, :enabled_modules, :users,

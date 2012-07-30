@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -68,7 +68,9 @@ module WatchersHelper
     users.map do |user|
       c = checked.nil? ? object.watched_by?(user) : checked
       tag = check_box_tag 'issue[watcher_user_ids][]', user.id, c, :id => nil
-      content_tag 'label', "#{tag} #{h(user)}", :id => "issue_watcher_user_ids_#{user.id}", :class => "floating"
-    end.join
+      content_tag 'label', "#{tag} #{h(user)}".html_safe,
+                  :id => "issue_watcher_user_ids_#{user.id}",
+                  :class => "floating"
+    end.join.html_safe
   end
 end

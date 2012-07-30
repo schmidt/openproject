@@ -1,10 +1,11 @@
-source :rubygems
+source 'http://rubygems.org'
 
-gem "rails", "2.3.14"
-gem "i18n", "~> 0.4.2"
-gem "coderay", "~> 1.0.0"
+gem 'rails', '3.2.3'
+gem 'prototype-rails', '3.2.1'
+gem "i18n", "~> 0.6.0"
+gem "coderay", "~> 1.0.6"
 gem "fastercsv", "~> 1.5.0", :platforms => [:mri_18, :mingw_18, :jruby]
-gem "tzinfo", "~> 0.3.31"
+gem "builder"
 
 # Optional gem for LDAP authentication
 group :ldap do
@@ -14,20 +15,23 @@ end
 # Optional gem for OpenID authentication
 group :openid do
   gem "ruby-openid", "~> 2.1.4", :require => "openid"
+  gem "rack-openid"
 end
 
-# Optional gem for exporting the gantt to a PNG file
-group :rmagick do
-  # RMagick 2 supports ruby 1.9
-  # RMagick 1 would be fine for ruby 1.8 but Bundler does not support
-  # different requirements for the same gem on different platforms
-  gem "rmagick", ">= 2.0.0"
+# Optional gem for exporting the gantt to a PNG file, not supported with jruby
+platforms :mri, :mingw do
+  group :rmagick do
+    # RMagick 2 supports ruby 1.9
+    # RMagick 1 would be fine for ruby 1.8 but Bundler does not support
+    # different requirements for the same gem on different platforms
+    gem "rmagick", ">= 2.0.0"
+  end
 end
 
 # Database gems
 platforms :mri, :mingw do
   group :postgresql do
-    gem "pg", "~> 0.9.0"
+    gem "pg", ">= 0.11.0"
   end
 
   group :sqlite do
@@ -43,7 +47,7 @@ end
 
 platforms :mri_19, :mingw_19 do
   group :mysql do
-    gem "mysql2", "~> 0.2.7"
+    gem "mysql2", "~> 0.3.11"
   end
 end
 
@@ -68,13 +72,18 @@ group :development do
 end
 
 group :test do
-  gem "shoulda", "~> 2.10.3"
-  gem "edavis10-object_daddy", :require => "object_daddy"
+  gem "shoulda", "~> 2.11"
   gem "mocha"
 end
 
+local_gemfile = File.join(File.dirname(__FILE__), "Gemfile.local")
+if File.exists?(local_gemfile)
+  puts "Loading Gemfile.local ..." if $DEBUG # `ruby -d` or `bundle -v`
+  instance_eval File.read(local_gemfile)
+end
+
 # Load plugins' Gemfiles
-Dir.glob File.expand_path("../vendor/plugins/*/Gemfile", __FILE__) do |file|
+Dir.glob File.expand_path("../plugins/*/Gemfile", __FILE__) do |file|
   puts "Loading #{file} ..." if $DEBUG # `ruby -d` or `bundle -v`
   instance_eval File.read(file)
 end

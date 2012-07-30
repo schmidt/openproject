@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -62,10 +62,27 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       entry = assigns(:entries).detect {|e| e.name == 'subversion_test'}
       assert_not_nil entry
       assert_equal 'dir', entry.kind
+      assert_select 'tr.dir a[href=/projects/subproject1/repository/show/subversion_test]'
 
       assert_tag 'input', :attributes => {:name => 'rev'}
       assert_tag 'a', :content => 'Statistics'
       assert_tag 'a', :content => 'Atom'
+      assert_tag :tag => 'a',
+                 :attributes => {:href => '/projects/subproject1/repository'},
+                 :content => 'root'
+    end
+
+    def test_show_non_default
+      Repository::Subversion.create(:project => @project,
+        :url => self.class.subversion_repository_url,
+        :is_default => false, :identifier => 'svn')
+
+      get :show, :id => PRJ_ID, :repository_id => 'svn'
+      assert_response :success
+      assert_template 'show'
+      assert_select 'tr.dir a[href=/projects/subproject1/repository/svn/show/subversion_test]'
+      # Repository menu should link to the main repo
+      assert_select '#main-menu a[href=/projects/subproject1/repository]'
     end
 
     def test_browse_directory
@@ -199,9 +216,8 @@ class RepositoriesSubversionControllerTest < ActionController::TestCase
       @repository.fetch_changesets
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
-      get :entry, :id => PRJ_ID,
-          :path => repository_path_hash(['subversion_test', 'helloworld.c'])[:param],
-          :format => 'raw'
+      get :raw, :id => PRJ_ID,
+          :path => repository_path_hash(['subversion_test', 'helloworld.c'])[:param]
       assert_response :success
       assert_equal 'attachment; filename="helloworld.c"', @response.headers['Content-Disposition']
     end
