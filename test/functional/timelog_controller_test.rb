@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -278,6 +278,12 @@ class TimelogControllerTest < ActionController::TestCase
 
     # System wide custom field
     assert_tag :select, :attributes => {:name => 'time_entry[custom_field_values][10]'}
+
+    # Activities
+    assert_select 'select[name=?]', 'time_entry[activity_id]' do
+      assert_select 'option[value=]', :text => '(No change)'
+      assert_select 'option[value=9]', :text => 'Design'
+    end
   end
 
   def test_get_bulk_edit_on_different_projects
@@ -450,6 +456,18 @@ class TimelogControllerTest < ActionController::TestCase
       :attributes => {:action => "/projects/ecookbook/time_entries", :id => 'query_form'}
   end
 
+  def test_index_from_a_date
+    get :index, :project_id => 'ecookbook', :from => "2007-03-23", :to => ""
+    assert_equal '2007-03-23'.to_date, assigns(:from)
+    assert_nil assigns(:to)
+  end
+
+  def test_index_to_a_date
+    get :index, :project_id => 'ecookbook', :from => "", :to => "2007-03-23"
+    assert_nil assigns(:from)
+    assert_equal '2007-03-23'.to_date, assigns(:to)
+  end
+
   def test_index_today
     Date.stubs(:today).returns('2011-12-15'.to_date)
     get :index, :period => 'today'
@@ -549,7 +567,7 @@ class TimelogControllerTest < ActionController::TestCase
     Setting.date_format = '%m/%d/%Y'
     get :index, :format => 'csv'
     assert_response :success
-    assert_equal 'text/csv', @response.content_type
+    assert_equal 'text/csv; header=present', @response.content_type
     assert @response.body.include?("Date,User,Activity,Project,Issue,Tracker,Subject,Hours,Comment,Overtime\n")
     assert @response.body.include?("\n04/21/2007,redMine Admin,Design,eCookbook,3,Bug,Error 281 when updating a recipe,1.0,\"\",\"\"\n")
   end
@@ -558,7 +576,7 @@ class TimelogControllerTest < ActionController::TestCase
     Setting.date_format = '%m/%d/%Y'
     get :index, :project_id => 1, :format => 'csv'
     assert_response :success
-    assert_equal 'text/csv', @response.content_type
+    assert_equal 'text/csv; header=present', @response.content_type
     assert @response.body.include?("Date,User,Activity,Project,Issue,Tracker,Subject,Hours,Comment,Overtime\n")
     assert @response.body.include?("\n04/21/2007,redMine Admin,Design,eCookbook,3,Bug,Error 281 when updating a recipe,1.0,\"\",\"\"\n")
   end
@@ -604,7 +622,7 @@ class TimelogControllerTest < ActionController::TestCase
     get :index, :project_id => 1, :format => 'csv',
         :from => '2011-11-10', :to => '2011-11-10'
     assert_response :success
-    assert_equal 'text/csv', @response.content_type
+    assert_equal 'text/csv; header=present', @response.content_type
     ar = @response.body.chomp.split("\n")
     s1 = "\xa4\xe9\xb4\xc1"
     if str_utf8.respond_to?(:force_encoding)
@@ -641,7 +659,7 @@ class TimelogControllerTest < ActionController::TestCase
     get :index, :project_id => 1, :format => 'csv',
         :from => '2011-11-10', :to => '2011-11-10'
     assert_response :success
-    assert_equal 'text/csv', @response.content_type
+    assert_equal 'text/csv; header=present', @response.content_type
     ar = @response.body.chomp.split("\n")
     s1 = "\xa4\xe9\xb4\xc1"
     if str_utf8.respond_to?(:force_encoding)
@@ -678,7 +696,7 @@ class TimelogControllerTest < ActionController::TestCase
       get :index, :project_id => 1, :format => 'csv',
           :from => '2011-11-10', :to => '2011-11-10'
       assert_response :success
-      assert_equal 'text/csv', @response.content_type
+      assert_equal 'text/csv; header=present', @response.content_type
 
       ar = @response.body.chomp.split("\n")
       s2 = ar[1].split(",")[7]
@@ -712,7 +730,7 @@ class TimelogControllerTest < ActionController::TestCase
       get :index, :project_id => 1, :format => 'csv',
           :from => '2011-11-10', :to => '2011-11-10'
       assert_response :success
-      assert_equal 'text/csv', @response.content_type
+      assert_equal 'text/csv; header=present', @response.content_type
 
       ar = @response.body.chomp.split("\n")
       s2 = ar[1].split(";")[7]

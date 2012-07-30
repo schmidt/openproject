@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -68,7 +68,7 @@ class AccountController < ApplicationController
         # create a new token for password recovery
         token = Token.new(:user => user, :action => "recovery")
         if token.save
-          Mailer.deliver_lost_password(token)
+          Mailer.lost_password(token).deliver
           flash[:notice] = l(:notice_account_lost_email_sent)
           redirect_to :action => 'login'
           return
@@ -131,14 +131,6 @@ class AccountController < ApplicationController
 
   private
 
-  def logout_user
-    if User.current.logged?
-      cookies.delete :autologin
-      Token.delete_all(["user_id = ? AND action = ?", User.current.id, 'autologin'])
-      self.logged_user = nil
-    end
-  end
-
   def authenticate_user
     if Setting.openid? && using_open_id?
       open_id_authenticate(params[:openid_url])
@@ -161,7 +153,7 @@ class AccountController < ApplicationController
   end
 
   def open_id_authenticate(openid_url)
-    authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email], :return_to => signin_url) do |result, identity_url, registration|
+    authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email], :return_to => signin_url, :method => :post) do |result, identity_url, registration|
       if result.successful?
         user = User.find_or_initialize_by_identity_url(identity_url)
         if user.new_record?
@@ -243,7 +235,7 @@ class AccountController < ApplicationController
   def register_by_email_activation(user, &block)
     token = Token.new(:user => user, :action => "register")
     if user.save and token.save
-      Mailer.deliver_register(token)
+      Mailer.register(token).deliver
       flash[:notice] = l(:notice_account_register_done)
       redirect_to :action => 'login'
     else
@@ -273,7 +265,7 @@ class AccountController < ApplicationController
   def register_manually_by_administrator(user, &block)
     if user.save
       # Sends an email to the administrators
-      Mailer.deliver_account_activation_request(user)
+      Mailer.account_activation_request(user).deliver
       account_pending
     else
       yield if block_given?

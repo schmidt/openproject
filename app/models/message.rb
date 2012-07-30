@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -37,7 +37,6 @@ class Message < ActiveRecord::Base
                             :author_key => :author_id
   acts_as_watchable
 
-  attr_protected :locked, :sticky
   validates_presence_of :board, :subject, :content
   validates_length_of :subject, :maximum => 255
   validate :cannot_reply_to_locked_topic, :on => :create
@@ -46,11 +45,11 @@ class Message < ActiveRecord::Base
   after_update :update_messages_board
   after_destroy :reset_board_counters
 
-  named_scope :visible, lambda {|*args| { :include => {:board => :project},
+  scope :visible, lambda {|*args| { :include => {:board => :project},
                                           :conditions => Project.allowed_to_condition(args.shift || User.current, :view_messages, *args) } }
 
   safe_attributes 'subject', 'content'
-  safe_attributes 'locked', 'sticky',
+  safe_attributes 'locked', 'sticky', 'board_id',
     :if => lambda {|message, user|
       user.allowed_to?(:edit_messages, message.project)
     }

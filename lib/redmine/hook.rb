@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,8 +17,6 @@
 
 module Redmine
   module Hook
-    include ActionController::UrlWriter
-
     @@listener_classes = []
     @@listeners = nil
     @@hook_listeners = {}
@@ -88,12 +86,11 @@ module Redmine
       include ActionView::Helpers::FormTagHelper
       include ActionView::Helpers::FormOptionsHelper
       include ActionView::Helpers::JavaScriptHelper
-      include ActionView::Helpers::PrototypeHelper
       include ActionView::Helpers::NumberHelper
       include ActionView::Helpers::UrlHelper
       include ActionView::Helpers::AssetTagHelper
       include ActionView::Helpers::TextHelper
-      include ActionController::UrlWriter
+      include Rails.application.routes.url_helpers
       include ApplicationHelper
 
       # Default to creating links using only the path.  Subclasses can
@@ -112,6 +109,14 @@ module Redmine
         define_method hook do |context|
           context[:controller].send(:render_to_string, {:locals => context}.merge(options))
         end
+      end
+      
+      def controller
+        nil
+      end
+      
+      def config
+        ActionController::Base.config
       end
     end
 
@@ -143,7 +148,7 @@ module Redmine
           default_context = { :project => @project }
           default_context[:controller] = controller if respond_to?(:controller)
           default_context[:request] = request if respond_to?(:request)
-          Redmine::Hook.call_hook(hook, default_context.merge(context)).join(' ')
+          Redmine::Hook.call_hook(hook, default_context.merge(context)).join(' ').html_safe
         end
       end
     end

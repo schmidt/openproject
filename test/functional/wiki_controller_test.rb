@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -198,7 +198,7 @@ class WikiControllerTest < ActionController::TestCase
 
     assert_tag 'textarea',
       :attributes => { :name => 'content[text]' },
-      :content => WikiPage.find_by_title('Another_page').content.text
+      :content => "\n"+WikiPage.find_by_title('Another_page').content.text
   end
 
   def test_edit_section
@@ -213,7 +213,7 @@ class WikiControllerTest < ActionController::TestCase
 
     assert_tag 'textarea',
       :attributes => { :name => 'content[text]' },
-      :content => section
+      :content => "\n"+section
     assert_tag 'input',
       :attributes => { :name => 'section', :type => 'hidden', :value => '2' }
     assert_tag 'input',
@@ -294,7 +294,7 @@ class WikiControllerTest < ActionController::TestCase
     assert_template 'edit'
 
     assert_error_tag :descendant => {:content => /Comment is too long/}
-    assert_tag :tag => 'textarea', :attributes => {:id => 'content_text'}, :content => 'edited'
+    assert_tag :tag => 'textarea', :attributes => {:id => 'content_text'}, :content => "\nedited"
     assert_tag :tag => 'input', :attributes => {:id => 'content_version', :value => '1'}
   end
 
@@ -768,6 +768,19 @@ class WikiControllerTest < ActionController::TestCase
     assert_equal 'text/html', @response.content_type
     assert_equal 'attachment; filename="CookBook_documentation.html"',
                   @response.headers['Content-Disposition']
+    assert_tag 'h1', :content => 'CookBook documentation'
+  end
+
+  def test_show_versioned_html
+    @request.session[:user_id] = 2
+    get :show, :project_id => 1, :format => 'html', :version => 2
+    assert_response :success
+    assert_not_nil assigns(:content)
+    assert_equal 2, assigns(:content).version
+    assert_equal 'text/html', @response.content_type
+    assert_equal 'attachment; filename="CookBook_documentation.html"',
+                  @response.headers['Content-Disposition']
+    assert_tag 'h1', :content => 'CookBook documentation'
   end
 
   def test_show_txt
@@ -778,6 +791,19 @@ class WikiControllerTest < ActionController::TestCase
     assert_equal 'text/plain', @response.content_type
     assert_equal 'attachment; filename="CookBook_documentation.txt"',
                   @response.headers['Content-Disposition']
+    assert_include 'h1. CookBook documentation', @response.body
+  end
+
+  def test_show_versioned_txt
+    @request.session[:user_id] = 2
+    get :show, :project_id => 1, :format => 'txt', :version => 2
+    assert_response :success
+    assert_not_nil assigns(:content)
+    assert_equal 2, assigns(:content).version
+    assert_equal 'text/plain', @response.content_type
+    assert_equal 'attachment; filename="CookBook_documentation.txt"',
+                  @response.headers['Content-Disposition']
+    assert_include 'h1. CookBook documentation', @response.body
   end
 
   def test_edit_unprotected_page

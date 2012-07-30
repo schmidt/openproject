@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -519,24 +519,5 @@ class ProjectsControllerTest < ActionController::TestCase
     get :show, :id => 3, :jump => 'foobar'
     assert_response :success
     assert_template 'show'
-  end
-
-  # A hook that is manually registered later
-  class ProjectBasedTemplate < Redmine::Hook::ViewListener
-    def view_layouts_base_html_head(context)
-      # Adds a project stylesheet
-      stylesheet_link_tag(context[:project].identifier) if context[:project]
-    end
-  end
-  # Don't use this hook now
-  Redmine::Hook.clear_listeners
-
-  def test_hook_response
-    Redmine::Hook.add_listener(ProjectBasedTemplate)
-    get :show, :id => 1
-    assert_tag :tag => 'link', :attributes => {:href => '/stylesheets/ecookbook.css'},
-                               :parent => {:tag => 'head'}
-
-    Redmine::Hook.clear_listeners
   end
 end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -67,7 +67,7 @@ class AttachmentsController < ApplicationController
       return
     end
 
-    @attachment = Attachment.new(:file => request.body)
+    @attachment = Attachment.new(:file => request.raw_post)
     @attachment.author = User.current
     @attachment.filename = Redmine::Utils.random_hex(16)
 
@@ -88,9 +88,7 @@ class AttachmentsController < ApplicationController
     end
     # Make sure association callbacks are called
     @attachment.container.attachments.delete(@attachment)
-    redirect_to :back
-  rescue ::ActionController::RedirectBackError
-    redirect_to :controller => 'projects', :action => 'show', :id => @project
+    redirect_to_referer_or project_path(@project)
   end
 
 private

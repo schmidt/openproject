@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -62,6 +62,24 @@ class MyController < ApplicationController
         redirect_to :action => 'account'
         return
       end
+    end
+  end
+
+  # Destroys user's account
+  def destroy
+    @user = User.current
+    unless @user.own_account_deletable?
+      redirect_to :action => 'account'
+      return
+    end
+
+    if request.post? && params[:confirm]
+      @user.destroy
+      if @user.destroyed?
+        logout_user
+        flash[:notice] = l(:notice_account_deleted)
+      end
+      redirect_to home_path
     end
   end
 

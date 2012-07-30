@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -42,7 +42,7 @@ class IssueRelationsController < ApplicationController
   def create
     @relation = IssueRelation.new(params[:relation])
     @relation.issue_from = @issue
-    if params[:relation] && m = params[:relation][:issue_to_id].to_s.match(/^#?(\d+)$/)
+    if params[:relation] && m = params[:relation][:issue_to_id].to_s.strip.match(/^#?(\d+)$/)
       @relation.issue_to = Issue.visible.find_by_id(m[1].to_i)
     end
     saved = @relation.save

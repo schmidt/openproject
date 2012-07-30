@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -47,7 +47,7 @@ class BoardsController < ApplicationController
                                       :include => [:author, {:last_reply => :author}],
                                       :limit  =>  @topic_pages.items_per_page,
                                       :offset =>  @topic_pages.current.offset
-        @message = Message.new
+        @message = Message.new(:board => @board)
         render :action => 'show', :layout => !request.xhr?
       }
       format.atom {

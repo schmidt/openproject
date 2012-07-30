@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -52,7 +52,7 @@ class WatchersController < ApplicationController
       end
     end
     respond_to do |format|
-      format.html { redirect_to :back }
+      format.html { redirect_to_referer_or {render :text => 'Watcher added.', :layout => true}}
       format.js do
         render :update do |page|
           page.replace_html 'ajax-modal', :partial => 'watchers/new', :locals => {:watched => @watched}
@@ -60,8 +60,6 @@ class WatchersController < ApplicationController
         end
       end
     end
-  rescue ::ActionController::RedirectBackError
-    render :text => 'Watcher added.', :layout => true
   end
 
   def append
@@ -72,9 +70,7 @@ class WatchersController < ApplicationController
         format.js do
           render :update do |page|
             users.each do |user|
-              page.select("#issue_watcher_user_ids_#{user.id}").each do |item|
-                page.remove item
-              end
+              page << %|$$("#issue_watcher_user_ids_#{user.id}").each(function(el){el.remove();});|
             end
             page.insert_html :bottom, 'watchers_inputs', :text => watchers_checkboxes(nil, users, true)
           end
@@ -111,7 +107,7 @@ private
       @watched = klass.find(params[:object_id])
       @project = @watched.project
     elsif params[:project_id]
-      @project = Project.visible.find(params[:project_id])
+      @project = Project.visible.find_by_param(params[:project_id])
     end
   rescue
     render_404
@@ -120,17 +116,13 @@ private
   def set_watcher(user, watching)
     @watched.set_watcher(user, watching)
     respond_to do |format|
-      format.html { redirect_to :back }
+      format.html { redirect_to_referer_or {render :text => (watching ? 'Watcher added.' : 'Watcher removed.'), :layout => true}}
       format.js do
         render(:update) do |page|
           c = watcher_css(@watched)
-          page.select(".#{c}").each do |item|
-            page.replace_html item, watcher_link(@watched, user)
-          end
+          page << %|$$(".#{c}").each(function(el){el.innerHTML="#{escape_javascript watcher_link(@watched, user)}"});|
         end
       end
     end
-  rescue ::ActionController::RedirectBackError
-    render :text => (watching ? 'Watcher added.' : 'Watcher removed.'), :layout => true
   end
 end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2011  Jean-Philippe Lang
+# Copyright (C) 2006-2012  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@ class Tracker < ActiveRecord::Base
   has_many :issues
   has_many :workflows, :dependent => :delete_all do
     def copy(source_tracker)
-      Workflow.copy(source_tracker, nil, proxy_owner, nil)
+      Workflow.copy(source_tracker, nil, proxy_association.owner, nil)
     end
   end
 
@@ -32,12 +32,12 @@ class Tracker < ActiveRecord::Base
   validates_uniqueness_of :name
   validates_length_of :name, :maximum => 30
 
-  named_scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
+  scope :named, lambda {|arg| { :conditions => ["LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip]}}
 
   def to_s; name end
 
   def <=>(tracker)
-    name <=> tracker.name
+    position <=> tracker.position
   end
 
   def self.all
