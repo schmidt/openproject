@@ -12,6 +12,7 @@ gem 'delayed_job', "~>2.0.4"
 
 group :test do
   gem 'shoulda', '~> 2.10.3'
+  gem 'test-unit', :platforms => [:mri_19]
   gem 'edavis10-object_daddy', :require => 'object_daddy'
   gem 'mocha'
   gem 'capybara'
