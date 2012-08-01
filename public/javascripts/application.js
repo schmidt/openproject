@@ -564,7 +564,7 @@ jQuery(document).ready(function($) {
 
       select2Container.nextElementInDom(":input:visible:not(.select2-input), a:visible:not(.select2-input)").keydown(function (e) {
         var keyCode = e.keyCode || e.which;
-        if (keyCode === 9 && e.shiftKey) {
+        if (keyCode === 9 && e.shiftKey && input.is(":visible")) {
           input.focus();
           e.preventDefault();
         }
