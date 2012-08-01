@@ -543,13 +543,13 @@ jQuery(document).ready(function($) {
 
     parent.bind("closed", function () {
       if ($(results).is(":visible")) {
-        select2Container.trigger(jQuery.Event('click'));
+        select2Container.trigger(jQuery.Event('mousedown'));
 
       }
     });
     parent.bind("opened", function () {
       var input;
-      select2Container.trigger(jQuery.Event('click'));
+      select2Container.trigger(jQuery.Event('mousedown'));
       input = parent.find(".select2-search input");
       input.val("");
       input.trigger("keyup-change");
