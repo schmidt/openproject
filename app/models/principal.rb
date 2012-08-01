@@ -41,6 +41,12 @@ class Principal < ActiveRecord::Base
     Principal.active_or_registered.like(criteria).find(:all, :limit => limit)
   end
 
+  def self.paginated_search(search, page, options = {})
+    limit = options.fetch(:page_limit) || 10
+    registered_scope = Principal.active_or_registered.like(search).scope(:find)
+    paginate({ :per_page => limit, :page => page }.merge(registered_scope))
+  end
+
   def <=>(principal)
     if self.class.name == principal.class.name
       self.to_s.downcase <=> principal.to_s.downcase

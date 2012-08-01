@@ -90,8 +90,20 @@ class MembersController < ApplicationController
   end
 
   def autocomplete_for_member
-    @principals = Principal.possible_members(params[:q], 100) - @project.principals
-    render :layout => false
+    size = params[:page_limit].to_i
+    principals = []
+    page = params[:page].to_i
+
+    @principals = Principal.paginated_search(params[:q], page, { :page_limit => size })
+    # we always get all the items on a page, so just check if we just got the last
+    @more = @principals.total_pages > page
+    @total = @principals.total_entries
+
+    respond_to do |format|
+      format.json { render :layout => false }
+      format.html { render :layout => false }
+    end
+
   end
 
 end
