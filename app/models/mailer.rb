@@ -35,48 +35,48 @@ class Mailer < ActionMailer::Base
   # Example:
   #   issue_add(issue, user) => tmail object
   #   Mailer.deliver_issue_add(issue, user) => sends an email to user.mail
-  def issue_add(issue, recipient)
-    set_language_if_valid recipient.language
-    openproject_headers 'Project' => issue.project.identifier,
-                        'Issue-Id' => issue.id,
-                        'Issue-Author' => issue.author.login,
-                        'Type' => "Issue"
-    openproject_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
-    message_id issue
-    recipients [recipient.mail]
-    subject "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] (#{issue.status.name}) #{issue.subject}"
-    body :issue => issue,
-         :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
-    render_multipart('issue_add', body)
-  end
+  # def issue_add(issue, recipient)
+  #   set_language_if_valid recipient.language
+  #   openproject_headers 'Project' => issue.project.identifier,
+  #                       'Issue-Id' => issue.id,
+  #                       'Issue-Author' => issue.author.login,
+  #                       'Type' => "Issue"
+  #   openproject_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
+  #   message_id issue
+  #   recipients [recipient.mail]
+  #   subject "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] (#{issue.status.name}) #{issue.subject}"
+  #   body :issue => issue,
+  #        :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
+  #   render_multipart('issue_add', body)
+  # end
 
   # Builds a tmail object used to email recipients of the edited issue.
   #
   # Example:
   #   issue_edit(journal, user) => tmail object
   #   Mailer.deliver_issue_edit(journal, user) => sends an email to user.mail
-  def issue_edit(journal, recipient)
-    set_language_if_valid recipient.language
-    issue = journal.journaled.reload
-    openproject_headers 'Project' => issue.project.identifier,
-                        'Issue-Id' => issue.id,
-                        'Issue-Author' => issue.author.login,
-                        'Type' => "Issue"
-    openproject_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
-    message_id journal
-    references issue
-    @author = journal.user
-    recipients [recipient.mail]
-    s = "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] "
-    s << "(#{issue.status.name}) " if journal.details['status_id']
-    s << issue.subject
-    subject s
-    body :issue => issue,
-         :journal => journal,
-         :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
-
-    render_multipart('issue_edit', body)
-  end
+  # def issue_edit(journal, recipient)
+  #   set_language_if_valid recipient.language
+  #   issue = journal.journaled.reload
+  #   openproject_headers 'Project' => issue.project.identifier,
+  #                       'Issue-Id' => issue.id,
+  #                       'Issue-Author' => issue.author.login,
+  #                       'Type' => "Issue"
+  #   openproject_headers 'Issue-Assignee' => issue.assigned_to.login if issue.assigned_to
+  #   message_id journal
+  #   references issue
+  #   @author = journal.user
+  #   recipients [recipient.mail]
+  #   s = "[#{issue.project.name} - #{issue.tracker.name} ##{issue.id}] "
+  #   s << "(#{issue.status.name}) " if journal.details['status_id']
+  #   s << issue.subject
+  #   subject s
+  #   body :issue => issue,
+  #        :journal => journal,
+  #        :issue_url => url_for(:controller => 'issues', :action => 'show', :id => issue)
+  # 
+  #   render_multipart('issue_edit', body)
+  # end
 
   def reminder(user, issues, days)
     openproject_headers 'Type' => "Issue"
@@ -277,15 +277,15 @@ class Mailer < ActionMailer::Base
     render_multipart('account_activated', body)
   end
 
-  def lost_password(token)
-    openproject_headers 'Type' => "Account"
-    set_language_if_valid(token.user.language)
-    recipients token.user.mail
-    subject l(:mail_subject_lost_password, Setting.app_title)
-    body :token => token,
-         :url => url_for(:controller => 'account', :action => 'lost_password', :token => token.value)
-    render_multipart('lost_password', body)
-  end
+  # def lost_password(token)
+  #   openproject_headers 'Type' => "Account"
+  #   set_language_if_valid(token.user.language)
+  #   recipients token.user.mail
+  #   subject l(:mail_subject_lost_password, Setting.app_title)
+  #   body :token => token,
+  #        :url => url_for(:controller => 'account', :action => 'lost_password', :token => token.value)
+  #   render_multipart('lost_password', body)
+  # end
 
   def register(token)
     openproject_headers 'Type' => "Account"
