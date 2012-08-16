@@ -1,10 +1,17 @@
 class UseTheFullStiClassNamesForRepositories < ActiveRecord::Migration
-  def self.up
-    type = ActiveRecord::Base.connection.quote_column_name('type')
-    ActiveRecord::Base.connection.execute("UPDATE #{ActiveRecord::Base.connection.quote_table_name('repositories')} SET #{type} = CONCAT('Repository::',#{type}) WHERE #{type} NOT LIKE 'Repository::%'")
+  def up
+    Repository.connection.select_rows("SELECT id, type FROM #{Repository.table_name}").each do |repository_id, repository_type|
+      unless repository_type =~ /^Repository::/
+        Repository.update_all ["type = ?", "Repository::#{repository_type}"], ["id = ?", repository_id]
+      end
+    end
   end
 
-  def self.down
-    # noop, full class name should also work with older versions of active record
+  def down
+    Repository.connection.select_rows("SELECT id, type FROM #{Repository.table_name}").each do |repository_id, repository_type|
+      if repository_type =~ /^Repository::(.+)$/
+        Repository.update_all ["type = ?", $1], ["id = ?", repository_id]
+      end
+    end
   end
 end
