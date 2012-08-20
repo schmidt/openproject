@@ -46,19 +46,6 @@ OpenProject::Application.routes.draw do
       end
     end
 
-    scope :controller => 'documents' do
-      scope :via => :get do
-        match '/projects/:project_id/documents', :action => :index
-        match '/projects/:project_id/documents/new', :action => :new
-        match '/documents/:id', :action => :show
-        match '/documents/:id/edit', :action => :edit
-      end
-      scope :via => :post do
-        match '/projects/:project_id/documents', :action => :new
-        match '/documents/:id/:action', :action => /destroy|edit/
-      end
-    end
-
     # only providing routes for journals when there are multiple subclasses of journals
     # all subclasses will look for the journals routes
     resources :journals, :only => [:edit, :update]
@@ -102,9 +89,10 @@ OpenProject::Application.routes.draw do
         post 'unarchive'
       end
 
+      resource :enumerations, :controller => 'project_enumerations', :only => [:update, :destroy]
+
       resources :documents, :shallow => true
 
-      resource :project_enumerations, :as => 'enumerations', :only => [:update, :destroy]
       resources :files, :only => [:index, :new, :create]
 
       resources :versions, :only => [:new, :create] do
@@ -123,9 +111,7 @@ OpenProject::Application.routes.draw do
       namespace :time_entries do
         resource :report, :controller => 'reports', :only => [:show]
       end
-      resources :time_entries, :controller => 'timelog' do
-        #get 'report' => 'time_entry_reports#report', :on => :collection
-      end
+      resources :time_entries, :controller => 'timelog'
 
       resources :wiki, :except => [:index, :new, :create] do
         collection do
@@ -178,7 +164,20 @@ OpenProject::Application.routes.draw do
     scope "admin" do
       match "/projects" => 'admin#projects', :via => :get
 
-      resources :enumerations, :only => [:index, :edit, :update, :destroy, :new, :create]
+      resources :enumerations
+
+      resources :groups do
+        member do
+          get :autocomplete_for_user
+          #this should be put into it's own resource
+          match "/members" => 'groups#add_users', :via => :post, :as => 'members_of'
+          match "/members/:user_id" => 'groups#remove_user', :via => :delete, :as => 'member_of'
+          #this should be put into it's own resource
+          match "/memberships/:membership_id" => 'groups#edit_membership', :via => :put, :as => 'membership_of'
+          match "/memberships/:membership_id" => 'groups#destroy_membership', :via => :delete, :as => 'membership_of'
+          match "/memberships" => 'groups#create_memberships', :via => :post, :as => 'memberships_of'
+        end
+      end
 
       resources :roles, :only => [:index, :new, :create, :edit, :update, :destroy] do
         collection do
@@ -216,10 +215,7 @@ OpenProject::Application.routes.draw do
         resource :report, :controller => 'reports', :only => [:show]
       end
 
-      resources :time_entries, :controller => 'timelog' do
-        #get 'report' => 'time_entry_reports#report', :on => :collection
-      end
-
+      resources :time_entries, :controller => 'timelog'
 
       member do
         # this route is defined so that it has precedence of the one defined on the collection
@@ -255,9 +251,7 @@ OpenProject::Application.routes.draw do
         :only => [:show]
     end
 
-    resources :time_entries, :controller => 'timelog' do
-      #get 'report' => 'time_entry_reports#report', :on => :collection
-    end
+    resources :time_entries, :controller => 'timelog'
 
     resources :activity, :activities, :only => :index, :controller => 'activities'
 
@@ -319,7 +313,8 @@ OpenProject::Application.routes.draw do
       match '/projects/:id/repository/:action', :via => :post
     end
 
-    resources :attachments, :only => [:show], :format => false do
+
+    resources :attachments, :only => [:show, :destroy], :format => false do
       member do
         scope :via => :get,  :constraints => { :id => /\d+/, :filename => /[^\/]*/ } do
           match 'download(/:filename)' => 'attachments#download', :as => 'download'
@@ -333,10 +328,7 @@ OpenProject::Application.routes.draw do
       match "/attachments/download/:id" => redirect("/attachments/%{id}/download"), :format => false
     end
 
-    resources :groups
-
     #left old routes at the bottom for backwards compat
-    match '/projects/:project_id/documents/:action', :controller => 'documents'
     match '/projects/:project_id/boards/:action/:id', :controller => 'boards'
     match '/boards/:board_id/topics/:action/:id', :controller => 'messages'
     match '/issues/:issue_id/relations/:action/:id', :controller => 'issue_relations'
