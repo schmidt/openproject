@@ -30,10 +30,8 @@ module WatchersHelper
            :action => (watched ? 'unwatch' : 'watch'),
            :object_type => object.class.to_s.underscore,
            :object_id => object.id}
-    link_to_remote((watched ? l(:button_unwatch) : l(:button_watch)),
-                   {:url => url},
-                   :href => url_for(url),
-                   :class => (watched ? 'icon icon-fav' : 'icon icon-fav-off'))
+    link_to((watched ? l(:button_unwatch) : l(:button_watch)), url,
+            :remote => true, :method => 'post', :class => (watched ? 'icon icon-fav' : 'icon icon-fav-off'))
 
   end
 
@@ -45,23 +43,24 @@ module WatchersHelper
   # Returns a comma separated list of users watching the given object
   def watchers_list(object)
     remove_allowed = User.current.allowed_to?("delete_#{object.class.name.underscore}_watchers".to_sym, object.project)
+    content = ''.html_safe
     lis = object.watcher_users.collect do |user|
-      s = avatar(user, :size => "16").to_s + link_to_user(user, :class => 'user').to_s
+      s = ''.html_safe
+      s << avatar(user, :size => "16").to_s
+      s << link_to_user(user, :class => 'user')
       if remove_allowed
         url = {:controller => 'watchers',
                :action => 'destroy',
                :object_type => object.class.to_s.underscore,
                :object_id => object.id,
                :user_id => user}
-        s += ' ' + link_to_remote(image_tag('delete.png'),
-                                  {:url => url},
-                                  :href => url_for(url),
-                                  :style => "vertical-align: middle",
-                                  :class => "delete")
+        s << ' '
+        s << link_to(image_tag('delete.png'), url,
+                     :remote => true, :method => 'post', :style => "vertical-align: middle", :class => "delete")
       end
-      content_tag :li, s.html_safe
+      content << content_tag('li', s)
     end
-    (lis.empty? ? "" : "<ul>#{ lis.join("\n") }</ul>").html_safe
+    content.present? ? content_tag('ul', content) : content
   end
 
   def watchers_checkboxes(object, users, checked=nil)

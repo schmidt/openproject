@@ -23,7 +23,8 @@ class QueryTest < ActiveSupport::TestCase
            :issue_categories, :enumerations, :issues,
            :watchers, :custom_fields, :custom_values, :versions,
            :queries,
-           :projects_trackers
+           :projects_trackers,
+           :custom_fields_trackers
 
   def test_custom_fields_for_all_projects_should_be_available_in_global_queries
     query = Query.new(:project => nil, :name => '_')
@@ -178,6 +179,20 @@ class QueryTest < ActiveSupport::TestCase
     assert_equal 2, issues.first.id
   end
 
+  def test_operator_is_on_integer_custom_field_should_accept_negative_value
+    f = IssueCustomField.create!(:name => 'filter', :field_format => 'int', :is_for_all => true, :is_filter => true)
+    CustomValue.create!(:custom_field => f, :customized => Issue.find(1), :value => '7')
+    CustomValue.create!(:custom_field => f, :customized => Issue.find(2), :value => '-12')
+    CustomValue.create!(:custom_field => f, :customized => Issue.find(3), :value => '')
+
+    query = Query.new(:name => '_')
+    query.add_filter("cf_#{f.id}", '=', ['-12'])
+    assert query.valid?
+    issues = find_issues_with_query(query)
+    assert_equal 1, issues.size
+    assert_equal 2, issues.first.id
+  end
+
   def test_operator_is_on_float_custom_field
     f = IssueCustomField.create!(:name => 'filter', :field_format => 'float', :is_filter => true, :is_for_all => true)
     CustomValue.create!(:custom_field => f, :customized => Issue.find(1), :value => '7.3')
@@ -186,6 +201,20 @@ class QueryTest < ActiveSupport::TestCase
 
     query = Query.new(:name => '_')
     query.add_filter("cf_#{f.id}", '=', ['12.7'])
+    issues = find_issues_with_query(query)
+    assert_equal 1, issues.size
+    assert_equal 2, issues.first.id
+  end
+
+  def test_operator_is_on_float_custom_field_should_accept_negative_value
+    f = IssueCustomField.create!(:name => 'filter', :field_format => 'float', :is_filter => true, :is_for_all => true)
+    CustomValue.create!(:custom_field => f, :customized => Issue.find(1), :value => '7.3')
+    CustomValue.create!(:custom_field => f, :customized => Issue.find(2), :value => '-12.7')
+    CustomValue.create!(:custom_field => f, :customized => Issue.find(3), :value => '')
+
+    query = Query.new(:name => '_')
+    query.add_filter("cf_#{f.id}", '=', ['-12.7'])
+    assert query.valid?
     issues = find_issues_with_query(query)
     assert_equal 1, issues.size
     assert_equal 2, issues.first.id
@@ -227,6 +256,36 @@ class QueryTest < ActiveSupport::TestCase
     issues = find_issues_with_query(query)
     assert !issues.map(&:id).include?(1)
     assert issues.map(&:id).include?(3)
+  end
+
+  def test_operator_is_on_is_private_field
+    # is_private filter only available for those who can set issues private
+    User.current = User.find(2)
+
+    query = Query.new(:name => '_')
+    assert query.available_filters.key?('is_private')
+
+    query.add_filter("is_private", '=', ['1'])
+    issues = find_issues_with_query(query)
+    assert issues.any?
+    assert_nil issues.detect {|issue| !issue.is_private?}
+  ensure
+    User.current = nil
+  end
+
+  def test_operator_is_not_on_is_private_field
+    # is_private filter only available for those who can set issues private
+    User.current = User.find(2)
+
+    query = Query.new(:name => '_')
+    assert query.available_filters.key?('is_private')
+
+    query.add_filter("is_private", '!', ['1'])
+    issues = find_issues_with_query(query)
+    assert issues.any?
+    assert_nil issues.detect {|issue| issue.is_private?}
+  ensure
+    User.current = nil
   end
 
   def test_operator_greater_than

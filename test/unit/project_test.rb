@@ -106,6 +106,20 @@ class ProjectTest < ActiveSupport::TestCase
     end
   end
 
+  def test_identifier_should_not_be_frozen_for_a_new_project
+    assert_equal false, Project.new.identifier_frozen?
+  end
+
+  def test_identifier_should_not_be_frozen_for_a_saved_project_with_blank_identifier
+    Project.update_all(["identifier = ''"], "id = 1")
+
+    assert_equal false, Project.find(1).identifier_frozen?
+  end
+
+  def test_identifier_should_be_frozen_for_a_saved_project_with_valid_identifier
+    assert_equal true, Project.find(1).identifier_frozen?
+  end
+
   def test_members_should_be_active_users
     Project.all.each do |project|
       assert_nil project.members.detect {|m| !(m.user.is_a?(User) && m.user.active?) }
@@ -174,6 +188,18 @@ class ProjectTest < ActiveSupport::TestCase
     assert_nil Member.first(:conditions => {:project_id => @ecookbook.id})
     assert_nil Board.first(:conditions => {:project_id => @ecookbook.id})
     assert_nil Issue.first(:conditions => {:project_id => @ecookbook.id})
+  end
+
+  def test_destroy_should_destroy_subtasks
+    issues = (0..2).to_a.map {Issue.create!(:project_id => 1, :tracker_id => 1, :author_id => 1, :subject => 'test')}
+    issues[0].update_attribute :parent_issue_id, issues[1].id
+    issues[2].update_attribute :parent_issue_id, issues[1].id
+    assert_equal 2, issues[1].children.count
+
+    assert_nothing_raised do
+      Project.find(1).destroy
+    end
+    assert Issue.find_all_by_id(issues.map(&:id)).empty?
   end
 
   def test_destroying_root_projects_should_clear_data

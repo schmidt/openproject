@@ -51,6 +51,9 @@ zh:
       about_x_hours:
         one: "大约一小时"
         other: "大约 %{count} 小时"
+      x_hours:
+        one:   "1 小时"
+        other: "%{count} 小时"
       x_days:
         one: "一天"
         other: "%{count} 天"
@@ -79,14 +82,14 @@ zh:
     human:
       format:
         delimiter: ""
-        precision: 1
+        precision: 3
       storage_units:
         format: "%n %u"
         units:
           byte:
             one: "Byte"
             other: "Bytes"
-          kb: "kB"
+          kb: "KB"
           mb: "MB"
           gb: "GB"
           tb: "TB"
@@ -1033,3 +1036,25 @@ zh:
   text_account_destroy_confirmation: |-
     确定继续处理？
     您的账号一旦删除，将无法再次激活使用。
+  error_session_expired: 您的会话已过期。请重新登陆。
+  text_session_expiration_settings: "警告： 更改这些设置将会使包括你在内的当前会话失效。"
+  setting_session_lifetime: 会话最大有效时间
+  setting_session_timeout: 会话闲置超时
+  label_session_expiration: 会话过期
+  permission_close_project: 关闭/重开项目
+  label_show_closed_projects: 查看已关闭的项目
+  button_close: 关闭
+  button_reopen: 重开
+  project_status_active: 已激活
+  project_status_closed: 已关闭
+  project_status_archived: 已存档
+  text_project_closed: 当前项目已被关闭。当前项目只读。
+  notice_user_successful_create: 用户 %{id} 已创建。
+  field_core_fields: 标准字段
+  field_timeout: 超时 (秒)
+  setting_thumbnails_enabled: 显示附件略缩图
+  setting_thumbnails_size: 略缩图尺寸 (像素)
+  label_status_transitions: 状态转换
+  label_fields_permissions: 字段权限
+  label_readonly: 只读
+  label_required: 必填

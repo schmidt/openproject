@@ -35,7 +35,7 @@ class ApplicationController < ActionController::Base
     cookies.delete(:autologin)
   end
 
-  before_filter :user_setup, :check_if_login_required, :set_localization
+  before_filter :session_expiration, :user_setup, :check_if_login_required, :set_localization
 
   rescue_from ActionController::InvalidAuthenticityToken, :with => :invalid_authenticity_token
   rescue_from ::Unauthorized, :with => :deny_access
@@ -43,6 +43,38 @@ class ApplicationController < ActionController::Base
   include Redmine::Search::Controller
   include Redmine::MenuManager::MenuController
   helper Redmine::MenuManager::MenuHelper
+
+  def session_expiration
+    if session[:user_id]
+      if session_expired? && !try_to_autologin
+        reset_session
+        flash[:error] = l(:error_session_expired)
+        redirect_to signin_url
+      else
+        session[:atime] = Time.now.utc.to_i
+      end
+    end
+  end
+
+  def session_expired?
+    if Setting.session_lifetime?
+      unless session[:ctime] && (Time.now.utc.to_i - session[:ctime].to_i <= Setting.session_lifetime.to_i * 60)
+        return true
+      end
+    end
+    if Setting.session_timeout?
+      unless session[:atime] && (Time.now.utc.to_i - session[:atime].to_i <= Setting.session_timeout.to_i * 60)
+        return true
+      end
+    end
+    false
+  end
+
+  def start_user_session(user)
+    session[:user_id] = user.id
+    session[:ctime] = Time.now.utc.to_i
+    session[:atime] = Time.now.utc.to_i
+  end
 
   def user_setup
     # Check the settings cache for each request
@@ -57,10 +89,7 @@ class ApplicationController < ActionController::Base
     if session[:user_id]
       # existing session
       (User.active.find(session[:user_id]) rescue nil)
-    elsif cookies[:autologin] && Setting.autologin?
-      # auto-login feature starts a new session
-      user = User.try_to_autologin(cookies[:autologin])
-      session[:user_id] = user.id if user
+    elsif user = try_to_autologin
       user
     elsif params[:format] == 'atom' && params[:key] && request.get? && accept_rss_auth?
       # RSS key authentication does not start a session
@@ -78,12 +107,24 @@ class ApplicationController < ActionController::Base
     end
   end
 
+  def try_to_autologin
+    if cookies[:autologin] && Setting.autologin?
+      # auto-login feature starts a new session
+      user = User.try_to_autologin(cookies[:autologin])
+      if user
+        reset_session
+        start_user_session(user)
+      end
+      user
+    end
+  end
+
   # Sets the logged in user
   def logged_user=(user)
     reset_session
     if user && user.is_a?(User)
       User.current = user
-      session[:user_id] = user.id
+      start_user_session(user)
     else
       User.current = User.anonymous
     end
@@ -235,7 +276,7 @@ class ApplicationController < ActionController::Base
   # make sure that the user is a member of the project (or admin) if project is private
   # used as a before_filter for actions that do not require any particular permission on the project
   def check_project_privacy
-    if @project && @project.active?
+    if @project && !@project.archived?
       if @project.visible?
         true
       else
@@ -445,9 +486,9 @@ class ApplicationController < ActionController::Base
   # Returns the API key present in the request
   def api_key_from_request
     if params[:key].present?
-      params[:key]
+      params[:key].to_s
     elsif request.headers["X-Redmine-API-Key"].present?
-      request.headers["X-Redmine-API-Key"]
+      request.headers["X-Redmine-API-Key"].to_s
     end
   end
 
@@ -477,6 +518,12 @@ class ApplicationController < ActionController::Base
     session.delete(:query)
     sort_clear if respond_to?(:sort_clear)
     render_error "An error occurred while executing the query and has been logged. Please report this error to your Redmine administrator."
+  end
+
+  # Renders a 200 response for successfull updates or deletions via the API
+  def render_api_ok
+    # head :ok would return a response body with one space
+    render :text => '', :status => :ok, :layout => nil
   end
 
   # Renders API response on validation failure
