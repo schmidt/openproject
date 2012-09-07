@@ -1,6 +1,6 @@
 source 'http://rubygems.org'
 
-gem 'rails', '3.2.3'
+gem 'rails', '3.2.6'
 gem 'prototype-rails', '3.2.1'
 gem "i18n", "~> 0.6.0"
 gem "coderay", "~> 1.0.6"
@@ -69,6 +69,7 @@ end
 
 group :development do
   gem "rdoc", ">= 2.4.2"
+  gem "yard"
 end
 
 group :test do

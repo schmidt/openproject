@@ -174,9 +174,9 @@ class Query < ActiveRecord::Base
       if values_for(field)
         case type_for(field)
         when :integer
-          add_filter_error(field, :invalid) if values_for(field).detect {|v| v.present? && !v.match(/^\d+$/) }
+          add_filter_error(field, :invalid) if values_for(field).detect {|v| v.present? && !v.match(/^[+-]?\d+$/) }
         when :float
-          add_filter_error(field, :invalid) if values_for(field).detect {|v| v.present? && !v.match(/^\d+(\.\d*)?$/) }
+          add_filter_error(field, :invalid) if values_for(field).detect {|v| v.present? && !v.match(/^[+-]?\d+(\.\d*)?$/) }
         when :date, :date_past
           case operator_for(field)
           when "=", ">=", "<=", "><"
@@ -213,10 +213,12 @@ class Query < ActiveRecord::Base
     is_public && !@is_for_all && user.allowed_to?(:manage_public_queries, project)
   end
 
+  def trackers
+    @trackers ||= project.nil? ? Tracker.find(:all, :order => 'position') : project.rolled_up_trackers
+  end
+
   def available_filters
     return @available_filters if @available_filters
-
-    trackers = project.nil? ? Tracker.find(:all, :order => 'position') : project.rolled_up_trackers
 
     @available_filters = { "status_id" => { :type => :list_status, :order => 1, :values => IssueStatus.find(:all, :order => 'position').collect{|s| [s.name, s.id.to_s] } },
                            "tracker_id" => { :type => :list, :order => 2, :values => trackers.collect{|s| [s.name, s.id.to_s] } },
@@ -300,6 +302,16 @@ class Query < ActiveRecord::Base
       end
       add_custom_fields_filters(IssueCustomField.find(:all, :conditions => {:is_filter => true, :is_for_all => true}))
     end
+
+    if User.current.allowed_to?(:set_issues_private, nil, :global => true) ||
+      User.current.allowed_to?(:set_own_issues_private, nil, :global => true)
+      @available_filters["is_private"] = { :type => :list, :order => 15, :values => [[l(:general_text_yes), "1"], [l(:general_text_no), "0"]] }
+    end
+
+    Tracker.disabled_core_fields(trackers).each {|field|
+      @available_filters.delete field
+    }
+
     @available_filters
   end
 
@@ -380,6 +392,17 @@ class Query < ActiveRecord::Base
         :caption => :label_spent_time
       )
     end
+
+    if User.current.allowed_to?(:set_issues_private, nil, :global => true) ||
+      User.current.allowed_to?(:set_own_issues_private, nil, :global => true)
+      @available_columns << QueryColumn.new(:is_private, :sortable => "#{Issue.table_name}.is_private")
+    end
+
+    disabled_fields = Tracker.disabled_core_fields(trackers).map {|field| field.sub(/_id$/, '')}
+    @available_columns.reject! {|column|
+      disabled_fields.include?(column.name.to_s)
+    }
+
     @available_columns
   end
 
@@ -686,6 +709,13 @@ class Query < ActiveRecord::Base
     end
   end
 
+  def sql_for_is_private_field(field, operator, value)
+    op = (operator == "=" ? 'IN' : 'NOT IN')
+    va = value.map {|v| v == '0' ? connection.quoted_false : connection.quoted_true}.uniq.join(',')
+
+    "#{Issue.table_name}.is_private #{op} (#{va})"
+  end
+
   private
 
   def sql_for_custom_field(field, operator, value, custom_field_id)
@@ -848,12 +878,18 @@ class Query < ActiveRecord::Base
     s = []
     if from
       from_yesterday = from - 1
-      from_yesterday_utc = Time.gm(from_yesterday.year, from_yesterday.month, from_yesterday.day)
-      s << ("#{table}.#{field} > '%s'" % [connection.quoted_date(from_yesterday_utc.end_of_day)])
+      from_yesterday_time = Time.local(from_yesterday.year, from_yesterday.month, from_yesterday.day)
+      if self.class.default_timezone == :utc
+        from_yesterday_time = from_yesterday_time.utc
+      end
+      s << ("#{table}.#{field} > '%s'" % [connection.quoted_date(from_yesterday_time.end_of_day)])
     end
     if to
-      to_utc = Time.gm(to.year, to.month, to.day)
-      s << ("#{table}.#{field} <= '%s'" % [connection.quoted_date(to_utc.end_of_day)])
+      to_time = Time.local(to.year, to.month, to.day)
+      if self.class.default_timezone == :utc
+        to_time = to_time.utc
+      end
+      s << ("#{table}.#{field} <= '%s'" % [connection.quoted_date(to_time.end_of_day)])
     end
     s.join(' AND ')
   end

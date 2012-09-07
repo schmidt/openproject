@@ -87,7 +87,7 @@
         # 下列三個選項設定, 若有設定值將會取代 number.format 成為預設值
         # separator:
         delimiter: ""
-        precision: 1
+        precision: 3
         # 儲存單位輸出格式.
         # %u 是儲存單位, %n 是數值 (預設值: 2 MB)
       storage_units:
@@ -120,6 +120,9 @@
       about_x_hours:
         one: "約 1 小時"
         other: "約 %{count} 小時"
+      x_hours:
+        one:   "1 hour"
+        other: "%{count} hours"
       x_days:
         one: "1 天"
         other: "%{count} 天"
@@ -256,6 +259,7 @@
   notice_issue_successful_create: "問題 %{id} 已建立。"
   notice_issue_update_conflict: "當您正在編輯這個問題的時候，它已經被其他人搶先一步更新過。"
   notice_account_deleted: "您的帳戶已被永久刪除。"
+  notice_user_successful_create: "已建立用戶 %{id}。"
 
   error_can_t_load_default_data: "無法載入預設組態： %{value}"
   error_scm_not_found: "在儲存機制中找不到這個項目或修訂版。"
@@ -269,13 +273,14 @@
   error_can_not_delete_tracker: "此追蹤標籤已包含問題，無法被刪除。"
   error_can_not_remove_role: "此角色已被使用，無法將其刪除。"
   error_can_not_reopen_issue_on_closed_version: '指派給「已結束」版本的問題，無法再將其狀態變更為「進行中」'
-  error_can_not_archive_project: 此專案無法被歸檔
+  error_can_not_archive_project: 此專案無法被歸檔封存
   error_issue_done_ratios_not_updated: "問題完成百分比未更新。"
   error_workflow_copy_source: '請選擇一個來源問題追蹤標籤或角色'
   error_workflow_copy_target: '請選擇一個（或多個）目的問題追蹤標籤或角色'
   error_unable_delete_issue_status: '無法刪除問題狀態'
   error_unable_to_connect: "無法連線至（%{value}）"
   error_attachment_too_big: "這個檔案無法被上傳，因為它已經超過最大的檔案大小 (%{max_size})"
+  error_session_expired: "您的工作階段已經過期。請重新登入。"
   warning_attachments_not_saved: "%{count} 個附加檔案無法被儲存。"
 
   mail_subject_lost_password: 您的 Redmine 網站密碼
@@ -405,6 +410,8 @@
   field_repository_is_default: 主要儲存機制
   field_multiple: 多重值
   field_ldap_filter: LDAP 篩選器
+  field_core_fields: 標準欄位
+  field_timeout: "逾時 (單位: 秒)"
 
   setting_app_title: 標題
   setting_app_subtitle: 副標題
@@ -467,10 +474,15 @@
   setting_default_issue_start_date_to_creation_date: 設定新問題的起始日期為今天的日期
   setting_commit_cross_project_ref: 允許關聯並修正其他專案的問題
   setting_unsubscribe: 允許用戶取消註冊（刪除帳戶）
+  setting_session_lifetime: 工作階段存留時間最大值
+  setting_session_timeout: 工作階段無活動逾時時間
+  setting_thumbnails_enabled: 顯示附加檔案的縮圖
+  setting_thumbnails_size: "縮圖大小 (單位: 像素 pixels)"
 
   permission_add_project: 建立專案
   permission_add_subprojects: 建立子專案
   permission_edit_project: 編輯專案
+  permission_close_project: 關閉 / 重新開啟專案
   permission_select_project_modules: 選擇專案模組
   permission_manage_members: 管理成員
   permission_manage_project_activities: 管理專案活動
@@ -929,6 +941,12 @@
   label_item_position: "%{position} / %{count}"
   label_completed_versions: 已完成版本
   label_search_for_watchers: 搜尋可供加入的監看者
+  label_session_expiration: 工作階段逾期
+  label_show_closed_projects: 檢視已關閉的專案
+  label_status_transitions: 狀態轉換
+  label_fields_permissions: 欄位權限
+  label_readonly: 唯讀
+  label_required: 必填
 
   button_login: 登入
   button_submit: 送出
@@ -963,8 +981,8 @@
   button_watch: 觀察
   button_unwatch: 取消觀察
   button_reply: 回應
-  button_archive: 歸檔
-  button_unarchive: 取消歸檔
+  button_archive: 歸檔封存
+  button_unarchive: 取消歸檔封存
   button_reset: 回復
   button_rename: 重新命名
   button_change_password: 變更密碼
@@ -979,10 +997,16 @@
   button_edit_section: 編輯此區塊
   button_export: 匯出
   button_delete_my_account: 刪除我的帳戶
+  button_close: 關閉
+  button_reopen: 重新開啟
 
   status_active: 活動中
   status_registered: 註冊完成
   status_locked: 鎖定中
+
+  project_status_active: 使用中
+  project_status_closed: 已關閉
+  project_status_archived: 已封存
 
   version_status_open: 進行中
   version_status_locked: 已鎖定
@@ -1066,6 +1090,8 @@
   text_account_destroy_confirmation: |-
     您確定要繼續這個動作嗎？
     您的帳戶將會被永久刪除，且無法被重新啟用。
+  text_session_expiration_settings: "警告：變更這些設定將會導致包含您在內的所有工作階段過期。"
+  text_project_closed: 此專案已被關閉，僅供唯讀使用。
 
   default_role_manager: 管理人員
   default_role_developer: 開發人員

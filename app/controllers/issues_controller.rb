@@ -50,7 +50,6 @@ class IssuesController < ApplicationController
   include SortHelper
   include IssuesHelper
   helper :timelog
-  helper :gantt
   include Redmine::Export::PDF
 
   def index
@@ -128,17 +127,7 @@ class IssuesController < ApplicationController
   def new
     respond_to do |format|
       format.html { render :action => 'new', :layout => !request.xhr? }
-      format.js {
-        render(:update) { |page|
-          if params[:project_change]
-            page.replace_html 'all_attributes', :partial => 'form'
-          else
-            page.replace_html 'attributes', :partial => 'attributes'
-          end
-          m = User.current.allowed_to?(:log_time, @issue.project) ? 'show' : 'hide'
-          page << "if ($('log_time')) {Element.#{m}('log_time');}"
-        }
-      }
+      format.js { render :partial => 'update_form' }
     end
   end
 
@@ -150,7 +139,7 @@ class IssuesController < ApplicationController
       respond_to do |format|
         format.html {
           render_attachment_warning_if_needed(@issue)
-          flash[:notice] = l(:notice_issue_successful_create, :id => "<a href='#{issue_path(@issue)}'>##{@issue.id}</a>")
+          flash[:notice] = l(:notice_issue_successful_create, :id => view_context.link_to("##{@issue.id}", issue_path(@issue)))
           redirect_to(params[:continue] ?  { :action => 'new', :project_id => @issue.project, :issue => {:tracker_id => @issue.tracker, :parent_issue_id => @issue.parent_issue_id}.reject {|k,v| v.nil?} } :
                       { :action => 'show', :id => @issue })
         }
@@ -198,7 +187,7 @@ class IssuesController < ApplicationController
 
       respond_to do |format|
         format.html { redirect_back_or_default({:action => 'show', :id => @issue}) }
-        format.api  { head :ok }
+        format.api  { render_api_ok }
       end
     else
       respond_to do |format|
@@ -308,7 +297,7 @@ class IssuesController < ApplicationController
     end
     respond_to do |format|
       format.html { redirect_back_or_default(:action => 'index', :project_id => @project) }
-      format.api  { head :ok }
+      format.api  { render_api_ok }
     end
   end
 

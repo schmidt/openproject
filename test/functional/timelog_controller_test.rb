@@ -44,6 +44,7 @@ class TimelogControllerTest < ActionController::TestCase
     # Default activity selected
     assert_tag :tag => 'option', :attributes => { :selected => 'selected' },
                                  :content => 'Development'
+    assert_select 'input[name=project_id][value=1]'
   end
 
   def test_get_new_should_only_show_active_time_entry_activities
@@ -61,6 +62,18 @@ class TimelogControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'new'
     assert_tag 'select', :attributes => {:name => 'time_entry[project_id]'}
+    assert_select 'input[name=project_id]', 0
+  end
+
+  def test_new_without_project_should_prefill_the_form
+    @request.session[:user_id] = 3
+    get :new, :time_entry => {:project_id => '1'}
+    assert_response :success
+    assert_template 'new'
+    assert_select 'select[name=?]', 'time_entry[project_id]' do
+      assert_select 'option[value=1][selected=selected]'
+    end
+    assert_select 'input[name=project_id]', 0
   end
 
   def test_new_without_project_should_deny_without_permission
@@ -144,7 +157,7 @@ class TimelogControllerTest < ActionController::TestCase
                                 :spent_on => '2008-03-14',
                                 :hours => '7.3'},
                 :continue => '1'
-    assert_redirected_to '/projects/ecookbook/time_entries/new'
+    assert_redirected_to '/projects/ecookbook/time_entries/new?time_entry%5Bactivity_id%5D=11&time_entry%5Bissue_id%5D='
   end
 
   def test_create_and_continue_with_issue_id
@@ -155,7 +168,7 @@ class TimelogControllerTest < ActionController::TestCase
                                 :spent_on => '2008-03-14',
                                 :hours => '7.3'},
                 :continue => '1'
-    assert_redirected_to '/projects/ecookbook/issues/1/time_entries/new'
+    assert_redirected_to '/projects/ecookbook/issues/1/time_entries/new?time_entry%5Bactivity_id%5D=11&time_entry%5Bissue_id%5D=1'
   end
 
   def test_create_and_continue_without_project
@@ -167,7 +180,7 @@ class TimelogControllerTest < ActionController::TestCase
                                 :hours => '7.3'},
                   :continue => '1'
 
-    assert_redirected_to '/time_entries/new'
+    assert_redirected_to '/time_entries/new?time_entry%5Bactivity_id%5D=11&time_entry%5Bissue_id%5D=&time_entry%5Bproject_id%5D=1'
   end
 
   def test_create_without_log_time_permission_should_be_denied
@@ -553,6 +566,20 @@ class TimelogControllerTest < ActionController::TestCase
     # to use /issues/:issue_id/time_entries
     assert_tag :form,
       :attributes => {:action => "/projects/ecookbook/issues/1/time_entries", :id => 'query_form'}
+  end
+
+  def test_index_should_sort_by_spent_on_and_created_on
+    t1 = TimeEntry.create!(:user => User.find(1), :project => Project.find(1), :hours => 1, :spent_on => '2012-06-16', :created_on => '2012-06-16 20:00:00', :activity_id => 10)
+    t2 = TimeEntry.create!(:user => User.find(1), :project => Project.find(1), :hours => 1, :spent_on => '2012-06-16', :created_on => '2012-06-16 20:05:00', :activity_id => 10)
+    t3 = TimeEntry.create!(:user => User.find(1), :project => Project.find(1), :hours => 1, :spent_on => '2012-06-15', :created_on => '2012-06-16 20:10:00', :activity_id => 10)
+
+    get :index, :project_id => 1, :from => '2012-06-15', :to => '2012-06-16'
+    assert_response :success
+    assert_equal [t2, t1, t3], assigns(:entries)
+
+    get :index, :project_id => 1, :from => '2012-06-15', :to => '2012-06-16', :sort => 'spent_on'
+    assert_response :success
+    assert_equal [t3, t1, t2], assigns(:entries)
   end
 
   def test_index_atom_feed

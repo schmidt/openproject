@@ -128,6 +128,10 @@ class ActiveSupport::TestCase
     return nil
   end
 
+  def self.convert_installed?
+    Redmine::Thumbnail.convert_available?
+  end
+
   # Returns the path to the test +vendor+ repository
   def self.repository_path(vendor)
     Rails.root.join("tmp/test/#{vendor.downcase}_repository").to_s
@@ -156,8 +160,8 @@ class ActiveSupport::TestCase
     assert_tag({:attributes => { :id => 'errorExplanation' }}.merge(options))
   end
 
-  def assert_include(expected, s)
-    assert s.include?(expected), "\"#{expected}\" not found in \"#{s}\""
+  def assert_include(expected, s, message=nil)
+    assert s.include?(expected), (message || "\"#{expected}\" not found in \"#{s}\"")
   end
 
   def assert_not_include(expected, s)

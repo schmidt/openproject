@@ -45,6 +45,7 @@ module ApplicationHelper
 
   # Display a link to remote if user is authorized
   def link_to_remote_if_authorized(name, options = {}, html_options = nil)
+    ActiveSupport::Deprecation.warn "ApplicationHelper#link_to_remote_if_authorized is deprecated and will be removed in Redmine 2.2."
     url = options[:url] || {}
     link_to_remote(name, options, html_options) if authorize_for(url[:controller] || params[:controller], url[:action])
   end
@@ -128,7 +129,7 @@ module ApplicationHelper
       h(truncate(message.subject, :length => 60)),
       { :controller => 'messages', :action => 'show',
         :board_id => message.board_id,
-        :id => message.root,
+        :id => (message.parent_id || message.id),
         :r => (message.parent_id && message.id),
         :anchor => (message.parent_id ? "message-#{message.id}" : nil)
       }.merge(options),
@@ -145,12 +146,18 @@ module ApplicationHelper
   #   link_to_project(project, {}, :class => "project") # => html options with default url (project overview)
   #
   def link_to_project(project, options={}, html_options = nil)
-    if project.active?
+    if project.archived?
+      h(project)
+    else
       url = {:controller => 'projects', :action => 'show', :id => project}.merge(options)
       link_to(h(project), url, html_options)
-    else
-      h(project)
     end
+  end
+
+  def thumbnail_tag(attachment)
+    link_to image_tag(url_for(:controller => 'attachments', :action => 'thumbnail', :id => attachment)),
+      {:controller => 'attachments', :action => 'show', :id => attachment, :filename => attachment.filename},
+      :title => attachment.filename
   end
 
   def toggle_link(name, id, options={})
@@ -178,7 +185,7 @@ module ApplicationHelper
   end
 
   def format_activity_day(date)
-    date == Date.today ? l(:label_today).titleize : format_date(date)
+    date == User.current.today ? l(:label_today).titleize : format_date(date)
   end
 
   def format_activity_description(text)
@@ -237,23 +244,24 @@ module ApplicationHelper
   # Renders the project quick-jump box
   def render_project_jump_box
     return unless User.current.logged?
-    projects = User.current.memberships.collect(&:project).compact.uniq
+    projects = User.current.memberships.collect(&:project).compact.select(&:active?).uniq
     if projects.any?
-      s = '<select onchange="if (this.value != \'\') { window.location = this.value; }">' +
-            "<option value=''>#{ l(:label_jump_to_a_project) }</option>" +
-            '<option value="" disabled="disabled">---</option>'
-      s << project_tree_options_for_select(projects, :selected => @project) do |p|
-        { :value => url_for(:controller => 'projects', :action => 'show', :id => p, :jump => current_menu_item) }
+      options =
+        ("<option value=''>#{ l(:label_jump_to_a_project) }</option>" +
+         '<option value="" disabled="disabled">---</option>').html_safe
+
+      options << project_tree_options_for_select(projects, :selected => @project) do |p|
+        { :value => project_path(:id => p, :jump => current_menu_item) }
       end
-      s << '</select>'
-      s.html_safe
+
+      select_tag('project_quick_jump_box', options, :onchange => 'if (this.value != \'\') { window.location = this.value; }')
     end
   end
 
   def project_tree_options_for_select(projects, options = {})
     s = ''
     project_tree(projects) do |project, level|
-      name_prefix = (level > 0 ? ('&nbsp;' * 2 * level + '&#187; ').html_safe : '')
+      name_prefix = (level > 0 ? '&nbsp;' * 2 * level + '&#187; ' : '').html_safe
       tag_options = {:value => project.id}
       if project == options[:selected] || (options[:selected].respond_to?(:include?) && options[:selected].include?(project))
         tag_options[:selected] = 'selected'
@@ -352,7 +360,7 @@ module ApplicationHelper
   def time_tag(time)
     text = distance_of_time_in_words(Time.now, time)
     if @project
-      link_to(text, {:controller => 'activities', :action => 'index', :id => @project, :from => time.to_date}, :title => format_time(time))
+      link_to(text, {:controller => 'activities', :action => 'index', :id => @project, :from => User.current.time_to_date(time)}, :title => format_time(time))
     else
       content_tag('acronym', text, :title => format_time(time))
     end
@@ -930,16 +938,6 @@ module ApplicationHelper
     content_tag("label", label_text)
   end
 
-  def labelled_tabular_form_for(*args, &proc)
-    ActiveSupport::Deprecation.warn "ApplicationHelper#labelled_tabular_form_for is deprecated and will be removed in Redmine 1.5. Use #labelled_form_for instead."
-    args << {} unless args.last.is_a?(Hash)
-    options = args.last
-    options[:html] ||= {}
-    options[:html][:class] = 'tabular' unless options[:html].has_key?(:class)
-    options.merge!({:builder => Redmine::Views::LabelledFormBuilder})
-    form_for(*args, &proc)
-  end
-
   def labelled_form_for(*args, &proc)
     args << {} unless args.last.is_a?(Hash)
     options = args.last
@@ -958,6 +956,7 @@ module ApplicationHelper
   end
 
   def labelled_remote_form_for(*args, &proc)
+    ActiveSupport::Deprecation.warn "ApplicationHelper#labelled_remote_form_for is deprecated and will be removed in Redmine 2.2."
     args << {} unless args.last.is_a?(Hash)
     options = args.last
     options.merge!({:builder => Redmine::Views::LabelledFormBuilder, :remote => true})
@@ -977,6 +976,24 @@ module ApplicationHelper
     end
     html.html_safe
   end  
+
+  def delete_link(url, options={})
+    options = {
+      :method => :delete,
+      :data => {:confirm => l(:text_are_you_sure)},
+      :class => 'icon icon-del'
+    }.merge(options)
+
+    link_to l(:button_delete), url, options
+  end
+
+  def preview_link(url, form, target='preview', options={})
+    content_tag 'a', l(:label_preview), {
+        :href => "#", 
+        :onclick => %|submitPreview("#{escape_javascript url_for(url)}", "#{escape_javascript form}", "#{escape_javascript target}"); return false;|, 
+        :accesskey => accesskey(:preview)
+      }.merge(options)
+  end
 
   def back_url_hidden_field_tag
     back_url = params[:back_url] || request.env['HTTP_REFERER']

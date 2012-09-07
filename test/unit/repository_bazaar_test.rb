@@ -67,7 +67,7 @@ class RepositoryBazaarTest < ActiveSupport::TestCase
       @project.reload
 
       assert_equal NUM_REV, @repository.changesets.count
-      assert_equal 9, @repository.changes.count
+      assert_equal 9, @repository.filechanges.count
       assert_equal 'Initial import', @repository.changesets.find_by_revision('1').comments
     end
 
@@ -88,6 +88,7 @@ class RepositoryBazaarTest < ActiveSupport::TestCase
 
     def test_entries
       entries = @repository.entries
+      assert_kind_of Redmine::Scm::Adapters::Entries, entries
       assert_equal 2, entries.size
 
       assert_equal 'dir', entries[0].kind
