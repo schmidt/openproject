@@ -130,8 +130,11 @@ class User < Principal
 
   # Returns the user that matches provided login and password, or nil
   def self.try_to_login(login, password)
+    login = login.to_s
+    password = password.to_s
+
     # Make sure no one can sign in with an empty password
-    return nil if password.to_s.empty?
+    return nil if password.empty?
     user = find_by_login(login)
     if user
       # user is already in local database
@@ -164,7 +167,7 @@ class User < Principal
 
   # Returns the user who matches the given autologin +key+ or nil
   def self.try_to_autologin(key)
-    tokens = Token.find_all_by_action_and_value('autologin', key)
+    tokens = Token.find_all_by_action_and_value('autologin', key.to_s)
     # Make sure there's only 1 token that matches the key
     if tokens.size == 1
       token = tokens.first
@@ -338,12 +341,12 @@ class User < Principal
   end
 
   def self.find_by_rss_key(key)
-    token = Token.find_by_value(key)
+    token = Token.find_by_action_and_value('feeds', key.to_s)
     token && token.user.active? ? token.user : nil
   end
 
   def self.find_by_api_key(key)
-    token = Token.find_by_action_and_value('api', key)
+    token = Token.find_by_action_and_value('api', key.to_s)
     token && token.user.active? ? token.user : nil
   end
 
@@ -370,6 +373,15 @@ class User < Principal
     end
   end
 
+  # Returns the day of +time+ according to user's time zone
+  def time_to_date(time)
+    if time_zone.nil?
+      time.to_date
+    else
+      time.in_time_zone(time_zone).to_date
+    end
+  end
+
   def logged?
     true
   end
@@ -382,7 +394,7 @@ class User < Principal
   def roles_for_project(project)
     roles = []
     # No role on archived projects
-    return roles unless project && project.active?
+    return roles if project.nil? || project.archived?
     if logged?
       # Find project membership
       membership = memberships.detect {|m| m.project_id == project.id}
@@ -443,9 +455,6 @@ class User < Principal
   #   or falls back to Non Member / Anonymous permissions depending if the user is logged
   def allowed_to?(action, context, options={}, &block)
     if context && context.is_a?(Project)
-      # No action allowed on archived projects
-      return false unless context.active?
-      # No action allowed on disabled modules
       return false unless context.allows_to?(action)
       # Admin users are authorized for anything else
       return true if admin?
@@ -649,6 +658,10 @@ class AnonymousUser < User
   def mail; nil end
   def time_zone; nil end
   def rss_key; nil end
+
+  def pref
+    UserPreference.new(:user => self)
+  end
 
   # Anonymous user can not be destroyed
   def destroy

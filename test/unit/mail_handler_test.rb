@@ -35,6 +35,10 @@ class MailHandlerTest < ActiveSupport::TestCase
     Setting.notified_events = Redmine::Notifiable.all.collect(&:name)
   end
 
+  def teardown
+    Setting.clear_cache
+  end
+
   def test_add_issue
     ActionMailer::Base.deliveries.clear
     # This email contains: 'Project: onlinestore'
@@ -347,6 +351,15 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal 'caaf384198bcbc9563ab5c058acd73cd', attachment.digest
   end
 
+  def test_add_issue_with_iso_8859_1_subject
+    issue = submit_email(
+              'subject_as_iso-8859-1.eml',
+              :issue => {:project => 'ecookbook'}
+            )
+    assert_kind_of Issue, issue
+    assert_equal 'Testmail from Webmail: ä ö ü...', issue.subject
+  end
+
   def test_should_ignore_emails_from_locked_users
     User.find(2).lock!
 
@@ -373,7 +386,8 @@ class MailHandlerTest < ActiveSupport::TestCase
     [
       "X-Auto-Response-Suppress: OOF",
       "Auto-Submitted: auto-replied",
-      "Auto-Submitted: Auto-Replied"
+      "Auto-Submitted: Auto-Replied",
+      "Auto-Submitted: auto-generated"
     ].each do |header|
       raw = IO.read(File.join(FIXTURES_PATH, 'ticket_on_given_project.eml'))
       raw = header + "\n" + raw

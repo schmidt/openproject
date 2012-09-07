@@ -50,6 +50,9 @@ bg:
       about_x_hours:
         one:   "около 1 час"
         other: "около %{count} часа"
+      x_hours:
+        one:   "1 hour"
+        other: "%{count} hours"
       x_days:
         one:   "1 ден"
         other: "%{count} дена"
@@ -78,7 +81,7 @@ bg:
     human:
       format:
         delimiter: ""
-        precision: 1
+        precision: 3
       storage_units:
         format: "%n %u"
         units:
@@ -175,6 +178,7 @@ bg:
   notice_issue_successful_create: Задача %{id} е създадена.
   notice_issue_update_conflict: Задачата е била променена от друг потребител, докато вие сте я редактирали.
   notice_account_deleted: Вашият профил беше премахнат без възможност за възстановяване.
+  notice_user_successful_create: Потребител %{id} е създаден.
 
   error_can_t_load_default_data: "Грешка при зареждане на примерната информация: %{value}"
   error_scm_not_found: Несъществуващ обект в хранилището.
@@ -195,6 +199,7 @@ bg:
   error_unable_delete_issue_status: Невъзможност за изтриване на състояние на задача
   error_unable_to_connect: Невъзможност за свързване с (%{value})
   error_attachment_too_big: Този файл не може да бъде качен, понеже надхвърля максималната възможна големина (%{max_size})
+  error_session_expired: Вашата сесия е изтекла. Моля влезете в Redmine отново.
   warning_attachments_not_saved: "%{count} файла не бяха записани."
 
   mail_subject_lost_password: "Вашата парола (%{value})"
@@ -324,6 +329,8 @@ bg:
   field_repository_is_default: Главно хранилище
   field_multiple: Избор на повече от една стойност
   field_ldap_filter: LDAP филтър
+  field_core_fields: Стандартни полета
+  field_timeout: Таймаут (в секунди)
 
   setting_app_title: Заглавие
   setting_app_subtitle: Описание
@@ -386,10 +393,15 @@ bg:
   setting_default_issue_start_date_to_creation_date: Начална дата на новите задачи по подразбиране да бъде днешната дата
   setting_commit_cross_project_ref: Отбелязване и приключване на задачи от други проекти, несвързани с конкретното хранилище
   setting_unsubscribe: Потребителите могат да премахват профилите си
+  setting_session_lifetime: Максимален живот на сесиите
+  setting_session_timeout: Таймаут за неактивност преди прекратяване на сесиите
+  setting_thumbnails_enabled: Показване на миниатюри на прикачените изображения
+  setting_thumbnails_size: Размер на миниатюрите (в пиксели)
 
   permission_add_project: Създаване на проект
   permission_add_subprojects: Създаване на подпроекти
   permission_edit_project: Редактиране на проект
+  permission_close_project: Затваряне / отваряне на проект
   permission_select_project_modules: Избор на проектни модули
   permission_manage_members: Управление на членовете (на екип)
   permission_manage_project_activities: Управление на дейностите на проекта
@@ -848,6 +860,12 @@ bg:
   label_item_position: "%{position}/%{count}"
   label_completed_versions: Завършени версии
   label_search_for_watchers: Търсене на потребители за наблюдатели
+  label_session_expiration: Изтичане на сесиите
+  label_show_closed_projects: Разглеждане на затворени проекти
+  label_status_transitions: Преходи между състоянията
+  label_fields_permissions: Видимост на полетата
+  label_readonly: Само за четене
+  label_required: Задължително
 
   button_login: Вход
   button_submit: Прикачване
@@ -898,10 +916,16 @@ bg:
   button_edit_section: Редактиране на тази секция
   button_export: Експорт
   button_delete_my_account: Премахване на моя профил
+  button_close: Затваряне
+  button_reopen: Отваряне
 
   status_active: активен
   status_registered: регистриран
   status_locked: заключен
+
+  project_status_active: активен
+  project_status_closed: затворен
+  project_status_archived: архивиран
 
   version_status_open: отворена
   version_status_locked: заключена
@@ -983,6 +1007,8 @@ bg:
   text_issue_conflict_resolution_add_notes: Добавяне на моите коментари и отхвърляне на другите мои промени
   text_issue_conflict_resolution_cancel: Отхвърляне на всички мои промени и презареждане на %{link}
   text_account_destroy_confirmation: "Сигурен/на ли сте, че желаете да продължите?\nВашият профил ще бъде премахнат без възможност за възстановяване."
+  text_session_expiration_settings: "Внимание: промяната на тези установяваноя може да прекрати всички активни сесии, включително и вашата."
+  text_project_closed: Този проект е затворен и е само за четене.
 
   default_role_manager: Мениджър
   default_role_developer: Разработчик

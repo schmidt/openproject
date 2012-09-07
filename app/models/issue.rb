@@ -58,7 +58,7 @@ class Issue < ActiveRecord::Base
   validates_length_of :subject, :maximum => 255
   validates_inclusion_of :done_ratio, :in => 0..100
   validates_numericality_of :estimated_hours, :allow_nil => true
-  validate :validate_issue
+  validate :validate_issue, :validate_required_fields
 
   scope :visible,
         lambda {|*args| { :include => :project,
@@ -75,7 +75,7 @@ class Issue < ActiveRecord::Base
                             :conditions => ["#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"]
 
   before_create :default_assign
-  before_save :close_duplicates, :update_done_ratio_from_issue_status
+  before_save :close_duplicates, :update_done_ratio_from_issue_status, :force_updated_on_change
   after_save {|issue| issue.send :after_project_change if !issue.id_changed? && issue.project_id_changed?} 
   after_save :reschedule_following_issues, :update_nested_set_attributes, :update_parent_attributes, :create_journal
   after_destroy :update_parent_attributes
@@ -122,6 +122,33 @@ class Issue < ActiveRecord::Base
       self.priority ||= IssuePriority.default
       self.watcher_user_ids = []
     end
+  end
+
+  # AR#Persistence#destroy would raise and RecordNotFound exception
+  # if the issue was already deleted or updated (non matching lock_version).
+  # This is a problem when bulk deleting issues or deleting a project
+  # (because an issue may already be deleted if its parent was deleted
+  # first).
+  # The issue is reloaded by the nested_set before being deleted so
+  # the lock_version condition should not be an issue but we handle it.
+  def destroy
+    super
+  rescue ActiveRecord::RecordNotFound
+    # Stale or already deleted
+    begin
+      reload
+    rescue ActiveRecord::RecordNotFound
+      # The issue was actually already deleted
+      @destroyed = true
+      return freeze
+    end
+    # The issue was stale, retry to destroy
+    super
+  end
+
+  def reload(*args)
+    @workflow_rule_by_attribute = nil
+    super
   end
 
   # Overrides Redmine::Acts::Customizable::InstanceMethods#available_custom_fields
@@ -186,7 +213,9 @@ class Issue < ActiveRecord::Base
 
   def status_id=(sid)
     self.status = nil
-    write_attribute(:status_id, sid)
+    result = write_attribute(:status_id, sid)
+    @workflow_rule_by_attribute = nil
+    result
   end
 
   def priority_id=(pid)
@@ -208,6 +237,7 @@ class Issue < ActiveRecord::Base
     self.tracker = nil
     result = write_attribute(:tracker_id, tid)
     @custom_field_values = nil
+    @workflow_rule_by_attribute = nil
     result
   end
 
@@ -314,6 +344,13 @@ class Issue < ActiveRecord::Base
     :if => lambda {|issue, user| (issue.new_record? || user.allowed_to?(:edit_issues, issue.project)) &&
       user.allowed_to?(:manage_subtasks, issue.project)}
 
+  def safe_attribute_names(user=nil)
+    names = super
+    names -= disabled_core_fields
+    names -= read_only_attribute_names(user)
+    names
+  end
+
   # Safely sets attributes
   # Should be called from controllers instead of #attributes=
   # attr_accessible is too rough because we still want things like
@@ -321,26 +358,27 @@ class Issue < ActiveRecord::Base
   def safe_attributes=(attrs, user=User.current)
     return unless attrs.is_a?(Hash)
 
-    # User can change issue attributes only if he has :edit permission or if a workflow transition is allowed
-    attrs = delete_unsafe_attributes(attrs, user)
-    return if attrs.empty?
+    attrs = attrs.dup
 
     # Project and Tracker must be set before since new_statuses_allowed_to depends on it.
-    if p = attrs.delete('project_id')
+    if (p = attrs.delete('project_id')) && safe_attribute?('project_id')
       if allowed_target_projects(user).collect(&:id).include?(p.to_i)
         self.project_id = p
       end
     end
 
-    if t = attrs.delete('tracker_id')
+    if (t = attrs.delete('tracker_id')) && safe_attribute?('tracker_id')
       self.tracker_id = t
     end
 
-    if attrs['status_id']
-      unless new_statuses_allowed_to(user).collect(&:id).include?(attrs['status_id'].to_i)
-        attrs.delete('status_id')
+    if (s = attrs.delete('status_id')) && safe_attribute?('status_id')
+      if new_statuses_allowed_to(user).collect(&:id).include?(s.to_i)
+        self.status_id = s
       end
     end
+
+    attrs = delete_unsafe_attributes(attrs, user)
+    return if attrs.empty?
 
     unless leaf?
       attrs.reject! {|k,v| %w(priority_id done_ratio start_date due_date estimated_hours).include?(k)}
@@ -350,9 +388,91 @@ class Issue < ActiveRecord::Base
       attrs.delete('parent_issue_id') unless Issue.visible(user).exists?(attrs['parent_issue_id'].to_i)
     end
 
+    if attrs['custom_field_values'].present?
+      attrs['custom_field_values'] = attrs['custom_field_values'].reject {|k, v| read_only_attribute_names(user).include? k.to_s}
+    end
+
+    if attrs['custom_fields'].present?
+      attrs['custom_fields'] = attrs['custom_fields'].reject {|c| read_only_attribute_names(user).include? c['id'].to_s}
+    end
+
     # mass-assignment security bypass
     assign_attributes attrs, :without_protection => true
   end
+
+  def disabled_core_fields
+    tracker ? tracker.disabled_core_fields : []
+  end
+
+  # Returns the custom_field_values that can be edited by the given user
+  def editable_custom_field_values(user=nil)
+    custom_field_values.reject do |value|
+      read_only_attribute_names(user).include?(value.custom_field_id.to_s)
+    end
+  end
+
+  # Returns the names of attributes that are read-only for user or the current user
+  # For users with multiple roles, the read-only fields are the intersection of
+  # read-only fields of each role
+  # The result is an array of strings where sustom fields are represented with their ids
+  #
+  # Examples:
+  #   issue.read_only_attribute_names # => ['due_date', '2']
+  #   issue.read_only_attribute_names(user) # => []
+  def read_only_attribute_names(user=nil)
+    workflow_rule_by_attribute(user).reject {|attr, rule| rule != 'readonly'}.keys
+  end
+
+  # Returns the names of required attributes for user or the current user
+  # For users with multiple roles, the required fields are the intersection of
+  # required fields of each role
+  # The result is an array of strings where sustom fields are represented with their ids
+  #
+  # Examples:
+  #   issue.required_attribute_names # => ['due_date', '2']
+  #   issue.required_attribute_names(user) # => []
+  def required_attribute_names(user=nil)
+    workflow_rule_by_attribute(user).reject {|attr, rule| rule != 'required'}.keys
+  end
+
+  # Returns true if the attribute is required for user
+  def required_attribute?(name, user=nil)
+    required_attribute_names(user).include?(name.to_s)
+  end
+
+  # Returns a hash of the workflow rule by attribute for the given user
+  #
+  # Examples:
+  #   issue.workflow_rule_by_attribute # => {'due_date' => 'required', 'start_date' => 'readonly'}
+  def workflow_rule_by_attribute(user=nil)
+    return @workflow_rule_by_attribute if @workflow_rule_by_attribute && user.nil?
+
+    user_real = user || User.current
+    roles = user_real.admin ? Role.all : user_real.roles_for_project(project)
+    return {} if roles.empty?
+
+    result = {}
+    workflow_permissions = WorkflowPermission.where(:tracker_id => tracker_id, :old_status_id => status_id, :role_id => roles.map(&:id)).all
+    if workflow_permissions.any?
+      workflow_rules = workflow_permissions.inject({}) do |h, wp|
+        h[wp.field_name] ||= []
+        h[wp.field_name] << wp.rule
+        h
+      end
+      workflow_rules.each do |attr, rules|
+        next if rules.size < roles.size
+        uniq_rules = rules.uniq
+        if uniq_rules.size == 1
+          result[attr] = uniq_rules.first
+        else
+          result[attr] = 'required'
+        end
+      end
+    end
+    @workflow_rule_by_attribute = result if user.nil?
+    result
+  end
+  private :workflow_rule_by_attribute
 
   def done_ratio
     if Issue.use_status_for_done_ratio? && status && status.default_done_ratio
@@ -415,6 +535,25 @@ class Issue < ActiveRecord::Base
     end
   end
 
+  # Validates the issue against additional workflow requirements
+  def validate_required_fields
+    user = new_record? ? author : current_journal.try(:user)
+
+    required_attribute_names(user).each do |attribute|
+      if attribute =~ /^\d+$/
+        attribute = attribute.to_i
+        v = custom_field_values.detect {|v| v.custom_field_id == attribute }
+        if v && v.value.blank?
+          errors.add :base, v.custom_field.name + ' ' + l('activerecord.errors.messages.blank')
+        end
+      else
+        if respond_to?(attribute) && send(attribute).blank?
+          errors.add attribute, :blank
+        end
+      end
+    end
+  end
+
   # Set the done_ratio using the status if that setting is set.  This will keep the done_ratios
   # even if the user turns off the setting later
   def update_done_ratio_from_issue_status
@@ -432,8 +571,6 @@ class Issue < ActiveRecord::Base
       @custom_values_before_change = {}
       self.custom_field_values.each {|c| @custom_values_before_change.store c.custom_field_id, c.value }
     end
-    # Make sure updated_on is updated when adding a note.
-    updated_on_will_change!
     @current_journal
   end
 
@@ -991,6 +1128,13 @@ class Issue < ActiveRecord::Base
         end
         duplicate.update_attribute :status, self.status
       end
+    end
+  end
+
+  # Make sure updated_on is updated when adding a note
+  def force_updated_on_change
+    if @current_journal
+      self.updated_on = current_time_from_proper_timezone
     end
   end
 
