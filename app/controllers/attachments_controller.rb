@@ -17,7 +17,7 @@
 
 class AttachmentsController < ApplicationController
   before_filter :find_project, :except => :upload
-  before_filter :file_readable, :read_authorize, :only => [:show, :download]
+  before_filter :file_readable, :read_authorize, :only => [:show, :download, :thumbnail]
   before_filter :delete_authorize, :only => :destroy
   before_filter :authorize_global, :only => :upload
 
@@ -52,11 +52,26 @@ class AttachmentsController < ApplicationController
       @attachment.increment_download
     end
 
-    # images are sent inline
-    send_file @attachment.diskfile, :filename => filename_for_content_disposition(@attachment.filename),
-                                    :type => detect_content_type(@attachment),
-                                    :disposition => (@attachment.image? ? 'inline' : 'attachment')
+    if stale?(:etag => @attachment.digest)
+      # images are sent inline
+      send_file @attachment.diskfile, :filename => filename_for_content_disposition(@attachment.filename),
+                                      :type => detect_content_type(@attachment),
+                                      :disposition => (@attachment.image? ? 'inline' : 'attachment')
+    end
+  end
 
+  def thumbnail
+    if @attachment.thumbnailable? && thumbnail = @attachment.thumbnail(:size => params[:size])
+      if stale?(:etag => thumbnail)
+        send_file thumbnail,
+          :filename => filename_for_content_disposition(@attachment.filename),
+          :type => detect_content_type(@attachment),
+          :disposition => 'inline'
+      end
+    else
+      # No thumbnail for the attachment or thumbnail could not be created
+      render :nothing => true, :status => 404
+    end
   end
 
   def upload

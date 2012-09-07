@@ -108,8 +108,9 @@ a:hover, a:active{ color: #c61a1a; text-decoration: underline;}
 a img{ border: 0; }
 
 a.issue.closed, a.issue.closed:link, a.issue.closed:visited { color: #999; text-decoration: line-through; }
+a.project.closed, a.project.closed:link, a.project.closed:visited { color: #999; }
 
-#sidebar a.selected {line-height:1.7em; padding:1px 3px 2px 2px; margin-left:-2px; background-color:#9DB9D5; color:#fff; border-radius:2px; -moz-border-radius:2px;}
+#sidebar a.selected {line-height:1.7em; padding:1px 3px 2px 2px; margin-left:-2px; background-color:#9DB9D5; color:#fff; border-radius:2px;}
 #sidebar a.selected:hover {text-decoration:none;}
 #admin-menu a {line-height:1.7em;}
 #admin-menu a.selected {padding-left: 20px !important; background-position: 2px 40%;}
@@ -130,6 +131,8 @@ table.list td.buttons a { padding-right: 0.6em; }
 table.list caption { text-align: left; padding: 0.5em 0.5em 0.5em 0; }
 
 tr.project td.name a { white-space:nowrap; }
+tr.project.closed, tr.project.archived { color: #aaa; }
+tr.project.closed a, tr.project.archived a { color: #aaa; }
 
 tr.project.idnt td.name span {background: url(../images/bullet_arrow_right.png) no-repeat 0 50%; padding-left: 16px;}
 tr.project.idnt-1 td.name {padding-left: 0.5em;}
@@ -318,7 +321,7 @@ div.issue div.subject div div { padding-left: 16px; }
 div.issue div.subject p {margin: 0; margin-bottom: 0.1em; font-size: 90%; color: #999;}
 div.issue div.subject>div>p { margin-top: 0.5em; }
 div.issue div.subject h3 {margin: 0; margin-bottom: 0.1em;}
-div.issue span.private { position:relative; bottom: 2px; text-transform: uppercase; background: #d22; color: #fff; font-weight:bold; padding: 0px 2px 0px 2px; font-size: 60%; margin-right: 2px; border-radius: 2px; -moz-border-radius: 2px;}
+div.issue span.private { position:relative; bottom: 2px; text-transform: uppercase; background: #d22; color: #fff; font-weight:bold; padding: 0px 2px 0px 2px; font-size: 60%; margin-right: 2px; border-radius: 2px;}
 div.issue .next-prev-links {color:#999;}
 div.issue table.attributes th {width:22%;}
 div.issue table.attributes td {width:28%;}
@@ -430,6 +433,10 @@ ul.properties li span {font-style:italic;}
 #user_login, #user_firstname, #user_lastname, #user_mail, #my_account_form select, #user_form select, #user_identity_url { width: 90%; }
 
 #workflow_copy_form select { width: 200px; }
+table.transitions td.enabled {background: #bfb;}
+table.fields_permissions select {font-size:90%}
+table.fields_permissions td.readonly {background:#ddd;}
+table.fields_permissions td.required {background:#d88;}
 
 textarea#custom_field_possible_values {width: 99%}
 input#content_comments {width: 99%}
@@ -501,7 +508,7 @@ input#time_entry_comments { width: 90%;}
 fieldset.settings label { display: block; }
 fieldset#notified_events .parent { padding-left: 20px; }
 
-.required {color: #bb0000;}
+span.required {color: #bb0000;}
 .summary {font-style: italic;}
 
 #attachments_fields input.description {margin-left: 8px; width:340px;}
@@ -512,6 +519,10 @@ div.attachments { margin-top: 12px; }
 div.attachments p { margin:4px 0 2px 0; }
 div.attachments img { vertical-align: middle; }
 div.attachments span.author { font-size: 0.9em; color: #888; }
+
+div.thumbnails {margin-top:0.6em;}
+div.thumbnails div {background:#fff;border:2px solid #ddd;display:inline-block;margin-right:2px;}
+div.thumbnails img {margin: 3px;}
 
 p.other-formats { text-align: right; font-size:0.9em; color: #666; }
 .other-formats span + span:before { content: "| "; }

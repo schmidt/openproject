@@ -31,6 +31,9 @@
 #
 #============================================================+
 
+require 'tempfile'
+require 'core/rmagick'
+
 #
 # TCPDF Class.
 # @package com.tecnick.tcpdf
@@ -283,6 +286,7 @@ class TCPDF
 		@state ||= 0
   	@tableborder ||= 0
   	@tdbegin ||= false
+	@tdtext ||= ''
   	@tdwidth ||= 0
   	@tdheight ||= 0
   	@tdalign ||= "L"
@@ -2059,17 +2063,12 @@ class TCPDF
 			type.downcase!
 			if (type == 'jpg' or type == 'jpeg')
 				info=parsejpg(file);
-			elsif (type == 'png' or type == 'gif')
-				img = Magick::ImageList.new(file)
-				img.format = "PNG"     # convert to PNG from gif 
-				img.opacity = 0        # PNG alpha channel delete
-				File.open( @@k_path_cache + File::basename(file), 'w'){|f|
-					f.binmode
-					f.print img.to_blob
-					f.close
-				}
-				info=parsepng( @@k_path_cache + File::basename(file));
-				File.delete( @@k_path_cache + File::basename(file))
+			elsif (type == 'png')
+				info=parsepng(file);
+			elsif (type == 'gif')
+			  tmpFile = imageToPNG(file);
+				info=parsepng(tmpFile.path);
+				tmpFile.delete
 			else
 				#Allow for additional formats
 				mtd='parse' + type;
@@ -2635,7 +2634,7 @@ class TCPDF
 			if (!info['trns'].nil? and info['trns'].kind_of?(Array))
 				trns='';
 				0.upto(info['trns'].length) do |i|
-					trns << info['trns'][i] + ' ' + info['trns'][i] + ' ';
+					trns << ("#{info['trns'][i]} " * 2);
 				end
 				out('/Mask [' + trns + ']');
 			end
@@ -2892,12 +2891,27 @@ class TCPDF
 		#Read whole file
 		data='';
 
-		open( @@k_path_cache + File::basename(file),'rb') do |f|
+		open(file,'rb') do |f|
 			data<<f.read();
 		end
-		File.delete( @@k_path_cache + File::basename(file))
 
 		return {'w' => a[0],'h' => a[1],'cs' => colspace,'bpc' => bpc,'f'=>'DCTDecode','data' => data}
+	end
+
+	def imageToPNG(file)
+		return unless Object.const_defined?(:Magick)
+
+		img = Magick::ImageList.new(file)
+		img.format = 'PNG'	 # convert to PNG from gif 
+		img.opacity = 0			 # PNG alpha channel delete
+
+		#use a temporary file....
+		tmpFile = Tempfile.new(['', '_' + File::basename(file) + '.png'], @@k_path_cache);
+		tmpFile.binmode
+		tmpFile.print img.to_blob
+		tmpFile
+	ensure
+		tmpFile.close
 	end
 
 	#
@@ -2961,8 +2975,8 @@ class TCPDF
 				elsif (ct==2)
 					trns = t[[1].unpack('C')[0], t[3].unpack('C')[0], t[5].unpack('C')[0]]
 				else
-					pos=t.include?(0.chr);
-					if (pos!=false)
+					pos=t.index(0.chr);
+					unless (pos.nil?)
 						trns = [pos]
 					end
 				end
@@ -2980,8 +2994,9 @@ class TCPDF
 		if (colspace=='Indexed' and pal.empty?)
 			Error('Missing palette in ' + file);
 		end
-		f.close
 		return {'w' => w, 'h' => h, 'cs' => colspace, 'bpc' => bpc, 'f'=>'FlateDecode', 'parms' => parms, 'pal' => pal, 'trns' => trns, 'data' => data}
+	ensure
+		f.close
 	end
 
 	#
@@ -3510,28 +3525,12 @@ class TCPDF
 				
       else
         #Text
-				if (@href)
+				if (@tdbegin)
+					element.gsub!(/[\t\r\n\f]/, "");
+					@tdtext << element.gsub(/&nbsp;/, " ");
+				elsif (@href)
 					element.gsub!(/[\t\r\n\f]/, "");
 					addHtmlLink(@href, element, fill);
-				elsif (@tdbegin)
-					element.gsub!(/[\t\r\n\f]/, "");
-					element.gsub!(/&nbsp;/, " ");
-					base_page = @page;
-					base_x = @x;
-					base_y = @y;
-
-					MultiCell(@tdwidth, @tdheight, unhtmlentities(element.strip), @tableborder, @tdalign, @tdfill, 1);
-					tr_end = @t_cells[@table_id][@tr_id][@td_id]['j1'] + 1;
-					if @max_td_page[tr_end].nil?  or (@max_td_page[tr_end] < @page)
-						@max_td_page[tr_end] = @page
-						@max_td_y[tr_end] = @y
-					elsif (@max_td_page[tr_end] == @page)
-						@max_td_y[tr_end] = @y if @max_td_y[tr_end].nil? or (@max_td_y[tr_end] < @y) 
-					end
-
-					@page = base_page;
-					@x = base_x + @tdwidth;
-					@y = base_y;
 				elsif (@pre_state == true and element.length > 0)
 					Write(@lasth, unhtmlentities(element), '', fill);
 				elsif (element.strip.length > 0)
@@ -3825,6 +3824,7 @@ class TCPDF
 				@x += 5;	
 
 			when 'table'
+				Ln();
 				if @default_table_columns < @max_table_columns[@table_id]
 					@table_columns = @max_table_columns[@table_id];
 				else
@@ -3921,6 +3921,11 @@ class TCPDF
 				
 			when 'img'
 				if (!attrs['src'].nil?)
+					# Don't generates image inside table tag
+					if (@tdbegin)
+						@tdtext << attrs['src'];
+						return
+					end
 					# Only generates image include a pdf if RMagick is avalaible
 					unless Object.const_defined?(:Magick)
 						Write(@lasth, attrs['src'], '', fill);
@@ -3946,9 +3951,6 @@ class TCPDF
 					rescue => err
 						logger.error "pdf: Image: error: #{err.message}"
 						Write(@lasth, attrs['src'], '', fill);
-						if File.file?( @@k_path_cache + File::basename(file))
-							File.delete( @@k_path_cache + File::basename(file))
-						end
 					end
 				end
 				
@@ -4079,6 +4081,23 @@ class TCPDF
 				Ln();
 
 			when 'td','th'
+				base_page = @page;
+				base_x = @x;
+				base_y = @y;
+
+				MultiCell(@tdwidth, @tdheight, unhtmlentities(@tdtext.strip), @tableborder, @tdalign, @tdfill, 1);
+				tr_end = @t_cells[@table_id][@tr_id][@td_id]['j1'] + 1;
+				if @max_td_page[tr_end].nil?  or (@max_td_page[tr_end] < @page)
+					@max_td_page[tr_end] = @page
+					@max_td_y[tr_end] = @y
+				elsif (@max_td_page[tr_end] == @page)
+					@max_td_y[tr_end] = @y if @max_td_y[tr_end].nil? or (@max_td_y[tr_end] < @y) 
+				end
+
+				@page = base_page;
+				@x = base_x + @tdwidth;
+				@y = base_y;
+				@tdtext = '';
 				@tdbegin = false;
 				@tdwidth = 0;
 				@tdheight = 0;
@@ -4126,7 +4145,6 @@ class TCPDF
 				@l_margin -= 5;
 				@r_margin -= 5;
 				@tableborder=0;
-				Ln();
 				@table_id += 1;
 				
 			when 'strong'
