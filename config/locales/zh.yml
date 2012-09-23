@@ -3,6 +3,8 @@
 zh:
   # Text direction: Left-to-Right (ltr) or Right-to-Left (rtl)
   direction: ltr
+  jquery:
+    locale: "zh-CN"
   date:
     formats:
       # Use the strftime parameters for formats.
@@ -1028,7 +1030,7 @@ zh:
   notice_issue_update_conflict: 当您正在编辑这个问题的时候，它已经被其他人抢先一步更新过了。
   text_issue_conflict_resolution_cancel: 取消我所有的变更并重新刷新显示 %{link} 。
   permission_manage_related_issues: 相关问题管理
-  field_ldap_filter: LDAP 过滤器
+  field_auth_source_ldap_filter: LDAP 过滤器
   label_search_for_watchers: 通过查找方式添加跟踪者
   notice_account_deleted: 您的账号已被永久删除（账号已无法恢复）。
   setting_unsubscribe: 允许用户退订
@@ -1058,3 +1060,10 @@ zh:
   label_fields_permissions: 字段权限
   label_readonly: 只读
   label_required: 必填
+  text_repository_identifier_info: 仅小写字母（a-z）、数字、破折号（-）和下划线（_）可以使用。<br />一旦保存，标识无法修改。
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks

@@ -139,7 +139,7 @@ class IssuesController < ApplicationController
       respond_to do |format|
         format.html {
           render_attachment_warning_if_needed(@issue)
-          flash[:notice] = l(:notice_issue_successful_create, :id => view_context.link_to("##{@issue.id}", issue_path(@issue)))
+          flash[:notice] = l(:notice_issue_successful_create, :id => view_context.link_to("##{@issue.id}", issue_path(@issue), :title => @issue.subject))
           redirect_to(params[:continue] ?  { :action => 'new', :project_id => @issue.project, :issue => {:tracker_id => @issue.tracker, :parent_issue_id => @issue.parent_issue_id}.reject {|k,v| v.nil?} } :
                       { :action => 'show', :id => @issue })
         }
@@ -172,12 +172,7 @@ class IssuesController < ApplicationController
     rescue ActiveRecord::StaleObjectError
       @conflict = true
       if params[:last_journal_id]
-        if params[:last_journal_id].present?
-          last_journal_id = params[:last_journal_id].to_i
-          @conflict_journals = @issue.journals.all(:conditions => ["#{Journal.table_name}.id > ?", last_journal_id])
-        else
-          @conflict_journals = @issue.journals.all
-        end
+        @conflict_journals = @issue.journals_after(params[:last_journal_id]).all
       end
     end
 
@@ -226,6 +221,7 @@ class IssuesController < ApplicationController
     @categories = target_projects.map {|p| p.issue_categories}.reduce(:&)
     if @copy
       @attachments_present = @issues.detect {|i| i.attachments.any?}.present?
+      @subtasks_present = @issues.detect {|i| !i.leaf?}.present?
     end
 
     @safe_attributes = @issues.map(&:safe_attribute_names).reduce(:&)
@@ -239,10 +235,20 @@ class IssuesController < ApplicationController
 
     unsaved_issue_ids = []
     moved_issues = []
+
+    if @copy && params[:copy_subtasks].present?
+      # Descendant issues will be copied with the parent task
+      # Don't copy them twice
+      @issues.reject! {|issue| @issues.detect {|other| issue.is_descendant_of?(other)}}
+    end
+
     @issues.each do |issue|
       issue.reload
       if @copy
-        issue = issue.copy({}, :attachments => params[:copy_attachments].present?)
+        issue = issue.copy({},
+          :attachments => params[:copy_attachments].present?,
+          :subtasks => params[:copy_subtasks].present?
+        )
       end
       journal = issue.init_journal(User.current, params[:notes])
       issue.safe_attributes = attributes
@@ -379,7 +385,8 @@ private
         begin
           @copy_from = Issue.visible.find(params[:copy_from])
           @copy_attachments = params[:copy_attachments].present? || request.get?
-          @issue.copy_from(@copy_from, :attachments => @copy_attachments)
+          @copy_subtasks = params[:copy_subtasks].present? || request.get?
+          @issue.copy_from(@copy_from, :attachments => @copy_attachments, :subtasks => @copy_subtasks)
         rescue ActiveRecord::RecordNotFound
           render_404
           return

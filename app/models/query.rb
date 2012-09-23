@@ -57,10 +57,7 @@ class QueryCustomFieldColumn < QueryColumn
   def initialize(custom_field)
     self.name = "cf_#{custom_field.id}".to_sym
     self.sortable = custom_field.order_statement || false
-    if %w(list date bool int).include?(custom_field.field_format) && !custom_field.multiple?
-      self.groupable = custom_field.order_statement
-    end
-    self.groupable ||= false
+    self.groupable = custom_field.group_statement || false
     @cf = custom_field
   end
 
@@ -144,7 +141,7 @@ class Query < ActiveRecord::Base
     QueryColumn.new(:assigned_to, :sortable => lambda {User.fields_for_order_statement}, :groupable => true),
     QueryColumn.new(:updated_on, :sortable => "#{Issue.table_name}.updated_on", :default_order => 'desc'),
     QueryColumn.new(:category, :sortable => "#{IssueCategory.table_name}.name", :groupable => true),
-    QueryColumn.new(:fixed_version, :sortable => ["#{Version.table_name}.effective_date", "#{Version.table_name}.name"], :default_order => 'desc', :groupable => true),
+    QueryColumn.new(:fixed_version, :sortable => lambda {Version.fields_for_order_statement}, :groupable => true),
     QueryColumn.new(:start_date, :sortable => "#{Issue.table_name}.start_date"),
     QueryColumn.new(:due_date, :sortable => "#{Issue.table_name}.due_date"),
     QueryColumn.new(:estimated_hours, :sortable => "#{Issue.table_name}.estimated_hours"),
@@ -215,6 +212,11 @@ class Query < ActiveRecord::Base
 
   def trackers
     @trackers ||= project.nil? ? Tracker.find(:all, :order => 'position') : project.rolled_up_trackers
+  end
+
+  # Returns a hash of localized labels for all filter operators
+  def self.operators_labels
+    operators.inject({}) {|h, operator| h[operator.first] = l(operator.last); h}
   end
 
   def available_filters
@@ -303,6 +305,8 @@ class Query < ActiveRecord::Base
       add_custom_fields_filters(IssueCustomField.find(:all, :conditions => {:is_filter => true, :is_for_all => true}))
     end
 
+    add_associations_custom_fields_filters :project, :author, :assigned_to, :fixed_version
+
     if User.current.allowed_to?(:set_issues_private, nil, :global => true) ||
       User.current.allowed_to?(:set_own_issues_private, nil, :global => true)
       @available_filters["is_private"] = { :type => :list, :order => 15, :values => [[l(:general_text_yes), "1"], [l(:general_text_no), "0"]] }
@@ -312,7 +316,20 @@ class Query < ActiveRecord::Base
       @available_filters.delete field
     }
 
+    @available_filters.each do |field, options|
+      options[:name] ||= l("field_#{field}".gsub(/_id$/, ''))
+    end
+
     @available_filters
+  end
+
+	# Returns a representation of the available filters for JSON serialization
+  def available_filters_as_json
+    json = {}
+    available_filters.each do |field, options|
+      json[field] = options.slice(:type, :name, :values).stringify_keys
+    end
+    json
   end
 
   def add_filter(field, operator, values)
@@ -557,7 +574,7 @@ class Query < ActiveRecord::Base
         end
       end
 
-      if field =~ /^cf_(\d+)$/
+      if field =~ /cf_(\d+)$/
         # custom field
         filters_clauses << sql_for_custom_field(field, operator, v, $1)
       elsif respond_to?("sql_for_#{field}_field")
@@ -607,13 +624,11 @@ class Query < ActiveRecord::Base
   def issues(options={})
     order_option = [group_by_sort_order, options[:order]].reject {|s| s.blank?}.join(',')
     order_option = nil if order_option.blank?
-    
-    joins = (order_option && order_option.include?('authors')) ? "LEFT OUTER JOIN users authors ON authors.id = #{Issue.table_name}.author_id" : nil
 
     issues = Issue.visible.scoped(:conditions => options[:conditions]).find :all, :include => ([:status, :project] + (options[:include] || [])).uniq,
                      :conditions => statement,
                      :order => order_option,
-                     :joins => joins,
+                     :joins => joins_for_order_statement(order_option),
                      :limit  => options[:limit],
                      :offset => options[:offset]
 
@@ -629,13 +644,11 @@ class Query < ActiveRecord::Base
   def issue_ids(options={})
     order_option = [group_by_sort_order, options[:order]].reject {|s| s.blank?}.join(',')
     order_option = nil if order_option.blank?
-    
-    joins = (order_option && order_option.include?('authors')) ? "LEFT OUTER JOIN users authors ON authors.id = #{Issue.table_name}.author_id" : nil
 
     Issue.visible.scoped(:conditions => options[:conditions]).scoped(:include => ([:status, :project] + (options[:include] || [])).uniq,
                      :conditions => statement,
                      :order => order_option,
-                     :joins => joins,
+                     :joins => joins_for_order_statement(order_option),
                      :limit  => options[:limit],
                      :offset => options[:offset]).find_ids
   rescue ::ActiveRecord::StatementInvalid => e
@@ -722,7 +735,8 @@ class Query < ActiveRecord::Base
     db_table = CustomValue.table_name
     db_field = 'value'
     filter = @available_filters[field]
-    if filter && filter[:format] == 'user'
+    return nil unless filter
+    if filter[:format] == 'user'
       if value.delete('me')
         value.push User.current.id.to_s
       end
@@ -733,7 +747,15 @@ class Query < ActiveRecord::Base
       operator = '='
       not_in = 'NOT'
     end
-    "#{Issue.table_name}.id #{not_in} IN (SELECT #{Issue.table_name}.id FROM #{Issue.table_name} LEFT OUTER JOIN #{db_table} ON #{db_table}.customized_type='Issue' AND #{db_table}.customized_id=#{Issue.table_name}.id AND #{db_table}.custom_field_id=#{custom_field_id} WHERE " +
+    customized_key = "id"
+    customized_class = Issue
+    if field =~ /^(.+)\.cf_/
+      assoc = $1
+      customized_key = "#{assoc}_id"
+      customized_class = Issue.reflect_on_association(assoc.to_sym).klass.base_class rescue nil
+      raise "Unknown Issue association #{assoc}" unless customized_class
+    end
+    "#{Issue.table_name}.#{customized_key} #{not_in} IN (SELECT #{customized_class.table_name}.id FROM #{customized_class.table_name} LEFT OUTER JOIN #{db_table} ON #{db_table}.customized_type='#{customized_class}' AND #{db_table}.customized_id=#{customized_class.table_name}.id AND #{db_table}.custom_field_id=#{custom_field_id} WHERE " +
       sql_for_field(field, operator, value, db_table, db_field, true) + ')'
   end
 
@@ -842,7 +864,8 @@ class Query < ActiveRecord::Base
     return sql
   end
 
-  def add_custom_fields_filters(custom_fields)
+  def add_custom_fields_filters(custom_fields, assoc=nil)
+    return unless custom_fields.present?
     @available_filters ||= {}
 
     custom_fields.select(&:is_filter?).each do |field|
@@ -869,7 +892,25 @@ class Query < ActiveRecord::Base
       else
         options = { :type => :string, :order => 20 }
       end
-      @available_filters["cf_#{field.id}"] = options.merge({ :name => field.name, :format => field.field_format })
+      filter_id = "cf_#{field.id}"
+      filter_name = field.name
+      if assoc.present?
+        filter_id = "#{assoc}.#{filter_id}"
+        filter_name = l("label_attribute_of_#{assoc}", :name => filter_name)
+      end
+      @available_filters[filter_id] = options.merge({ :name => filter_name, :format => field.field_format })
+    end
+  end
+
+  def add_associations_custom_fields_filters(*associations)
+    fields_by_class = CustomField.where(:is_filter => true).group_by(&:class)
+    associations.each do |assoc|
+      association_klass = Issue.reflect_on_association(assoc).klass
+      fields_by_class.each do |field_class, fields|
+        if field_class.customized_class <= association_klass
+          add_custom_fields_filters(fields, assoc)
+        end
+      end
     end
   end
 
@@ -897,5 +938,25 @@ class Query < ActiveRecord::Base
   # Returns a SQL clause for a date or datetime field using relative dates.
   def relative_date_clause(table, field, days_from, days_to)
     date_clause(table, field, (days_from ? Date.today + days_from : nil), (days_to ? Date.today + days_to : nil))
+  end
+
+  # Additional joins required for the given sort options
+  def joins_for_order_statement(order_options)
+    joins = []
+
+    if order_options
+      if order_options.include?('authors')
+        joins << "LEFT OUTER JOIN #{User.table_name} authors ON authors.id = #{Issue.table_name}.author_id"
+      end
+      order_options.scan(/cf_\d+/).uniq.each do |name|
+        column = available_columns.detect {|c| c.name.to_s == name}
+        join = column && column.custom_field.join_for_order_statement
+        if join
+          joins << join
+        end
+      end
+    end
+
+    joins.any? ? joins.join(' ') : nil
   end
 end

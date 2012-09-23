@@ -1,5 +1,4 @@
-<%= breadcrumb link_to(l(:label_board_plural), project_boards_path(@project)),
-               link_to(h(@board.name), project_board_path(@project, @board)) %>
+<%= board_breadcrumb(@message) %>
 
 <div class="contextual">
     <%= watcher_tag(@topic, User.current) %>
@@ -82,10 +81,6 @@
 <% end %>
 <div id="preview" class="wiki"></div>
 </div>
-<% end %>
-
-<% content_for :header_tags do %>
-  <%= stylesheet_link_tag 'scm' %>
 <% end %>
 
 <% html_title @topic.subject %>
