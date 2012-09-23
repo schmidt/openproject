@@ -1,9 +1,9 @@
-source 'http://rubygems.org'
+source 'https://rubygems.org'
 
-gem 'rails', '3.1.8'
+gem 'rails', '3.2.8'
 
 gem "coderay", "~> 0.9.7"
-gem "rubytree", "~> 0.5.2", :require => 'tree'
+gem "rubytree", "~> 0.8.3"
 gem "rdoc", ">= 2.4.2"
 # Needed only on RUBY_VERSION = 1.8, ruby 1.9+ compatible interpreters should bring their csv
 gem "fastercsv", "~> 1.5.0", :platforms => [:ruby_18, :jruby, :mingw_18]
@@ -19,15 +19,12 @@ gem 'rails_autolink'
 gem 'awesome_nested_set'
 
 group :assets do
-  gem 'sass-rails',   '~> 3.1.5'
-  gem 'coffee-rails', '~> 3.1.1'
-
-  # See https://github.com/sstephenson/execjs#readme for more supported runtimes
-  # gem 'therubyracer'
-
+  gem 'sass-rails',   '~> 3.2.3'
+  gem 'coffee-rails', '~> 3.2.1'
   gem 'uglifier', '>= 1.0.3'
 end
 
+gem "prototype-rails"
 gem 'jquery-rails'
 
 group :test do
@@ -40,9 +37,6 @@ group :test do
 
   gem 'ruby-debug', :platforms => [:mri_18, :mingw_18]
   gem 'debugger',   :platforms => [:mri_19, :mingw_19]
-
-  # remove in rails 3.2
-  gem 'turn', '~> 0.8.3', :require => false
 end
 
 group :openid do
@@ -53,6 +47,7 @@ group :development do
   gem 'rails-footnotes', '>= 3.7.5.rc4'
   gem 'bullet'
   gem "letter_opener"
+  gem 'rails-dev-tweaks', '~> 0.6.1'
 end
 
 group :rmagick do
