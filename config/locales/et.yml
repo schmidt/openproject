@@ -342,7 +342,7 @@ et:
   field_cvs_module: "Moodul"
   field_repository_is_default: "Peamine hoidla"
   field_multiple: "Korraga mitu väärtust"
-  field_ldap_filter: "LDAP filter"
+  field_auth_source_ldap_filter: "LDAP filter"
 
   setting_app_title: "Veebilehe pealkiri"
   setting_app_subtitle: "Veebilehe alampealkiri"
@@ -1069,3 +1069,10 @@ et:
   label_fields_permissions: Fields permissions
   label_readonly: Read-only
   label_required: Required
+  text_repository_identifier_info: "Lubatud on ainult väikesed tähed (a-z), numbrid ja kriipsud.<br />Peale salvestamist ei saa tunnust enam muuta."
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks

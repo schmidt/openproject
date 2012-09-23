@@ -295,7 +295,7 @@ sub set_val {
 Apache2::Module::add(__PACKAGE__, \@directives);
 
 
-my %read_only_methods = map { $_ => 1 } qw/GET PROPFIND REPORT OPTIONS/;
+my %read_only_methods = map { $_ => 1 } qw/GET HEAD PROPFIND REPORT OPTIONS/;
 
 sub request_is_read_only {
   my ($r) = @_;
@@ -342,7 +342,7 @@ sub authen_handler {
       return OK;
   } else {
       $r->note_auth_failure();
-      return AUTH_REQUIRED;
+      return DECLINED;
   }
 }
 

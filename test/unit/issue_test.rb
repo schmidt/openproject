@@ -51,6 +51,7 @@ class IssueTest < ActiveSupport::TestCase
                       :subject => 'test_create')
     assert issue.save
     assert issue.description.nil?
+    assert_nil issue.estimated_hours
   end
 
   def test_create_with_required_custom_field
@@ -633,6 +634,41 @@ class IssueTest < ActiveSupport::TestCase
     assert_equal orig.status, issue.status
   end
 
+  def test_copy_should_copy_subtasks
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+
+    copy = issue.reload.copy
+    copy.author = User.find(7)
+    assert_difference 'Issue.count', 1+issue.descendants.count do
+      assert copy.save
+    end
+    copy.reload
+    assert_equal %w(Child1 Child2), copy.children.map(&:subject).sort
+    child_copy = copy.children.detect {|c| c.subject == 'Child1'}
+    assert_equal %w(Child11), child_copy.children.map(&:subject).sort
+    assert_equal copy.author, child_copy.author
+  end
+
+  def test_copy_should_copy_subtasks_to_target_project
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+
+    copy = issue.copy(:project_id => 3)
+    assert_difference 'Issue.count', 1+issue.descendants.count do
+      assert copy.save
+    end
+    assert_equal [3], copy.reload.descendants.map(&:project_id).uniq
+  end
+
+  def test_copy_should_not_copy_subtasks_twice_when_saving_twice
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+
+    copy = issue.reload.copy
+    assert_difference 'Issue.count', 1+issue.descendants.count do
+      assert copy.save
+      assert copy.save
+    end
+  end
+
   def test_should_not_call_after_project_change_on_creation
     issue = Issue.new(:project_id => 1, :tracker_id => 1, :status_id => 1, :subject => 'Test', :author_id => 1)
     issue.expects(:after_project_change).never
@@ -757,6 +793,26 @@ class IssueTest < ActiveSupport::TestCase
     issue = Issue.find(12)
     assert_equal 'locked', issue.fixed_version.status
     issue.status_id = 1
+    assert issue.save
+  end
+
+  def test_should_not_be_able_to_keep_unshared_version_when_changing_project
+    issue = Issue.find(2)
+    assert_equal 2, issue.fixed_version_id
+    issue.project_id = 3
+    assert_nil issue.fixed_version_id
+    issue.fixed_version_id = 2
+    assert !issue.save
+    assert_include 'Target version is not included in the list', issue.errors.full_messages
+  end
+
+  def test_should_keep_shared_version_when_changing_project
+    Version.find(2).update_attribute :sharing, 'tree'
+ 
+    issue = Issue.find(2)
+    assert_equal 2, issue.fixed_version_id
+    issue.project_id = 3
+    assert_equal 2, issue.fixed_version_id
     assert issue.save
   end
 
@@ -1439,10 +1495,9 @@ class IssueTest < ActiveSupport::TestCase
     assert_equal 2, groups.inject(0) {|sum, group| sum + group['total'].to_i}
   end
 
-  def test_recently_updated_with_limit_scopes
+  def test_recently_updated_scope
     #should return the last updated issue
-    assert_equal 1, Issue.recently_updated.with_limit(1).length
-    assert_equal Issue.find(:first, :order => "updated_on DESC"), Issue.recently_updated.with_limit(1).first
+    assert_equal Issue.reorder("updated_on DESC").first, Issue.recently_updated.limit(1).first
   end
 
   def test_on_active_projects_scope
@@ -1509,5 +1564,14 @@ class IssueTest < ActiveSupport::TestCase
 
   def test_last_journal_id_without_journals_should_return_nil
     assert_nil Issue.find(3).last_journal_id
+  end
+
+  def test_journals_after_should_return_journals_with_greater_id
+    assert_equal [Journal.find(2)], Issue.find(1).journals_after('1')
+    assert_equal [], Issue.find(1).journals_after('2')
+  end
+
+  def test_journals_after_with_blank_arg_should_return_all_journals
+    assert_equal [Journal.find(1), Journal.find(2)], Issue.find(1).journals_after('')
   end
 end

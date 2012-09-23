@@ -70,7 +70,6 @@ class Issue < ActiveRecord::Base
   }
 
   scope :recently_updated, :order => "#{Issue.table_name}.updated_on DESC"
-  scope :with_limit, lambda { |limit| { :limit => limit} }
   scope :on_active_project, :include => [:status, :project, :tracker],
                             :conditions => ["#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"]
 
@@ -78,6 +77,8 @@ class Issue < ActiveRecord::Base
   before_save :close_duplicates, :update_done_ratio_from_issue_status, :force_updated_on_change
   after_save {|issue| issue.send :after_project_change if !issue.id_changed? && issue.project_id_changed?} 
   after_save :reschedule_following_issues, :update_nested_set_attributes, :update_parent_attributes, :create_journal
+  # Should be after_create but would be called before previous after_save callbacks
+  after_save :after_create_from_copy
   after_destroy :update_parent_attributes
 
   # Returns a SQL conditions string used to find all issues visible by the specified user
@@ -148,6 +149,7 @@ class Issue < ActiveRecord::Base
 
   def reload(*args)
     @workflow_rule_by_attribute = nil
+    @assignable_versions = nil
     super
   end
 
@@ -169,6 +171,7 @@ class Issue < ActiveRecord::Base
       end
     end
     @copied_from = issue
+    @copy_options = options
     self
   end
 
@@ -252,6 +255,8 @@ class Issue < ActiveRecord::Base
     write_attribute(:project_id, project ? project.id : nil)
     association_instance_set('project', project)
     if project_was && project && project_was != project
+      @assignable_versions = nil
+
       unless keep_tracker || project.trackers.include?(tracker)
         self.tracker = project.trackers.first
       end
@@ -579,8 +584,17 @@ class Issue < ActiveRecord::Base
     if new_record?
       nil
     else
-      journals.first(:order => "#{Journal.table_name}.id DESC").try(:id)
+      journals.maximum(:id)
     end
+  end
+
+  # Returns a scope for journals that have an id greater than journal_id
+  def journals_after(journal_id)
+    scope = journals.reorder("#{Journal.table_name}.id ASC")
+    if journal_id.present?
+      scope = scope.where("#{Journal.table_name}.id > ?", journal_id.to_i)
+    end
+    scope
   end
 
   # Return true if the issue is closed, otherwise false
@@ -639,7 +653,21 @@ class Issue < ActiveRecord::Base
 
   # Versions that the issue can be assigned to
   def assignable_versions
-    @assignable_versions ||= (project.shared_versions.open + [Version.find_by_id(fixed_version_id_was)]).compact.uniq.sort
+    return @assignable_versions if @assignable_versions
+
+    versions = project.shared_versions.open.all
+    if fixed_version
+      if fixed_version_id_changed?
+        # nothing to do
+      elsif project_id_changed?
+        if project.shared_versions.include?(fixed_version)
+          versions << fixed_version
+        end
+      else
+        versions << fixed_version
+      end
+    end
+    @assignable_versions = versions.uniq.sort
   end
 
   # Returns true if this issue is blocked by another issue that is still open
@@ -819,7 +847,7 @@ class Issue < ActiveRecord::Base
 
   # Returns a string of css classes that apply to the issue
   def css_classes
-    s = "issue status-#{status.position} priority-#{priority.position}"
+    s = "issue status-#{status_id} priority-#{priority_id}"
     s << ' closed' if closed?
     s << ' overdue' if overdue?
     s << ' child' if child?
@@ -972,6 +1000,30 @@ class Issue < ActiveRecord::Base
       unless child.save
         raise ActiveRecord::Rollback
       end
+    end
+  end
+
+  # Copies subtasks from the copied issue
+  def after_create_from_copy
+    return unless copy?
+
+    unless @copied_from.leaf? || @copy_options[:subtasks] == false || @subtasks_copied
+      @copied_from.children.each do |child|
+        unless child.visible?
+          # Do not copy subtasks that are not visible to avoid potential disclosure of private data
+          logger.error "Subtask ##{child.id} was not copied during ##{@copied_from.id} copy because it is not visible to the current user" if logger
+          next
+        end
+        copy = Issue.new.copy_from(child, @copy_options)
+        copy.author = author
+        copy.project = project
+        copy.parent_issue_id = id
+        # Children subtasks are copied recursively
+        unless copy.save
+          logger.error "Could not copy subtask ##{child.id} while copying ##{@copied_from.id} to ##{id} due to validation errors: #{copy.errors.full_messages.join(', ')}" if logger
+        end
+      end
+      @subtasks_copied = true
     end
   end
 
