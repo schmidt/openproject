@@ -1056,7 +1056,7 @@ ja:
   notice_issue_update_conflict: このチケットを編集中に他のユーザーが更新しました。
   text_issue_conflict_resolution_cancel: 自分の編集内容を破棄し %{link} を再表示
   permission_manage_related_issues: 関連するチケットの管理
-  field_ldap_filter: LDAPフィルタ
+  field_auth_source_ldap_filter: LDAPフィルタ
   label_search_for_watchers: ウォッチャーを検索して追加
   notice_account_deleted: アカウントが削除されました。
   setting_unsubscribe: ユーザーによるアカウント削除を許可
@@ -1086,3 +1086,10 @@ ja:
   label_fields_permissions: フィールドに対する権限
   label_readonly: 読み取り専用
   label_required: 必須
+  text_repository_identifier_info: アルファベット小文字(a-z)・数字・ハイフン・アンダースコアが使えます。<br />識別子は後で変更することはできません。
+  field_board_parent: Parent forum
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
+  label_copy_subtasks: Copy subtasks

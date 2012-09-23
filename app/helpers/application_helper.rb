@@ -43,13 +43,6 @@ module ApplicationHelper
     link_to(name, options, html_options, *parameters_for_method_reference) if authorize_for(options[:controller] || params[:controller], options[:action])
   end
 
-  # Display a link to remote if user is authorized
-  def link_to_remote_if_authorized(name, options = {}, html_options = nil)
-    ActiveSupport::Deprecation.warn "ApplicationHelper#link_to_remote_if_authorized is deprecated and will be removed in Redmine 2.2."
-    url = options[:url] || {}
-    link_to_remote(name, options, html_options) if authorize_for(url[:controller] || params[:controller], url[:action])
-  end
-
   # Displays a link to user's account page if active
   def link_to_user(user, options={})
     if user.is_a?(User)
@@ -161,8 +154,8 @@ module ApplicationHelper
   end
 
   def toggle_link(name, id, options={})
-    onclick = "Element.toggle('#{id}'); "
-    onclick << (options[:focus] ? "Form.Element.focus('#{options[:focus]}'); " : "this.blur(); ")
+    onclick = "$('##{id}').toggle(); "
+    onclick << (options[:focus] ? "$('##{options[:focus]}').focus(); " : "this.blur(); ")
     onclick << "return false;"
     link_to(name, "#", :onclick => onclick)
   end
@@ -173,11 +166,6 @@ module ApplicationHelper
         :type => "image", :src => image_path(name),
         :onclick => (html_options[:onclick] ? "#{html_options[:onclick]}; " : "") + "#{function};"
         }))
-  end
-
-  def prompt_to_remote(name, text, param, url, html_options = {})
-    html_options[:onclick] = "promptToRemote('#{text}', '#{param}', '#{url_for(url)}'); return false;"
-    link_to name, {}, html_options
   end
 
   def format_activity_title(text)
@@ -205,6 +193,39 @@ module ApplicationHelper
     if date
       l((date < Date.today ? :label_roadmap_overdue : :label_roadmap_due_in), distance_of_date_in_words(Date.today, date))
     end
+  end
+
+  # Renders a tree of projects as a nested set of unordered lists
+  # The given collection may be a subset of the whole project tree
+  # (eg. some intermediate nodes are private and can not be seen)
+  def render_project_nested_lists(projects)
+    s = ''
+    if projects.any?
+      ancestors = []
+      original_project = @project
+      projects.sort_by(&:lft).each do |project|
+        # set the project environment to please macros.
+        @project = project
+        if (ancestors.empty? || project.is_descendant_of?(ancestors.last))
+          s << "<ul class='projects #{ ancestors.empty? ? 'root' : nil}'>\n"
+        else
+          ancestors.pop
+          s << "</li>"
+          while (ancestors.any? && !project.is_descendant_of?(ancestors.last))
+            ancestors.pop
+            s << "</ul></li>\n"
+          end
+        end
+        classes = (ancestors.empty? ? 'root' : 'child')
+        s << "<li class='#{classes}'><div class='#{classes}'>"
+        s << h(block_given? ? yield(project) : project.name)
+        s << "</div>\n"
+        ancestors << project
+      end
+      s << ("</li></ul>\n" * ancestors.size)
+      @project = original_project
+    end
+    s.html_safe
   end
 
   def render_page_hierarchy(pages, node=nil, options={})
@@ -281,30 +302,6 @@ module ApplicationHelper
     Project.project_tree(projects, &block)
   end
 
-  def project_nested_ul(projects, &block)
-    s = ''
-    if projects.any?
-      ancestors = []
-      projects.sort_by(&:lft).each do |project|
-        if (ancestors.empty? || project.is_descendant_of?(ancestors.last))
-          s << "<ul>\n"
-        else
-          ancestors.pop
-          s << "</li>"
-          while (ancestors.any? && !project.is_descendant_of?(ancestors.last))
-            ancestors.pop
-            s << "</ul></li>\n"
-          end
-        end
-        s << "<li>"
-        s << yield(project).to_s
-        ancestors << project
-      end
-      s << ("</li></ul>\n" * ancestors.size)
-    end
-    s.html_safe
-  end
-
   def principals_check_box_tags(name, principals)
     s = ''
     principals.sort.each do |principal|
@@ -317,7 +314,7 @@ module ApplicationHelper
   def principals_options_for_select(collection, selected=nil)
     s = ''
     if collection.include?(User.current)
-      s << content_tag('option', "<< #{l(:label_me)} >>".html_safe, :value => User.current.id)
+      s << content_tag('option', "<< #{l(:label_me)} >>", :value => User.current.id)
     end
     groups = ''
     collection.sort.each do |element|
@@ -530,6 +527,8 @@ module ApplicationHelper
     project = options[:project] || @project || (obj && obj.respond_to?(:project) ? obj.project : nil)
     only_path = options.delete(:only_path) == false ? false : true
 
+    text = text.dup
+    macros = catch_macros(text)
     text = Redmine::WikiFormatting.to_html(Setting.text_formatting, text, :object => obj, :attribute => attr)
 
     @parsed_headings = []
@@ -537,8 +536,8 @@ module ApplicationHelper
     @current_section = 0 if options[:edit_section_links]
 
     parse_sections(text, project, obj, attr, only_path, options)
-    text = parse_non_pre_blocks(text) do |text|
-      [:parse_inline_attachments, :parse_wiki_links, :parse_redmine_links, :parse_macros].each do |method_name|
+    text = parse_non_pre_blocks(text, obj, macros) do |text|
+      [:parse_inline_attachments, :parse_wiki_links, :parse_redmine_links].each do |method_name|
         send method_name, text, project, obj, attr, only_path, options
       end
     end
@@ -551,7 +550,7 @@ module ApplicationHelper
     text.html_safe
   end
 
-  def parse_non_pre_blocks(text)
+  def parse_non_pre_blocks(text, obj, macros)
     s = StringScanner.new(text)
     tags = []
     parsed = ''
@@ -560,6 +559,9 @@ module ApplicationHelper
       text, full_tag, closing, tag = s[1], s[2], s[3], s[4]
       if tags.empty?
         yield text
+        inject_macros(text, obj, macros) if macros.any?
+      else
+        inject_macros(text, obj, macros, false) if macros.any?
       end
       parsed << text
       if tag
@@ -715,7 +717,7 @@ module ApplicationHelper
           oid = identifier.to_i
           case prefix
           when nil
-            if issue = Issue.visible.find_by_id(oid, :include => :status)
+            if oid.to_s == identifier && issue = Issue.visible.find_by_id(oid, :include => :status)
               anchor = comment_id ? "note-#{comment_id}" : nil
               link = link_to("##{oid}", {:only_path => only_path, :controller => 'issues', :action => 'show', :id => oid, :anchor => anchor},
                                         :class => issue.css_classes,
@@ -820,7 +822,7 @@ module ApplicationHelper
     end
   end
 
-  HEADING_RE = /(<h(1|2|3|4)( [^>]+)?>(.+?)<\/h(1|2|3|4)>)/i unless const_defined?(:HEADING_RE)
+  HEADING_RE = /(<h(\d)( [^>]+)?>(.+?)<\/h(\d)>)/i unless const_defined?(:HEADING_RE)
 
   def parse_sections(text, project, obj, attr, only_path, options)
     return unless options[:edit_section_links]
@@ -859,29 +861,55 @@ module ApplicationHelper
     end
   end
 
-  MACROS_RE = /
+  MACROS_RE = /(
                 (!)?                        # escaping
                 (
                 \{\{                        # opening tag
                 ([\w]+)                     # macro name
-                (\(([^\}]*)\))?             # optional arguments
+                (\(([^\n\r]*?)\))?          # optional arguments
+                ([\n\r].*?[\n\r])?          # optional block of text
                 \}\}                        # closing tag
                 )
-              /x unless const_defined?(:MACROS_RE)
+               )/mx unless const_defined?(:MACROS_RE)
 
-  # Macros substitution
-  def parse_macros(text, project, obj, attr, only_path, options)
+  MACRO_SUB_RE = /(
+                  \{\{
+                  macro\((\d+)\)
+                  \}\}
+                  )/x unless const_defined?(:MACRO_SUB_RE)
+
+  # Extracts macros from text
+  def catch_macros(text)
+    macros = {}
     text.gsub!(MACROS_RE) do
-      esc, all, macro = $1, $2, $3.downcase
-      args = ($5 || '').split(',').each(&:strip)
-      if esc.nil?
-        begin
-          exec_macro(macro, obj, args)
-        rescue => e
-          "<div class=\"flash error\">Error executing the <strong>#{macro}</strong> macro (#{e})</div>"
-        end || all
+      all, macro = $1, $4.downcase
+      if macro_exists?(macro) || all =~ MACRO_SUB_RE
+        index = macros.size
+        macros[index] = all
+        "{{macro(#{index})}}"
       else
         all
+      end
+    end
+    macros
+  end
+
+  # Executes and replaces macros in text
+  def inject_macros(text, obj, macros, execute=true)
+    text.gsub!(MACRO_SUB_RE) do
+      all, index = $1, $2.to_i
+      orig = macros.delete(index)
+      if execute && orig && orig =~ MACROS_RE
+        esc, all, macro, args, block = $2, $3, $4.downcase, $6.to_s, $7.try(:strip)
+        if esc.nil?
+          h(exec_macro(macro, obj, args, block) || all)
+        else
+          h(all)
+        end
+      elsif orig
+        h(orig)
+      else
+        h(all)
       end
     end
   end
@@ -891,6 +919,8 @@ module ApplicationHelper
   # Renders the TOC with given headings
   def replace_toc(text, headings)
     text.gsub!(TOC_RE) do
+      # Keep only the 4 first levels
+      headings = headings.select{|level, anchor, item| level <= 4}
       if headings.empty?
         ''
       else
@@ -995,10 +1025,21 @@ module ApplicationHelper
       }.merge(options)
   end
 
+  def link_to_function(name, function, html_options={})
+    content_tag(:a, name, {:href => '#', :onclick => "#{function}; return false;"}.merge(html_options))
+  end
+
+  def back_url
+    url = params[:back_url]
+    if url.nil? && referer = request.env['HTTP_REFERER']
+      url = CGI.unescape(referer.to_s)
+    end
+    url
+  end
+
   def back_url_hidden_field_tag
-    back_url = params[:back_url] || request.env['HTTP_REFERER']
-    back_url = CGI.unescape(back_url.to_s)
-    hidden_field_tag('back_url', CGI.escape(back_url), :id => nil) unless back_url.blank?
+    url = back_url
+    hidden_field_tag('back_url', url, :id => nil) unless url.blank?
   end
 
   def check_all_links(form_name)
@@ -1042,35 +1083,28 @@ module ApplicationHelper
       end
       @context_menu_included = true
     end
-    javascript_tag "new ContextMenu('#{ url_for(url) }')"
+    javascript_tag "contextMenuInit('#{ url_for(url) }')"
   end
 
   def calendar_for(field_id)
     include_calendar_headers_tags
-    image_tag("calendar.png", {:id => "#{field_id}_trigger",:class => "calendar-trigger"}) +
-    javascript_tag("Calendar.setup({inputField : '#{field_id}', ifFormat : '%Y-%m-%d', button : '#{field_id}_trigger' });")
+    javascript_tag("$(function() { $('##{field_id}').datepicker(datepickerOptions); });")
   end
 
   def include_calendar_headers_tags
     unless @calendar_headers_tags_included
       @calendar_headers_tags_included = true
       content_for :header_tags do
-        start_of_week = case Setting.start_of_week.to_i
-        when 1
-          'Calendar._FD = 1;' # Monday
-        when 7
-          'Calendar._FD = 0;' # Sunday
-        when 6
-          'Calendar._FD = 6;' # Saturday
-        else
-          '' # use language
+        tags = javascript_tag(
+                   "var datepickerOptions={dateFormat: 'yy-mm-dd', " +
+                     "showOn: 'button', buttonImageOnly: true, buttonImage: '" + 
+                     path_to_image('/images/calendar.png') +
+                     "', showButtonPanel: true};")
+        jquery_locale = l('jquery.locale', :default => current_language.to_s)
+        unless jquery_locale == 'en'
+          tags << javascript_include_tag("i18n/jquery.ui.datepicker-#{jquery_locale}.js") 
         end
-
-        javascript_include_tag('calendar/calendar') +
-        javascript_include_tag("calendar/lang/calendar-#{current_language.to_s.downcase}.js") +
-        javascript_tag(start_of_week) +
-        javascript_include_tag('calendar/calendar-setup') +
-        stylesheet_link_tag('calendar')
+        tags
       end
     end
   end
@@ -1168,14 +1202,19 @@ module ApplicationHelper
   end
 
   def sanitize_anchor_name(anchor)
-    anchor.gsub(%r{[^\w\s\-]}, '').gsub(%r{\s+(\-+\s*)?}, '-')
+    if ''.respond_to?(:encoding) || RUBY_PLATFORM == 'java'
+      anchor.gsub(%r{[^\p{Word}\s\-]}, '').gsub(%r{\s+(\-+\s*)?}, '-')
+    else
+      # TODO: remove when ruby1.8 is no longer supported
+      anchor.gsub(%r{[^\w\s\-]}, '').gsub(%r{\s+(\-+\s*)?}, '-')
+    end
   end
 
   # Returns the javascript tags that are included in the html layout head
   def javascript_heads
-    tags = javascript_include_tag('prototype', 'effects', 'dragdrop', 'controls', 'rails', 'application')
+    tags = javascript_include_tag('jquery-1.7.2-ui-1.8.21-ujs-2.0.3', 'application')
     unless User.current.pref.warn_on_leaving_unsaved == '0'
-      tags << "\n".html_safe + javascript_tag("Event.observe(window, 'load', function(){ new WarnLeavingUnsaved('#{escape_javascript( l(:text_warn_on_leaving_unsaved) )}'); });")
+      tags << "\n".html_safe + javascript_tag("$(window).load(function(){ warnLeavingUnsaved('#{escape_javascript l(:text_warn_on_leaving_unsaved)}'); });")
     end
     tags
   end

@@ -182,6 +182,28 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert !issue.description.match(/^searchable field:/i)
   end
 
+  def test_add_issue_with_version_custom_fields
+    field = IssueCustomField.create!(:name => 'Affected version', :field_format => 'version', :is_for_all => true, :tracker_ids => [1,2,3])
+
+    issue = submit_email('ticket_with_custom_fields.eml', :issue => {:project => 'ecookbook'}) do |email|
+      email << "Affected version: 1.0\n"
+    end
+    assert issue.is_a?(Issue)
+    assert !issue.new_record?
+    issue.reload
+    assert_equal '2', issue.custom_field_value(field)
+  end
+
+  def test_add_issue_should_match_assignee_on_display_name
+    user = User.generate!(:firstname => 'Foo Bar', :lastname => 'Foo Baz')
+    User.add_to_project(user, Project.find(2))
+    issue = submit_email('ticket_on_given_project.eml') do |email|
+      email.sub!(/^Assigned to.*$/, 'Assigned to: Foo Bar Foo baz')
+    end
+    assert issue.is_a?(Issue)
+    assert_equal user, issue.assigned_to
+  end
+
   def test_add_issue_with_cc
     issue = submit_email('ticket_with_cc.eml', :issue => {:project => 'ecookbook'})
     assert issue.is_a?(Issue)

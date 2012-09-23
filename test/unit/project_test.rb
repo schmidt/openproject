@@ -132,6 +132,10 @@ class ProjectTest < ActiveSupport::TestCase
     end
   end
 
+  def test_open_scope_on_issues_association
+    assert_kind_of Issue, Project.find(1).issues.open.first
+  end
+
   def test_archive
     user = @ecookbook.members.first.user
     @ecookbook.archive
@@ -819,6 +823,27 @@ class ProjectTest < ActiveSupport::TestCase
       assert_equal "Closed", copied_issue.status.name
     end
 
+    should "copy issues assigned to a locked version" do
+      User.current = User.find(1)
+      assigned_version = Version.generate!(:name => "Assigned Issues")
+      @source_project.versions << assigned_version
+      Issue.generate_for_project!(@source_project,
+                                  :fixed_version_id => assigned_version.id,
+                                  :subject => "copy issues assigned to a locked version",
+                                  :tracker_id => 1,
+                                  :project_id => @source_project.id)
+      assigned_version.update_attribute :status, 'locked'
+
+      assert @project.copy(@source_project)
+      @project.reload
+      copied_issue = @project.issues.first(:conditions => {:subject => "copy issues assigned to a locked version"})
+
+      assert copied_issue
+      assert copied_issue.fixed_version
+      assert_equal "Assigned Issues", copied_issue.fixed_version.name # Same name
+      assert_equal 'locked', copied_issue.fixed_version.status
+    end
+
     should "change the new issues to use the copied version" do
       User.current = User.find(1)
       assigned_version = Version.generate!(:name => "Assigned Issues", :status => 'open')
@@ -838,6 +863,22 @@ class ProjectTest < ActiveSupport::TestCase
       assert copied_issue.fixed_version
       assert_equal "Assigned Issues", copied_issue.fixed_version.name # Same name
       assert_not_equal assigned_version.id, copied_issue.fixed_version.id # Different record
+    end
+
+    should "keep target shared versions from other project" do
+      assigned_version = Version.generate!(:name => "Assigned Issues", :status => 'open', :project_id => 1, :sharing => 'system')
+      issue = Issue.generate_for_project!(@source_project,
+                                  :fixed_version => assigned_version,
+                                  :subject => "keep target shared versions",
+                                  :tracker_id => 1,
+                                  :project_id => @source_project.id)
+
+      assert @project.copy(@source_project)
+      @project.reload
+      copied_issue = @project.issues.first(:conditions => {:subject => "keep target shared versions"})
+
+      assert copied_issue
+      assert_equal assigned_version, copied_issue.fixed_version
     end
 
     should "copy issue relations" do
@@ -1014,7 +1055,23 @@ class ProjectTest < ActiveSupport::TestCase
       assert @project.issue_categories.any?
       assert @project.issues.empty?
     end
+  end
 
+  def test_copy_should_copy_subtasks
+    source = Project.generate!(:tracker_ids => [1])
+    issue = Issue.generate_with_descendants!(source, :subject => 'Parent')
+    project = Project.new(:name => 'Copy', :identifier => 'copy', :tracker_ids => [1])
+
+    assert_difference 'Project.count' do
+      assert_difference 'Issue.count', 1+issue.descendants.count do
+        assert project.copy(source.reload)
+      end
+    end
+    copy = Issue.where(:parent_id => nil).order("id DESC").first
+    assert_equal project, copy.project
+    assert_equal issue.descendants.count, copy.descendants.count
+    child_copy = copy.children.detect {|c| c.subject == 'Child1'}
+    assert child_copy.descendants.any?
   end
 
   context "#start_date" do
