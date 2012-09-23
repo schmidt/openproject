@@ -1,4 +1,4 @@
-# Bulgarian translation by Ivan Cenov i_cenov@botevgrad.com
+# Bulgarian translation by Nikolay Solakov and Ivan Cenov
 bg:
   # Text direction: Left-to-Right (ltr) or Right-to-Left (rtl)
   direction: ltr
@@ -328,9 +328,10 @@ bg:
   field_cvs_module: Модул
   field_repository_is_default: Главно хранилище
   field_multiple: Избор на повече от една стойност
-  field_ldap_filter: LDAP филтър
+  field_auth_source_ldap_filter: LDAP филтър
   field_core_fields: Стандартни полета
   field_timeout: Таймаут (в секунди)
+  field_board_parent: Родителски форум
 
   setting_app_title: Заглавие
   setting_app_subtitle: Описание
@@ -857,6 +858,7 @@ bg:
   label_child_revision: Ревизия наследник
   label_export_options: "%{export_format} опции за експорт"
   label_copy_attachments: Копиране на прикачените файлове
+  label_copy_subtasks: Копиране на подзадачите
   label_item_position: "%{position}/%{count}"
   label_completed_versions: Завършени версии
   label_search_for_watchers: Търсене на потребители за наблюдатели
@@ -866,6 +868,10 @@ bg:
   label_fields_permissions: Видимост на полетата
   label_readonly: Само за четене
   label_required: Задължително
+  label_attribute_of_project: Project's %{name}
+  label_attribute_of_author: Author's %{name}
+  label_attribute_of_assigned_to: Assignee's %{name}
+  label_attribute_of_fixed_version: Target version's %{name}
 
   button_login: Вход
   button_submit: Прикачване
@@ -1054,3 +1060,4 @@ bg:
   description_date_range_interval: Изберете диапазон чрез задаване на начална и крайна дати
   description_date_from: Въведете начална дата
   description_date_to: Въведете крайна дата
+  text_repository_identifier_info: 'Позволени са малки букви (a-z), цифри, тирета и _.<br />Промяна след създаването му не е възможна.'

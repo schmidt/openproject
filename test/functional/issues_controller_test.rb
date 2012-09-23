@@ -61,7 +61,7 @@ class IssuesControllerTest < ActionController::TestCase
       assert_template 'index'
       assert_not_nil assigns(:issues)
       assert_nil assigns(:project)
-      assert_tag :tag => 'a', :content => /Can't print recipes/
+      assert_tag :tag => 'a', :content => /Can&#x27;t print recipes/
       assert_tag :tag => 'a', :content => /Subproject issue/
       # private projects hidden
       assert_no_tag :tag => 'a', :content => /Issue of a private subproject/
@@ -78,7 +78,7 @@ class IssuesControllerTest < ActionController::TestCase
     assert_template 'index'
     assert_not_nil assigns(:issues)
     assert_nil assigns(:project)
-    assert_no_tag :tag => 'a', :content => /Can't print recipes/
+    assert_no_tag :tag => 'a', :content => /Can&#x27;t print recipes/
     assert_tag :tag => 'a', :content => /Subproject issue/
   end
 
@@ -95,7 +95,7 @@ class IssuesControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'index'
     assert_not_nil assigns(:issues)
-    assert_tag :tag => 'a', :content => /Can't print recipes/
+    assert_tag :tag => 'a', :content => /Can&#x27;t print recipes/
     assert_no_tag :tag => 'a', :content => /Subproject issue/
   end
 
@@ -105,7 +105,7 @@ class IssuesControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'index'
     assert_not_nil assigns(:issues)
-    assert_tag :tag => 'a', :content => /Can't print recipes/
+    assert_tag :tag => 'a', :content => /Can&#x27;t print recipes/
     assert_tag :tag => 'a', :content => /Subproject issue/
     assert_no_tag :tag => 'a', :content => /Issue of a private subproject/
   end
@@ -117,7 +117,7 @@ class IssuesControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'index'
     assert_not_nil assigns(:issues)
-    assert_tag :tag => 'a', :content => /Can't print recipes/
+    assert_tag :tag => 'a', :content => /Can&#x27;t print recipes/
     assert_tag :tag => 'a', :content => /Subproject issue/
     assert_tag :tag => 'a', :content => /Issue of a private subproject/
   end
@@ -230,6 +230,22 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal({}, query.filters)
   end
 
+  def test_index_with_project_custom_field_filter
+    field = ProjectCustomField.create!(:name => 'Client', :is_filter => true, :field_format => 'string')
+    CustomValue.create!(:custom_field => field, :customized => Project.find(3), :value => 'Foo')
+    CustomValue.create!(:custom_field => field, :customized => Project.find(5), :value => 'Foo')
+    filter_name = "project.cf_#{field.id}"
+    @request.session[:user_id] = 1
+
+    get :index, :set_filter => 1,
+      :f => [filter_name],
+      :op => {filter_name => '='},
+      :v => {filter_name => ['Foo']}
+    assert_response :success
+    assert_template 'index'
+    assert_equal [3, 5], assigns(:issues).map(&:project_id).uniq.sort
+  end
+
   def test_index_with_query
     get :index, :project_id => 1, :query_id => 5
     assert_response :success
@@ -252,6 +268,27 @@ class IssuesControllerTest < ActionController::TestCase
     assert_template 'index'
     assert_not_nil assigns(:issues)
     assert_not_nil assigns(:issue_count_by_group)
+  end
+
+  def test_index_with_query_grouped_by_user_custom_field
+    cf = IssueCustomField.create!(:name => 'User', :is_for_all => true, :tracker_ids => [1,2,3], :field_format => 'user')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(1), :value => '2')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(2), :value => '3')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(3), :value => '3')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(5), :value => '')
+
+    get :index, :project_id => 1, :set_filter => 1, :group_by => "cf_#{cf.id}"
+    assert_response :success
+
+    assert_select 'tr.group', 3
+    assert_select 'tr.group' do
+      assert_select 'a', :text => 'John Smith'
+      assert_select 'span.count', :text => '(1)'
+    end
+    assert_select 'tr.group' do
+      assert_select 'a', :text => 'Dave Lopper'
+      assert_select 'span.count', :text => '(2)'
+    end
   end
 
   def test_index_with_query_id_and_project_id_should_set_session_query
@@ -619,6 +656,19 @@ class IssuesControllerTest < ActionController::TestCase
     assert_equal hours.sort.reverse, hours
   end
 
+  def test_index_sort_by_user_custom_field
+    cf = IssueCustomField.create!(:name => 'User', :is_for_all => true, :tracker_ids => [1,2,3], :field_format => 'user')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(1), :value => '2')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(2), :value => '3')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(3), :value => '3')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(5), :value => '')
+
+    get :index, :project_id => 1, :set_filter => 1, :sort => "cf_#{cf.id},id"
+    assert_response :success
+
+    assert_equal [2, 3, 1], assigns(:issues).select {|issue| issue.custom_field_value(cf).present?}.map(&:id)
+  end
+
   def test_index_with_columns
     columns = ['tracker', 'subject', 'assigned_to']
     get :index, :set_filter => 1, :c => columns
@@ -773,7 +823,7 @@ class IssuesControllerTest < ActionController::TestCase
                                 :child => { :tag => 'legend',
                                             :content => /Notes/ } }
     assert_tag :tag => 'title',
-      :content => "Bug #1: Can't print recipes - eCookbook - Redmine"
+      :content => "Bug #1: Can&#x27;t print recipes - eCookbook - Redmine"
   end
 
   def test_show_by_manager
@@ -1112,6 +1162,24 @@ class IssuesControllerTest < ActionController::TestCase
 
     assert_no_tag 'a', :content => /Previous/
     assert_no_tag 'a', :content => /Next/
+  end
+
+  def test_show_show_should_display_prev_next_links_with_query_sort_by_user_custom_field
+    cf = IssueCustomField.create!(:name => 'User', :is_for_all => true, :tracker_ids => [1,2,3], :field_format => 'user')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(1), :value => '2')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(2), :value => '3')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(3), :value => '3')
+    CustomValue.create!(:custom_field => cf, :customized => Issue.find(5), :value => '')
+
+    query = Query.create!(:name => 'test', :is_public => true,  :user_id => 1, :filters => {},
+      :sort_criteria => [["cf_#{cf.id}", 'asc'], ['id', 'asc']])
+    @request.session[:query] = {:id => query.id, :project_id => nil}
+
+    get :show, :id => 3
+    assert_response :success
+
+    assert_equal 2, assigns(:prev_issue_id)
+    assert_equal 1, assigns(:next_issue_id)
   end
 
   def test_show_should_display_link_to_the_assignee
@@ -1654,7 +1722,7 @@ class IssuesControllerTest < ActionController::TestCase
     issue = Issue.first(:order => 'id DESC')
     assert_redirected_to :controller => 'issues', :action => 'new', :project_id => 'ecookbook', :issue => {:tracker_id => 3}
     assert_not_nil flash[:notice], "flash was not set"
-    assert flash[:notice].include?(%|<a href="/issues/#{issue.id}">##{issue.id}</a>|), "issue link not found in flash: #{flash[:notice]}"
+    assert_include %|<a href="/issues/#{issue.id}" title="This is first issue">##{issue.id}</a>|, flash[:notice], "issue link not found in the flash message"
   end
 
   def test_post_create_without_custom_fields_param
@@ -1739,7 +1807,7 @@ class IssuesControllerTest < ActionController::TestCase
     assert_template 'new'
     issue = assigns(:issue)
     assert_not_nil issue
-    assert_error_tag :content => /Database can't be blank/
+    assert_error_tag :content => /Database can&#x27;t be blank/
   end
 
   def test_create_should_validate_required_fields
@@ -1763,8 +1831,8 @@ class IssuesControllerTest < ActionController::TestCase
       assert_template 'new'
     end
 
-    assert_error_tag :content => /Due date can't be blank/i
-    assert_error_tag :content => /Bar can't be blank/i
+    assert_error_tag :content => /Due date can&#x27;t be blank/i
+    assert_error_tag :content => /Bar can&#x27;t be blank/i
   end
 
   def test_create_should_ignore_readonly_fields
@@ -2200,6 +2268,14 @@ class IssuesControllerTest < ActionController::TestCase
     assert_no_tag 'input', :attributes => {:name => 'copy_attachments', :type => 'checkbox', :checked => 'checked', :value => '1'}
   end
 
+  def test_new_as_copy_with_subtasks_should_show_copy_subtasks_checkbox
+    @request.session[:user_id] = 2
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+    get :new, :project_id => 1, :copy_from => issue.id
+
+    assert_select 'input[type=checkbox][name=copy_subtasks][checked=checked][value=1]'
+  end
+
   def test_new_as_copy_with_invalid_issue_should_respond_with_404
     @request.session[:user_id] = 2
     get :new, :project_id => 1, :copy_from => 99999
@@ -2279,6 +2355,37 @@ class IssuesControllerTest < ActionController::TestCase
     end
     copy = Issue.first(:order => 'id DESC')
     assert_equal count + 1, copy.attachments.count
+  end
+
+  def test_create_as_copy_should_copy_subtasks
+    @request.session[:user_id] = 2
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+    count = issue.descendants.count
+
+    assert_difference 'Issue.count', count+1 do
+      assert_no_difference 'Journal.count' do
+        post :create, :project_id => 1, :copy_from => issue.id,
+          :issue => {:project_id => '1', :tracker_id => '3', :status_id => '1', :subject => 'Copy with subtasks'},
+          :copy_subtasks => '1'
+      end
+    end
+    copy = Issue.where(:parent_id => nil).first(:order => 'id DESC')
+    assert_equal count, copy.descendants.count
+    assert_equal issue.descendants.map(&:subject).sort, copy.descendants.map(&:subject).sort
+  end
+
+  def test_create_as_copy_without_copy_subtasks_option_should_not_copy_subtasks
+    @request.session[:user_id] = 2
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+
+    assert_difference 'Issue.count', 1 do
+      assert_no_difference 'Journal.count' do
+        post :create, :project_id => 1, :copy_from => 3,
+          :issue => {:project_id => '1', :tracker_id => '3', :status_id => '1', :subject => 'Copy with subtasks'}
+      end
+    end
+    copy = Issue.where(:parent_id => nil).first(:order => 'id DESC')
+    assert_equal 0, copy.descendants.count
   end
 
   def test_create_as_copy_with_failure
@@ -2801,7 +2908,7 @@ class IssuesControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'edit'
 
-    assert_error_tag :descendant => {:content => /Activity can't be blank/}
+    assert_error_tag :descendant => {:content => /Activity can&#x27;t be blank/}
     assert_tag :textarea, :attributes => { :name => 'notes' }, :content => "\n"+notes
     assert_tag :input, :attributes => { :name => 'time_entry[hours]', :value => "2z" }
   end
@@ -2819,8 +2926,8 @@ class IssuesControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'edit'
 
-    assert_error_tag :descendant => {:content => /Activity can't be blank/}
-    assert_error_tag :descendant => {:content => /Hours can't be blank/}
+    assert_error_tag :descendant => {:content => /Activity can&#x27;t be blank/}
+    assert_error_tag :descendant => {:content => /Hours can&#x27;t be blank/}
     assert_tag :textarea, :attributes => { :name => 'notes' }, :content => "\n"+notes
     assert_tag :input, :attributes => { :name => 'time_entry[comments]', :value => "this is my comment" }
   end
@@ -3403,6 +3510,48 @@ class IssuesControllerTest < ActionController::TestCase
              }
       end
     end
+  end
+
+  def test_bulk_copy_should_allow_not_copying_the_subtasks
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+    @request.session[:user_id] = 2
+
+    assert_difference 'Issue.count', 1 do
+      post :bulk_update, :ids => [issue.id], :copy => '1',
+           :issue => {
+             :project_id => ''
+           }
+    end
+  end
+
+  def test_bulk_copy_should_allow_copying_the_subtasks
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+    count = issue.descendants.count
+    @request.session[:user_id] = 2
+
+    assert_difference 'Issue.count', count+1 do
+      post :bulk_update, :ids => [issue.id], :copy => '1', :copy_subtasks => '1',
+           :issue => {
+             :project_id => ''
+           }
+    end
+    copy = Issue.where(:parent_id => nil).order("id DESC").first
+    assert_equal count, copy.descendants.count
+  end
+
+  def test_bulk_copy_should_not_copy_selected_subtasks_twice
+    issue = Issue.generate_with_descendants!(Project.find(1), :subject => 'Parent')
+    count = issue.descendants.count
+    @request.session[:user_id] = 2
+
+    assert_difference 'Issue.count', count+1 do
+      post :bulk_update, :ids => issue.self_and_descendants.map(&:id), :copy => '1', :copy_subtasks => '1',
+           :issue => {
+             :project_id => ''
+           }
+    end
+    copy = Issue.where(:parent_id => nil).order("id DESC").first
+    assert_equal count, copy.descendants.count
   end
 
   def test_bulk_copy_to_another_project_should_follow_when_needed

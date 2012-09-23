@@ -149,7 +149,7 @@ class MyControllerTest < ActionController::TestCase
                     :new_password_confirmation => 'hello2'
     assert_response :success
     assert_template 'password'
-    assert_error_tag :content => /Password doesn't match confirmation/
+    assert_error_tag :content => /Password doesn&#x27;t match confirmation/
 
     # wrong password
     post :password, :password => 'wrongpassword',
@@ -194,7 +194,7 @@ class MyControllerTest < ActionController::TestCase
   end
 
   def test_order_blocks
-    xhr :post, :order_blocks, :group => 'left', 'list-left' => ['documents', 'calendar', 'latestnews']
+    xhr :post, :order_blocks, :group => 'left', 'blocks' => ['documents', 'calendar', 'latestnews']
     assert_response :success
     assert_equal ['documents', 'calendar', 'latestnews'], User.find(2).pref[:my_page_layout]['left']
   end

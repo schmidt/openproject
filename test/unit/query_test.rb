@@ -18,6 +18,8 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class QueryTest < ActiveSupport::TestCase
+  include Redmine::I18n
+
   fixtures :projects, :enabled_modules, :users, :members,
            :member_roles, :roles, :trackers, :issue_statuses,
            :issue_categories, :enumerations, :issues,
@@ -577,6 +579,51 @@ class QueryTest < ActiveSupport::TestCase
     User.current = nil
   end
 
+  def test_filter_on_project_custom_field
+    field = ProjectCustomField.create!(:name => 'Client', :is_filter => true, :field_format => 'string')
+    CustomValue.create!(:custom_field => field, :customized => Project.find(3), :value => 'Foo')
+    CustomValue.create!(:custom_field => field, :customized => Project.find(5), :value => 'Foo')
+
+    query = Query.new(:name => '_')
+    filter_name = "project.cf_#{field.id}"
+    assert_include filter_name, query.available_filters.keys
+    query.filters = {filter_name => {:operator => '=', :values => ['Foo']}}
+    assert_equal [3, 5], find_issues_with_query(query).map(&:project_id).uniq.sort
+  end
+
+  def test_filter_on_author_custom_field
+    field = UserCustomField.create!(:name => 'Client', :is_filter => true, :field_format => 'string')
+    CustomValue.create!(:custom_field => field, :customized => User.find(3), :value => 'Foo')
+
+    query = Query.new(:name => '_')
+    filter_name = "author.cf_#{field.id}"
+    assert_include filter_name, query.available_filters.keys
+    query.filters = {filter_name => {:operator => '=', :values => ['Foo']}}
+    assert_equal [3], find_issues_with_query(query).map(&:author_id).uniq.sort
+  end
+
+  def test_filter_on_assigned_to_custom_field
+    field = UserCustomField.create!(:name => 'Client', :is_filter => true, :field_format => 'string')
+    CustomValue.create!(:custom_field => field, :customized => User.find(3), :value => 'Foo')
+
+    query = Query.new(:name => '_')
+    filter_name = "assigned_to.cf_#{field.id}"
+    assert_include filter_name, query.available_filters.keys
+    query.filters = {filter_name => {:operator => '=', :values => ['Foo']}}
+    assert_equal [3], find_issues_with_query(query).map(&:assigned_to_id).uniq.sort
+  end
+
+  def test_filter_on_fixed_version_custom_field
+    field = VersionCustomField.create!(:name => 'Client', :is_filter => true, :field_format => 'string')
+    CustomValue.create!(:custom_field => field, :customized => Version.find(2), :value => 'Foo')
+
+    query = Query.new(:name => '_')
+    filter_name = "fixed_version.cf_#{field.id}"
+    assert_include filter_name, query.available_filters.keys
+    query.filters = {filter_name => {:operator => '=', :values => ['Foo']}}
+    assert_equal [2], find_issues_with_query(query).map(&:fixed_version_id).uniq.sort
+  end
+
   def test_statement_should_be_nil_with_no_filters
     q = Query.new(:name => '_')
     q.filters = {}
@@ -619,6 +666,20 @@ class QueryTest < ActiveSupport::TestCase
     q = Query.new
     column = q.groupable_columns.detect {|c| c.name == :cf_1}
     assert_nil column
+  end
+
+  def test_groupable_columns_should_include_user_custom_fields
+    cf = IssueCustomField.create!(:name => 'User', :is_for_all => true, :tracker_ids => [1], :field_format => 'user')
+
+    q = Query.new
+    assert q.groupable_columns.detect {|c| c.name == "cf_#{cf.id}".to_sym}
+  end
+
+  def test_groupable_columns_should_include_version_custom_fields
+    cf = IssueCustomField.create!(:name => 'User', :is_for_all => true, :tracker_ids => [1], :field_format => 'version')
+
+    q = Query.new
+    assert q.groupable_columns.detect {|c| c.name == "cf_#{cf.id}".to_sym}
   end
 
   def test_grouped_with_valid_column
@@ -797,8 +858,17 @@ class QueryTest < ActiveSupport::TestCase
   end
 
   def test_label_for
+    set_language_if_valid 'en'
     q = Query.new
     assert_equal 'Assignee', q.label_for('assigned_to_id')
+  end
+
+  def test_label_for_fr
+    set_language_if_valid 'fr'
+    q = Query.new
+    s = "Assign\xc3\xa9 \xc3\xa0"
+    s.force_encoding('UTF-8') if s.respond_to?(:force_encoding)
+    assert_equal s, q.label_for('assigned_to_id')
   end
 
   def test_editable_by

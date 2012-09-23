@@ -41,7 +41,7 @@ class VersionsControllerTest < ActionController::TestCase
     # Completed version doesn't appear
     assert !assigns(:versions).include?(Version.find(1))
     # Context menu on issues
-    assert_select "script", :text => Regexp.new(Regexp.escape("new ContextMenu('/issues/context_menu')"))
+    assert_select "script", :text => Regexp.new(Regexp.escape("contextMenuInit('/issues/context_menu')"))
     # Links to versions anchors
     assert_tag 'a', :attributes => {:href => '#2.0'},
                     :ancestor => {:tag => 'div', :attributes => {:id => 'sidebar'}}
@@ -78,6 +78,20 @@ class VersionsControllerTest < ActionController::TestCase
 
     assert assigns(:versions).include?(Version.find(4)), "Shared version not found"
     assert assigns(:versions).include?(@subproject_version), "Subproject version not found"
+  end
+
+  def test_index_should_prepend_shared_versions
+    get :index, :project_id => 1
+    assert_response :success
+
+    assert_select '#sidebar' do
+      assert_select 'a[href=?]', '#2.0', :text => '2.0'
+      assert_select 'a[href=?]', '#subproject1-2.0', :text => 'eCookbook Subproject 1 - 2.0'
+    end
+    assert_select '#content' do
+      assert_select 'a[name=?]', '2.0', :text => '2.0'
+      assert_select 'a[name=?]', 'subproject1-2.0', :text => 'eCookbook Subproject 1 - 2.0'
+    end
   end
 
   def test_show
@@ -127,6 +141,7 @@ class VersionsControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'create'
     assert_equal 'text/javascript', response.content_type
+    assert_include 'test_add_version_from_issue_form', response.body
   end
 
   def test_create_from_issue_form_with_failure
