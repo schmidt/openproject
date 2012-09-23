@@ -12,11 +12,13 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-class PreviewsController < ApplicationController
-  before_filter :find_project
+class Issues::PreviewsController < ApplicationController
+  before_filter :find_model_object_and_project,
+                :authorize
 
-  def issue
-    @issue = @project.issues.find_by_id(params[:id]) unless params[:id].blank?
+  model_object Issue
+
+  def create
     if @issue
       @attachements = @issue.attachments
       @description = params[:issue] && params[:issue][:description]
@@ -29,19 +31,4 @@ class PreviewsController < ApplicationController
     end
     render :layout => false
   end
-
-  def news
-    @text = (params[:news] ? params[:news][:description] : nil)
-    render :partial => 'common/preview'
-  end
-
-  private
-
-  def find_project
-    project_id = (params[:issue] && params[:issue][:project_id]) || params[:project_id]
-    @project = Project.find(project_id)
-  rescue ActiveRecord::RecordNotFound
-    render_404
-  end
-
 end

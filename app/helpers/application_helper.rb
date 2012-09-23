@@ -19,6 +19,7 @@ module ApplicationHelper
   include Redmine::WikiFormatting::Macros::Definitions
   include Redmine::I18n
   include GravatarHelper::PublicMethods
+  include ERB::Util # for h()
 
   extend Forwardable
   def_delegators :wiki_helper, :wikitoolbar_for, :heads_for_wiki_formatter
@@ -73,6 +74,19 @@ module ApplicationHelper
     else
       h(user.to_s)
     end
+  end
+
+  def link_to_issue_preview(context = nil, options = {})
+    url = context.is_a?(Project) ?
+            preview_new_project_issues_path(:project_id => context) :
+            preview_issue_path(context)
+
+    id = options[:form_id] || 'issue-form-preview'
+
+    link_to l(:label_preview),
+            url,
+            :id => id,
+            :class => 'preview'
   end
 
   # Show a sorted linkified (if active) comma-joined list of users
@@ -184,7 +198,12 @@ module ApplicationHelper
     end
 
     if project.active?
-      link << link_to(project.name, project_path(project, options), html_options)
+      # backwards compatibility
+      if options.delete(:action) == 'settings'
+        link << link_to(project.name, settings_project_path(project, options), html_options)
+      else
+        link << link_to(project.name, project_path(project, options), html_options)
+      end
     else
       link << project.name
     end
@@ -886,7 +905,7 @@ module ApplicationHelper
     options = args.extract_options!
     options[:html] ||= {}
     options[:html][:class] = 'tabular' unless options[:html].has_key?(:class)
-    form_for(record_or_name_or_array, *(args << options.merge({:builder => TabularFormBuilder, :lang => current_language})), &proc)
+    form_for(*(args << options.merge(:builder => TabularFormBuilder, :lang => current_language, :as => record_or_name_or_array)), &proc)
   end
 
   def back_url_hidden_field_tag

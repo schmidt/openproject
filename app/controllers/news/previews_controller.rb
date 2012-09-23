@@ -12,7 +12,12 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-require File.expand_path('../../../test_helper', __FILE__)
+class News::PreviewsController < ApplicationController
+  model_object News
+  before_filter :find_object_and_scope
 
-class IssueMovesHelperTest < ActionView::TestCase
+  def create
+    @text = (params[:news] ? params[:news][:description] : nil)
+    render :partial => 'common/preview'
+  end
 end

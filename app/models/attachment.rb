@@ -29,6 +29,11 @@ class Attachment < ActiveRecord::Base
   validates_length_of :filename, :maximum => 255
   validates_length_of :disk_filename, :maximum => 255
 
+  validate :filesize_below_allowed_maximum
+
+  before_save :copy_file_to_destination
+  after_destroy :delete_file_on_disk
+
   acts_as_journalized :event_title => :filename,
         :event_url => (Proc.new do |o|
           { :controller => 'attachments', :action => 'download',
@@ -57,9 +62,9 @@ class Attachment < ActiveRecord::Base
   end
 
   cattr_accessor :storage_path
-  @@storage_path = Redmine::Configuration['attachments_storage_path'] || "#{RAILS_ROOT}/files"
+  @@storage_path = Redmine::Configuration['attachments_storage_path'] || Rails.root.join('files').to_s
 
-  def validate
+  def filesize_below_allowed_maximum
     if self.filesize > Setting.attachment_max_size.to_i.kilobytes
       errors.add(:base, :too_long, :count => Setting.attachment_max_size.to_i.kilobytes)
     end
@@ -86,7 +91,7 @@ class Attachment < ActiveRecord::Base
 
   # Copies the temporary file to its final location
   # and computes its MD5 hash
-  def before_save
+  def copy_file_to_destination
     if @temp_file && (@temp_file.size > 0)
       logger.debug("saving '#{self.diskfile}'")
       md5 = Digest::MD5.new
@@ -106,8 +111,8 @@ class Attachment < ActiveRecord::Base
   end
 
   # Deletes file on the disk
-  def after_destroy
-    File.delete(diskfile) if !filename.blank? && File.exist?(diskfile)
+  def delete_file_on_disk
+    File.delete(diskfile) if filename.present? && File.exist?(diskfile)
   end
 
   # Returns file's location on disk

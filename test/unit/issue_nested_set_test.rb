@@ -63,7 +63,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
                              :parent_issue_id => issue.id }
     end
     assert !child.save
-    assert_not_nil child.errors.on(:parent_issue_id)
+    refute_empty child.errors[:parent_issue_id]
   end
 
   def test_creating_a_child_in_different_project_should_validate_if_allowed
@@ -77,7 +77,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
                              :parent_issue_id => issue.id }
     end
     assert child.save
-    assert_nil child.errors.on(:parent_issue_id)
+    assert_empty child.errors[:parent_issue_id]
   end
 
   def test_move_a_root_to_child
@@ -204,7 +204,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
     child.reload
     child.parent_issue_id = grandchild.id
     assert !child.save
-    assert_not_nil child.errors.on(:parent_issue_id)
+    refute_empty child.errors[:parent_issue_id]
   end
 
   def test_moving_an_issue_should_keep_valid_relations_only
@@ -389,6 +389,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
   end
 
   def test_project_copy_should_copy_issue_tree
+    Project.delete_all # make sure unqiue identifiers
     p = Project.create!(:name => 'Tree copy', :identifier => 'tree-copy', :tracker_ids => [1, 2])
     i1 = create_issue!(:project_id => p.id, :subject => 'i1')
     i2 = create_issue!(:project_id => p.id, :subject => 'i2', :parent_issue_id => i1.id)
@@ -400,7 +401,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
     c.reload
 
     assert_equal 5, c.issues.count
-    ic1, ic2, ic3, ic4, ic5 = c.issues.find(:all, :order => 'subject')
+    ic1, ic2, ic3, ic4, ic5 = c.issues.reorder('subject')
     assert ic1.root?
     assert_equal ic1, ic2.parent
     assert_equal ic1, ic3.parent

@@ -33,29 +33,14 @@ OpenProject::Application.routes.draw do
     match '/projects/:id/wiki' => 'wikis#edit', :via => :post
     match '/projects/:id/wiki/destroy' => 'wikis#destroy', :via => [:get, :post]
 
-    scope :controller => 'messages' do
-      scope :via => :get do
-        match '/boards/:board_id/topics/new', :action => :new
-        match '/boards/:board_id/topics/:id', :action => :show
-        match '/boards/:board_id/topics/:id/edit', :action => :edit
-      end
-      scope :via => :post do
-        match '/boards/:board_id/topics/new', :action => :new
-        match '/boards/:board_id/topics/:id/replies', :action => :reply
-        match '/boards/:board_id/topics/:id/:action', :action => /edit|destroy/
-      end
-    end
 
     # only providing routes for journals when there are multiple subclasses of journals
     # all subclasses will look for the journals routes
     resources :journals, :only => [:edit, :update]
 
-    namespace :issues do
-    end
-
     # generic route for adding/removing watchers
     # looks to be ressourceful
-    scope ':object_type/:object_id', :constraints => { :object_type => /issues|messages|boards|wikis|wiki_pages/,
+    scope ':object_type/:object_id', :constraints => { :object_type => /issues|messages|boards|wikis|wiki_pages|news/,
                                                        :object_id => /\d+/ } do
       resources :watchers, :only => [:new]
 
@@ -70,7 +55,7 @@ OpenProject::Application.routes.draw do
       match 'changes' => 'journals#index', :as => 'changes'
     end
 
-    resources :projects do
+    resources :projects, :except => [:edit] do
       member do
         # this route let's you access the project specific settings (by tab)
         #
@@ -82,11 +67,15 @@ OpenProject::Application.routes.draw do
         #
         get 'settings(/:tab)', :action => 'settings', :as => :settings
 
-        get 'copy'
-        post 'copy'
-        post 'modules'
-        post 'archive'
-        post 'unarchive'
+        get :copy
+        post :copy
+        put :modules
+        put :archive
+        put :unarchive
+
+        # Destroy uses a get request to prompt the user before the actual DELETE request
+        get :destroy_info, :as => 'confirm_destroy'
+
       end
 
       resource :enumerations, :controller => 'project_enumerations', :only => [:update, :destroy]
@@ -106,7 +95,11 @@ OpenProject::Application.routes.draw do
       # this could probably be rewritten with a resource :as => 'roadmap'
       match '/roadmap' => 'versions#index', :via => :get
 
-      resources :news, :shallow => true
+      resources :news, :only => [:index, :new, :create] do
+        collection do
+          resource :preview, :controller => "news/previews", :only => [:create], :as => "news_preview"
+        end
+      end
 
       namespace :time_entries do
         resource :report, :controller => 'reports', :only => [:show]
@@ -150,14 +143,23 @@ OpenProject::Application.routes.draw do
         collection do
           get :all
 
+          match '/report/:detail' => 'issues/reports#report_details', :via => :get
+          match '/report' => 'issues/reports#report', :via => :get
+
           # get a preview of a new issue (i.e. one without an ID)
-          match '/new/preview' => 'previews#issue', :as => 'preview_new', :via => :post
+          match '/new/preview' => 'issues/previews#create', :as => 'preview_new', :via => :post
         end
       end
 
       resources :activity, :activities, :only => :index, :controller => 'activities'
 
       resources :boards
+
+      resources :issue_categories, :except => [:index, :show], :shallow => true
+
+      resources :members, :only => [:create, :update, :destroy], :shallow => true do
+        get :autocomplete, :on => :collection
+      end
     end
 
     #TODO: evaluate whether this can be turned into a namespace
@@ -210,14 +212,17 @@ OpenProject::Application.routes.draw do
     end
 
     # TODO: remove create as issues should be created scoped under project
-    resources :issues, :only => [:create, :show, :edit, :update, :destroy] do
+    resources :issues, :except => [:new] do
       namespace :time_entries do
         resource :report, :controller => 'reports', :only => [:show]
       end
 
       resources :time_entries, :controller => 'timelog'
 
+      resources :relations, :controller => 'issue_relations', :only => [:create, :destroy]
+
       member do
+        match '/preview' => 'issues/previews#create', :via => :post
         # this route is defined so that it has precedence of the one defined on the collection
         delete :destroy
       end
@@ -237,14 +242,9 @@ OpenProject::Application.routes.draw do
     end
 
     # Misc issue routes. TODO: move into resources
-    match '/issues/preview/:id' => 'previews#issue', :as => 'preview_issue'  # TODO: would look nicer as /issues/:id/preview
     match '/issues/:id/quoted' => 'journals#new', :id => /\d+/, :via => :post, :as => 'quoted_issue'
     match '/issues/:id/destroy' => 'issues#destroy', :via => :post # legacy
 
-    scope :controller => 'reports', :via => :get do
-      match '/projects/:id/issues/report', :action => :issue_report
-      match '/projects/:id/issues/report/:detail', :action => :issue_report_details
-    end
 
     namespace :time_entries do
       resource :report, :controller => 'reports',
@@ -255,41 +255,36 @@ OpenProject::Application.routes.draw do
 
     resources :activity, :activities, :only => :index, :controller => 'activities'
 
-    scope  :controller => 'issue_relations', :via => :post do
-      match '/issues/:issue_id/relations(/:id)', :action => :new
-      match '/issues/:issue_id/relations/:id/destroy', :action => :destroy
-    end
-
-    match '/projects/:id/members/new' => 'members#new'
-
-    resources :users, :member => {
-      :edit_membership => :post,
-      :destroy_membership => :post,
-      :deletion_info => :get
-    }
-
-    scope :controller => 'users' do
-      match '/users/:id/edit/:tab', :action => 'edit', :tab => nil, :via => :get
-
-      scope :via => :post do
-        match '/users/:id/memberships', :action => 'edit_membership'
-        match '/users/:id/memberships/:membership_id', :action => 'edit_membership'
-        match '/users/:id/memberships/:membership_id/destroy', :action => 'destroy_membership'
+    resources :users do
+      member do
+        match '/edit/:tab' => 'users#edit', :via => :get
+        match '/memberships/:membership_id/destroy' => 'users#destroy_membership', :via => :post
+        match '/memberships/:membership_id' => 'users#edit_membership', :via => :post
+        match '/memberships' => 'users#edit_membership', :via => :post
+        post :edit_membership
+        post :destroy_membership
+        get :deletion_info
       end
     end
 
+    resources :boards, :only => [] do
+      resources :topics, :controller => 'messages', :except => [:index], :shallow => true do
+        collection do
+          post :preview
+        end
 
-    match '/news' => 'news#index', :as => 'all_news'
-    match '/news.:format' => 'news#index', :as => 'formatted_all_news'
-    match '/news/preview' => 'previews#news', :as => 'preview_news'
-    match '/news/:id/comments' => 'comments#create', :via => :post
-    match '/news/:id/comments/:comment_id' => 'comments#destroy', :via => :delete
+        member do
+          get :quote
+          post :reply, :as => 'reply_to'
+          post :preview
+        end
+      end
+    end
 
-    # Destroy uses a get request to prompt the user before the actual DELETE request
-    match '/projects/:id/destroy' => 'project#destroy', :via => :get, :as => 'project_destroy_confirm'
+    resources :news, :only => [:index, :destroy, :update, :edit, :show] do
+      resources :comments, :controller => 'news/comments', :only => [:create, :destroy], :shallow => true
 
-    scope :controller => 'issue_categories' do
-      match '/projects/:project_id/issue_categories/new', :action => :new
+      resource :preview, :controller => 'news/previews', :only => [:create]
     end
 
     scope :controller => 'repositories' do
@@ -329,10 +324,6 @@ OpenProject::Application.routes.draw do
     end
 
     #left old routes at the bottom for backwards compat
-    match '/projects/:project_id/boards/:action/:id', :controller => 'boards'
-    match '/boards/:board_id/topics/:action/:id', :controller => 'messages'
-    match '/issues/:issue_id/relations/:action/:id', :controller => 'issue_relations'
-    match '/projects/:project_id/news/:action', :controller => 'news'
     scope :controller => 'repositories' do
       match '/repositories/browse/:id/*path', :action => 'browse', :as => 'repositories_show'
       match '/repositories/changes/:id/*path', :action => 'changes', :as => 'repositories_changes'

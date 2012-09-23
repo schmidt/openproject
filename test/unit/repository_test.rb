@@ -47,8 +47,8 @@ class RepositoryTest < ActiveSupport::TestCase
   end
 
   def test_destroy
-    changesets = Changeset.count(:all, :conditions => "repository_id = 10")
-    changes = Change.count(:all, :conditions => "repository_id = 10", :include => :changeset)
+    changesets = Changeset.where('repository_id = 10').size
+    changes = Change.includes(:changeset).where("#{Changeset.table_name}.repository_id = 10").size
     assert_difference 'Changeset.count', -changesets do
       assert_difference 'Change.count', -changes do
         Repository.find(10).destroy
@@ -61,7 +61,7 @@ class RepositoryTest < ActiveSupport::TestCase
     Setting.enabled_scm = ['Darcs', 'Git']
     repository = Repository::Subversion.new(:project => Project.find(3), :url => "svn://localhost")
     assert !repository.save
-    assert_equal I18n.translate('activerecord.errors.messages.invalid'), repository.errors.on(:type)
+    assert_include repository.errors[:type], I18n.translate('activerecord.errors.messages.invalid')
     # re-enable Subversion for following tests
     Setting.delete_all
   end

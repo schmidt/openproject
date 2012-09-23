@@ -105,7 +105,7 @@ class ProjectTest < ActiveSupport::TestCase
       p = Project.new
       p.identifier = identifier
       p.valid?
-      assert_equal valid, p.errors.on('identifier').nil?
+      assert_equal valid, p.errors['identifier'].empty?
     end
   end
 
@@ -162,6 +162,8 @@ class ProjectTest < ActiveSupport::TestCase
     assert @ecookbook_sub1.unarchive
   end
 
+  # fails because @ecookbook.issues[5 und 6].destroy fails
+  # because ActiveRecord::StaleObjectError
   def test_destroy
     # 2 active members
     assert_equal 2, @ecookbook.members.size
@@ -261,6 +263,9 @@ class ProjectTest < ActiveSupport::TestCase
     assert_equal parent.children.sort_by(&:name), parent.children
   end
 
+  # TODO: we customized awesome_nested_set to accept and :order parameter
+  # this is not in the official gem. look whether sb did it already
+  # otherwise take the previous code (vendor/plugins/awesome...) and make a PR
   def test_rebuild_should_sort_children_alphabetically
     ProjectCustomField.delete_all
     parent = Project.create!(:name => 'Parent', :identifier => 'parent')
@@ -1074,22 +1079,34 @@ class ProjectTest < ActiveSupport::TestCase
       @role = Role.generate!
 
       @user_with_membership_notification = User.generate!(:mail_notification => 'selected')
-      Member.generate!(:project => @project, :roles => [@role], :principal => @user_with_membership_notification, :mail_notification => true)
+      Member.create!(:project => @project, :principal => @user_with_membership_notification, :mail_notification => true) do |member|
+        member.role_ids = [@role.id]
+      end
 
       @all_events_user = User.generate!(:mail_notification => 'all')
-      Member.generate!(:project => @project, :roles => [@role], :principal => @all_events_user)
+      Member.create!(:project => @project, :principal => @all_events_user) do |member|
+        member.role_ids = [@role.id]
+      end
 
       @no_events_user = User.generate!(:mail_notification => 'none')
-      Member.generate!(:project => @project, :roles => [@role], :principal => @no_events_user)
+      Member.create!(:project => @project, :principal => @no_events_user) do |member|
+        member.role_ids = [@role.id]
+      end
 
       @only_my_events_user = User.generate!(:mail_notification => 'only_my_events')
-      Member.generate!(:project => @project, :roles => [@role], :principal => @only_my_events_user)
+      Member.create!(:project => @project, :principal => @only_my_events_user) do |member|
+        member.role_ids = [@role.id]
+      end
 
       @only_assigned_user = User.generate!(:mail_notification => 'only_assigned')
-      Member.generate!(:project => @project, :roles => [@role], :principal => @only_assigned_user)
+      Member.create!(:project => @project, :principal => @only_assigned_user) do |member|
+        member.role_ids = [@role.id]
+      end
 
       @only_owned_user = User.generate!(:mail_notification => 'only_owner')
-      Member.generate!(:project => @project, :roles => [@role], :principal => @only_owned_user)
+      Member.create!(:project => @project, :principal => @only_owned_user) do |member|
+        member.role_ids = [@role.id]
+      end
     end
 
     should "include members with a mail notification" do

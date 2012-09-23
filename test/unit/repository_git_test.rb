@@ -17,7 +17,7 @@ class RepositoryGitTest < ActiveSupport::TestCase
   fixtures :projects, :repositories, :enabled_modules, :users, :roles
 
   # No '..' in the repository path
-  REPOSITORY_PATH = RAILS_ROOT.gsub(%r{config\/\.\.}, '') + '/tmp/test/git_repository'
+  REPOSITORY_PATH = Rails.root.to_s.gsub(%r{config\/\.\.}, '') + '/tmp/test/git_repository'
   REPOSITORY_PATH.gsub!(/\//, "\\") if Redmine::Platform.mswin?
 
   FELIX_HEX  = "Felix Sch\xC3\xA4fer"
@@ -51,7 +51,7 @@ class RepositoryGitTest < ActiveSupport::TestCase
       assert_equal 21, @repository.changesets.count
       assert_equal 33, @repository.changes.count
 
-      commit = @repository.changesets.find(:first, :order => 'committed_on ASC')
+      commit = @repository.changesets.reorder('committed_on ASC').first
       assert_equal "Initial import.\nThe repository contains 3 files.", commit.comments
       assert_equal "jsmith <jsmith@foo.bar>", commit.committer
       assert_equal User.find_by_login('jsmith'), commit.user

@@ -28,7 +28,7 @@ module Redmine
         end
 
         def method_missing(sym, *args, &block)
-          if args.size == 1 && args.first.is_a?(Time)
+          if args.size == 1 && args.first.kind_of?(time_class)
             __send__ sym, args.first.xmlschema, &block
           else
             super
@@ -37,6 +37,10 @@ module Redmine
 
         def array(name, options={}, &block)
           __send__ name, (options || {}).merge(:type => 'array'), &block
+        end
+
+        def time_class
+          ::Object.const_get('Time')
         end
       end
     end

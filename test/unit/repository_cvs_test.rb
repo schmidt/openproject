@@ -17,7 +17,7 @@ class RepositoryCvsTest < ActiveSupport::TestCase
   fixtures :projects
 
   # No '..' in the repository path
-  REPOSITORY_PATH = RAILS_ROOT.gsub(%r{config\/\.\.}, '') + '/tmp/test/cvs_repository'
+  REPOSITORY_PATH = Rails.root.to_s.gsub(%r{config\/\.\.}, '') + '/tmp/test/cvs_repository'
   REPOSITORY_PATH.gsub!(/\//, "\\") if Redmine::Platform.mswin?
   # CVS module
   MODULE_NAME = 'test'
@@ -54,7 +54,7 @@ class RepositoryCvsTest < ActiveSupport::TestCase
       assert_equal 3, @repository.changesets.count
       assert_equal %w|3 2 1|, @repository.changesets.collect(&:revision)
 
-      rev3_commit = @repository.changesets.find(:first, :order => 'committed_on DESC')
+      rev3_commit = @repository.changesets.reorder('committed_on DESC').first
       assert_equal '3', rev3_commit.revision
        # 2007-12-14 01:27:22 +0900
       rev3_committed_on = Time.gm(2007, 12, 13, 16, 27, 22)

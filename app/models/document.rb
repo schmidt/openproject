@@ -35,16 +35,19 @@ class Document < ActiveRecord::Base
                                     :conditions => Project.allowed_to_condition(args.first || User.current, :view_documents) } }
   scope :with_attachments, includes(:attachments).where("attachments.container_id is not NULL" )
 
+  after_initialize :set_default_category
+
+  # TODO: category_id needed for forms?
+  attr_accessible :title, :description, :project, :category
+
   safe_attributes 'category_id', 'title', 'description'
 
   def visible?(user=User.current)
     !user.nil? && user.allowed_to?(:view_documents, project)
   end
 
-  def after_initialize
-    if new_record?
-      self.category ||= DocumentCategory.default
-    end
+  def set_default_category
+    self.category ||= DocumentCategory.default if new_record?
   end
 
   def updated_on
@@ -52,7 +55,7 @@ class Document < ActiveRecord::Base
       # attachments has a default order that conflicts with `created_on DESC`
       # #reorder removes that default order but rather than #unscoped keeps the
       # scoping by this document
-      a = attachments.reorder(nil).order('created_on DESC').first
+      a = attachments.reorder('created_on DESC').first
       @updated_on = (a && a.created_on) || created_on
     end
     @updated_on

@@ -18,7 +18,6 @@ if RUBY_VERSION >= '1.9.3'
 end
 
 require 'active_record'
-ActiveSupport::Deprecation.silenced = true
 module ActiveRecord
   class Base
     include Redmine::I18n
@@ -101,7 +100,7 @@ module ActionView
             # excluding custom_values from the errors.each loop before
             # as more than one error can be assigned to custom_values
             # which would add to many error messages
-            if object.errors.on(:custom_values)
+            if object.errors[:custom_values].any?
               object.custom_values.each do |value|
                 value.errors.collect do |attr, msg|
                   # Generating unique identifier in order to jump directly to the field with the error
@@ -245,6 +244,7 @@ module CollectiveIdea
   module Acts
     module NestedSet
       module Model
+        # fixes IssueNestedSetTest#test_destroy_parent_issue_updated_during_children_destroy
         def destroy_descendants_with_reload
           destroy_descendants_without_reload
           # Reload is needed because children may have updated their parent (self) during deletion.
@@ -252,42 +252,6 @@ module CollectiveIdea
           reload
         end
         alias_method_chain :destroy_descendants, :reload
-
-        module ClassMethods
-          # Rebuilds the left & rights if unset or invalid.
-          # Also very useful for converting from acts_as_tree.
-          def rebuild!(validate_nodes = true)
-            # Don't rebuild a valid tree.
-            return true if valid?
-
-            scope = lambda{|node|}
-            if acts_as_nested_set_options[:scope]
-              scope = lambda{|node|
-                scope_column_names.inject(""){|str, column_name|
-                  str << "AND #{connection.quote_column_name(column_name)} = #{connection.quote(node.send(column_name.to_sym))} "
-                }
-              }
-            end
-            indices = {}
-
-            set_left_and_rights = lambda do |node|
-              # set left
-              node[left_column_name] = indices[scope.call(node)] += 1
-              # find
-              where(["#{quoted_parent_column_name} = ? #{scope.call(node)}", node]).order("#{quoted_left_column_name}, #{quoted_right_column_name}, #{acts_as_nested_set_options[:order] || 'id'}").each{|n| set_left_and_rights.call(n) }
-              # set right
-              node[right_column_name] = indices[scope.call(node)] += 1
-              node.save!(:validate => validate_nodes)
-            end
-
-            # Find root node(s)
-            root_nodes = where("#{quoted_parent_column_name} IS NULL").order("#{quoted_left_column_name}, #{quoted_right_column_name}, #{acts_as_nested_set_options[:order] || 'id'}").each do |root_node|
-              # setup index for this scope
-              indices[scope.call(root_node)] ||= 0
-              set_left_and_rights.call(root_node)
-            end
-          end
-        end
       end
     end
   end

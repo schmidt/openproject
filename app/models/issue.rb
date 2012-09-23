@@ -69,6 +69,14 @@ class Issue < ActiveRecord::Base
   validates_inclusion_of :done_ratio, :in => 0..100
   validates_numericality_of :estimated_hours, :allow_nil => true
 
+  validate :validate_format_of_due_date
+  validate :validate_start_date_before_due_date
+  validate :validate_start_date_before_soonest_start_date
+  validate :validate_fixed_version_is_assignable
+  validate :validate_fixed_version_is_still_open
+  validate :validate_enabled_tracker
+  validate :validate_correct_parent
+
   scope :visible, lambda {|*args| { :include => :project,
                                     :conditions => Issue.visible_condition(args.first || User.current) } }
 
@@ -95,6 +103,7 @@ class Issue < ActiveRecord::Base
   before_save :close_duplicates, :update_done_ratio_from_issue_status
   after_save :reschedule_following_issues, :update_nested_set_attributes, :update_parent_attributes
   after_destroy :update_parent_attributes
+  after_initialize :set_default_values
 
   # Returns a SQL conditions string used to find all issues visible by the specified user
   def self.visible_condition(user, options={})
@@ -106,10 +115,9 @@ class Issue < ActiveRecord::Base
     (usr || User.current).allowed_to?(:view_issues, self.project)
   end
 
-  def after_initialize
-    if new_record?
-      # set default values for new records only
-      self.status ||= IssueStatus.default
+  def set_default_values
+    if new_record? # set default values for new records only
+      self.status   ||= IssueStatus.default
       self.priority ||= IssuePriority.default
     end
   end
@@ -315,34 +323,44 @@ class Issue < ActiveRecord::Base
     Setting.issue_done_ratio == 'issue_field'
   end
 
-  def validate
+  def validate_format_of_due_date
     if self.due_date.nil? && @attributes['due_date'] && !@attributes['due_date'].empty?
       errors.add :due_date, :not_a_date
     end
+  end
 
+  def validate_start_date_before_due_date
     if self.due_date and self.start_date and self.due_date < self.start_date
       errors.add :due_date, :greater_than_start_date
     end
+  end
 
+  def validate_start_date_before_soonest_start_date
     if start_date && soonest_start && start_date < soonest_start
       errors.add :start_date, :invalid
     end
+  end
 
+  def validate_fixed_version_is_assignable
     if fixed_version
-      if !assignable_versions.include?(fixed_version)
-        errors.add :fixed_version_id, :inclusion
-      elsif reopened? && fixed_version.closed?
-        errors.add_to_base I18n.t(:error_can_not_reopen_issue_on_closed_version)
-      end
+      errors.add :fixed_version_id, :inclusion unless assignable_versions.include?(fixed_version)
     end
+  end
 
+  def validate_fixed_version_is_still_open
+    if fixed_version && assignable_versions.include?(fixed_version)
+      errors.add :base, I18n.t(:error_can_not_reopen_issue_on_closed_version) if reopened? && fixed_version.closed?
+    end
+  end
+
+  def validate_enabled_tracker
     # Checks that the issue can not be added/moved to a disabled tracker
     if project && (tracker_id_changed? || project_id_changed?)
-      unless project.trackers.include?(tracker)
-        errors.add :tracker_id, :inclusion
-      end
+      errors.add :tracker_id, :inclusion unless project.trackers.include?(tracker)
     end
+  end
 
+  def validate_correct_parent
     # Checks parent issue assignment
     if @parent_issue
       if !Setting.cross_project_issue_relations? && @parent_issue.project_id != self.project_id
@@ -478,6 +496,14 @@ class Issue < ActiveRecord::Base
     (relations_from + relations_to).sort
   end
 
+  def relation(id)
+    IssueRelation.of_issue(self).find(id)
+  end
+
+  def new_relation
+    self.relations_from.build
+  end
+
   def all_dependent_issues(except=[])
     except << self
     dependencies = []
@@ -610,7 +636,7 @@ class Issue < ActiveRecord::Base
 
           error_message << " " << l(:notice_locking_conflict_reload_page)
 
-          errors.add_to_base error_message
+          errors.add :base, error_message
           raise ActiveRecord::Rollback
         end
       end
@@ -774,7 +800,7 @@ class Issue < ActiveRecord::Base
   def recalculate_attributes_for(issue_id)
     if issue_id && p = Issue.find_by_id(issue_id)
       # priority = highest priority of children
-      if priority_position = p.children.maximum("#{IssuePriority.table_name}.position", :include => :priority)
+      if priority_position = p.children.joins(:priority).maximum("#{IssuePriority.table_name}.position")
         p.priority = IssuePriority.find_by_position(priority_position)
       end
 
@@ -793,7 +819,7 @@ class Issue < ActiveRecord::Base
           if average == 0
             average = 1
           end
-          done = p.leaves.sum("COALESCE(estimated_hours, #{average}) * (CASE WHEN is_closed = #{connection.quoted_true} THEN 100 ELSE COALESCE(done_ratio, 0) END)", :include => :status).to_f
+          done = p.leaves.joins(:status).sum("COALESCE(estimated_hours, #{average}) * (CASE WHEN is_closed = #{connection.quoted_true} THEN 100 ELSE COALESCE(done_ratio, 0) END)").to_f
           progress = done / (average * leaves_count)
           p.done_ratio = progress.round
         end
@@ -804,7 +830,7 @@ class Issue < ActiveRecord::Base
       p.estimated_hours = nil if p.estimated_hours == 0.0
 
       # ancestors will be recursively updated
-      p.save(false)
+      p.save(:validate => false)
     end
   end
 

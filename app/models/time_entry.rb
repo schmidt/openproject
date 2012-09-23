@@ -33,14 +33,21 @@ class TimeEntry < ActiveRecord::Base
   validates_numericality_of :hours, :allow_nil => true, :message => :invalid
   validates_length_of :comments, :maximum => 255, :allow_nil => true
 
+  validate :validate_hours_are_in_range
+  validate :validate_project_is_set
+  validate :validate_consistency_of_issue_id
+
   scope :visible, lambda {|*args| {
     :include => :project,
     :conditions => Project.allowed_to_condition(args.first || User.current, :view_time_entries)
   }}
 
+  after_initialize :set_default_activity
+  before_validation :set_default_project
+
   safe_attributes 'hours', 'comments', 'issue_id', 'activity_id', 'spent_on', 'custom_field_values'
 
-  def after_initialize
+  def set_default_activity
     if new_record? && self.activity.nil?
       if default_activity = TimeEntryActivity.default
         self.activity_id = default_activity.id
@@ -49,14 +56,8 @@ class TimeEntry < ActiveRecord::Base
     end
   end
 
-  def before_validation
-    self.project = issue.project if issue && project.nil?
-  end
-
-  def validate
-    errors.add :hours, :invalid if hours && (hours < 0 || hours >= 1000)
-    errors.add :project_id, :invalid if project.nil?
-    errors.add :issue_id, :invalid if (issue_id && !issue) || (issue && project!=issue.project)
+  def set_default_project
+    self.project ||= issue.project if issue
   end
 
   def hours=(h)
@@ -102,5 +103,19 @@ class TimeEntry < ActiveRecord::Base
       finder_conditions << ["project_id IN (?)", project.hierarchy.collect(&:id)]
     end
     TimeEntry.maximum(:spent_on, :include => :project, :conditions => finder_conditions.conditions)
+  end
+
+private
+
+  def validate_hours_are_in_range
+    errors.add :hours, :invalid if hours && (hours < 0 || hours >= 1000)
+  end
+
+  def validate_project_is_set
+    errors.add :project_id, :invalid if project.nil?
+  end
+
+  def validate_consistency_of_issue_id
+    errors.add :issue_id, :invalid if (issue_id && !issue) || (issue && project!=issue.project)
   end
 end
