@@ -524,6 +524,7 @@ en:
   label_login: Sign in
   label_logout: Sign out
   label_help: Help
+  label_hide: Hide
   label_reported_issues: Reported issues
   label_assigned_to_me_issues: Issues assigned to me
   label_last_login: Last connection
@@ -939,9 +940,12 @@ en:
   text_are_you_sure: Are you sure?
   text_are_you_sure_with_children: "Delete issue and all child issues?"
   text_journal_changed: "%{label} changed from %{old} to %{new}"
+  text_journal_changed_with_diff: "%{label} changed (%{link})"
   text_journal_changed_no_detail: "%{label} updated"
   text_journal_set_to: "%{label} set to %{value}"
+  text_journal_set_with_diff: "%{label} set (%{link})"
   text_journal_deleted: "%{label} deleted (%{old})"
+  text_journal_deleted_with_diff: "%{label} deleted (%{link})"
   text_journal_added: "%{label} %{value} added"
   text_tip_issue_begin_day: issue beginning this day
   text_tip_issue_end_day: issue ending this day
@@ -1089,3 +1093,16 @@ en:
           Of the data the user created (e.g. e-mail, preferences, issues, wiki entries) as much as possible will be deleted. Note however, that data like issues and wiki entries can not be deleted without impeding the work of the other users. Such data is hence reassigned to an account called "Deleted user". As the data of every deleted account is reassigned to this account it will not be possible to distinguish the data the user created from the data of another deleted account.
 
 
+  js:
+    select2:
+      searching: Searching ...
+      load_more: Loading more results ...
+      no_matches: No matches found
+      input_too_short:
+        one: Please enter one more character
+        other: Please enter {{count}} more characters
+        zero: Please enter more characters
+      selection_too_big:
+        one: You can only select one item
+        other: You can only select {{limit}} items
+        zero: You cannot select any items

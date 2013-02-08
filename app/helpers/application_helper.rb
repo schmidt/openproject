@@ -291,20 +291,28 @@ module ApplicationHelper
     end
   end
 
-  def project_tree_options_for_select(projects, options = {})
-    s = ''
-    project_tree(projects) do |project, level|
-      name_prefix = (level > 0 ? ('&nbsp;' * 3 * level + '&#187; ') : '').html_safe
-      tag_options = {:value => project.id, :title => h(project)}
-      if project == options[:selected] || (options[:selected].respond_to?(:include?) && options[:selected].include?(project))
+  def project_tree_options_for_select(projects, options = {}, &block)
+    Project.project_level_list(projects).map do |element|
+
+      tag_options = {
+        :value => h(element[:project].id),
+        :title => h(element[:project].name),
+      }
+
+      if options[:selected] == element[:project] ||
+         (options[:selected].respond_to?(:include?) &&
+          options[:selected].include?(element[:project]))
+
         tag_options[:selected] = 'selected'
-      else
-        tag_options[:selected] = nil
       end
-      tag_options.merge!(yield(project)) if block_given?
-      s << content_tag('option', name_prefix + project.name, tag_options)
-    end
-    s.html_safe
+
+      level_prefix = ''
+      level_prefix = '&nbsp;' * 3 * element[:level] + '&#187; ' if element[:level] > 0
+
+      tag_options.merge!(yield(element[:project])) if block_given?
+
+      content_tag('option', level_prefix + h(element[:project].name), tag_options)
+    end.join('')
   end
 
   # Yields the given block for each project with its level in the tree
@@ -1073,6 +1081,11 @@ module ApplicationHelper
   # Returns the javascript tags that are included in the html layout head
   def user_specific_javascript_includes
     tags = ''
+    tags += javascript_tag(%Q{
+      window.openProject = new OpenProject({
+        urlRoot : '#{Redmine::Utils.relative_url_root}'
+      });
+    })
 
     unless User.current.pref.warn_on_leaving_unsaved == '0'
       tags += javascript_tag("Event.observe(window, 'load', function(){ new WarnLeavingUnsaved('#{escape_javascript( l(:text_warn_on_leaving_unsaved) )}'); });")
@@ -1081,6 +1094,7 @@ module ApplicationHelper
     if User.current.impaired? and accessibility_js_enabled?
       tags += javascript_include_tag("accessibility.js")
     end
+
 
     tags.html_safe
   end
@@ -1166,4 +1180,14 @@ module ApplicationHelper
     raw "<em>" + l(:text_caracters_minimum, :count => Setting.password_min_length) + "</em>"
   end
 
+  def breadcrumb_paths(*args)
+    if args.nil?
+      nil
+    elsif args.empty?
+      @breadcrumb_paths ||= [default_breadcrumb]
+    else
+      @breadcrumb_paths ||= []
+      @breadcrumb_paths += args
+    end
+  end
 end

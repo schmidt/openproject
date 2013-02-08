@@ -74,6 +74,10 @@ OpenProject::Application.routes.draw do
 
     end
 
+    collection do
+      get :level_list
+    end
+
     resource :enumerations, :controller => 'project_enumerations', :only => [:update, :destroy]
 
     resources :documents, :shallow => true
@@ -177,6 +181,9 @@ OpenProject::Application.routes.draw do
         match "/memberships" => 'groups#create_memberships', :via => :post, :as => 'memberships_of'
       end
     end
+
+    #XXX: map.journal_diff should be a ressource
+    map.journal_diff '/journals/:id/diff/:field', :controller => 'journals', :action => 'diff', :conditions => { :method => :get }
 
     resources :roles, :only => [:index, :new, :create, :edit, :update, :destroy] do
       collection do
