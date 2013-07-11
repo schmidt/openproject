@@ -35,6 +35,10 @@ class MailHandlerTest < ActiveSupport::TestCase
     Setting.notified_events = Redmine::Notifiable.all.collect(&:name)
   end
 
+  def teardown
+    Setting.clear_cache
+  end
+
   def test_add_issue
     ActionMailer::Base.deliveries.clear
     # This email contains: 'Project: onlinestore'
@@ -363,7 +367,8 @@ class MailHandlerTest < ActiveSupport::TestCase
     [
       "X-Auto-Response-Suppress: OOF",
       "Auto-Submitted: auto-replied",
-      "Auto-Submitted: Auto-Replied"
+      "Auto-Submitted: Auto-Replied",
+      "Auto-Submitted: auto-generated"
     ].each do |header|
       raw = IO.read(File.join(FIXTURES_PATH, 'ticket_on_given_project.eml'))
       raw = header + "\n" + raw
