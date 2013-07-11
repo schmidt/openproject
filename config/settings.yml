@@ -23,6 +23,10 @@ app_title:
   default: Redmine
 app_subtitle:
   default: Project management
+brute_force_block_minutes:
+  default: 30
+brute_force_block_after_failed_logins:
+  default: 20
 welcome_text:
   default:
 login_required:
