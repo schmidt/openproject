@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -18,6 +16,7 @@ class AuthSourcesControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @request.session[:user_id] = 1
   end
 
@@ -26,8 +25,7 @@ class AuthSourcesControllerTest < ActionController::TestCase
       get :index
     end
 
-    should assign_to :auth_sources
-    should assign_to :auth_source_pages
+    should_assign_to :auth_sources
     should respond_with :success
     should render_template :index
   end
@@ -37,7 +35,7 @@ class AuthSourcesControllerTest < ActionController::TestCase
       get :new
     end
 
-    should assign_to :auth_source
+    should_assign_to :auth_source
     should respond_with :success
     should render_template :new
 
@@ -63,7 +61,7 @@ class AuthSourcesControllerTest < ActionController::TestCase
       get :edit, :id => @auth_source.id
     end
 
-    should assign_to(:auth_source) {@auth_source}
+    should_assign_to(:auth_source) {@auth_source}
     should respond_with :success
     should render_template :edit
   end

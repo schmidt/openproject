@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -15,10 +13,9 @@
 require 'diff'
 
 class JournalsController < ApplicationController
-  before_filter :find_journal, :only => [:edit, :update]
-  before_filter :find_issue, :only => [:new]
+  before_filter :find_journal, :only => [:edit, :update, :diff]
   before_filter :find_optional_project, :only => [:index]
-  before_filter :authorize, :only => [:new, :edit, :update ]
+  before_filter :authorize, :only => [:edit, :update]
   accept_key_auth :index
   menu_item :issues
 
@@ -31,8 +28,8 @@ class JournalsController < ApplicationController
     sort_update(@query.sortable_columns)
 
     if @query.valid?
-      @journals = @query.issue_journals(:order => "#{Journal.table_name}.created_at DESC",
-                                        :limit => 25)
+      @journals = @query.work_package_journals(:order => "#{Journal.table_name}.created_at DESC",
+                                            :limit => 25)
     end
     @title = (@project ? @project.name : Setting.app_title) + ": " + (@query.new_record? ? l(:label_changes_details) : @query.name)
     respond_to do |format|
@@ -40,30 +37,6 @@ class JournalsController < ApplicationController
     end
   rescue ActiveRecord::RecordNotFound
     render_404
-  end
-
-  # Used when replying to an issue or journal
-  def new
-    journal = Journal.find(params[:journal_id]) if params[:journal_id]
-    if journal
-      user = journal.user
-      text = journal.notes
-    else
-      user = @issue.author
-      text = @issue.description
-    end
-    # Replaces pre blocks with [...]
-    text = text.to_s.strip.gsub(%r{<pre>((.|\s)*?)</pre>}m, '[...]')
-    content = "#{ll(Setting.default_language, :text_user_wrote, user)}\n> "
-    content << text.gsub(/(\r?\n|\r\n?)/, "\n> ") + "\n\n"
-
-    render(:update) { |page|
-      page.<< "$('notes').value = \"#{escape_javascript content}\";"
-      page.show 'update'
-      page << "Form.Element.focus('notes');"
-      page << "Element.scrollTo('update');"
-      page << "$('notes').scrollTop = $('notes').scrollHeight - $('notes').clientHeight;"
-    }
   end
 
   def edit
@@ -82,7 +55,7 @@ class JournalsController < ApplicationController
     @journal.destroy if @journal.details.empty? && @journal.notes.blank?
     call_hook(:controller_journals_edit_post, { :journal => @journal, :params => params})
     respond_to do |format|
-      format.html { redirect_to :controller => @journal.journaled.class.name.pluralize.downcase,
+      format.html { redirect_to :controller => "/#{@journal.journaled.class.name.pluralize.downcase}",
         :action => 'show', :id => @journal.journaled_id }
       format.js { render :action => 'update' }
     end
@@ -90,8 +63,8 @@ class JournalsController < ApplicationController
 
   def diff
     if valid_field?(params[:field])
-      from = @journal.changes[params[:field]][0]
-      to = @journal.changes[params[:field]][1]
+      from = @journal.changed_data[params[:field]][0]
+      to = @journal.changed_data[params[:field]][1]
 
       @diff = Redmine::Helpers::Diff.new(to, from)
       @issue = @journal.journaled
@@ -113,16 +86,12 @@ class JournalsController < ApplicationController
     render_404
   end
 
-  # TODO: duplicated in IssuesController
-  def find_issue
-    @issue = Issue.find(params[:id], :include => [:project, :tracker, :status, :author, :priority, :category])
-    @project = @issue.project
-  rescue ActiveRecord::RecordNotFound
-    render_404
-  end
-
   # Is this a valid field for diff'ing?
   def valid_field?(field)
     field.to_s.strip == "description"
+  end
+
+  def default_breadcrumb
+    I18n.t(:label_journal_diff)
   end
 end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -48,7 +46,7 @@ class IssueTest < ActiveSupport::TestCase
   end
 
   def test_create_with_required_custom_field
-    field = IssueCustomField.find_by_name('Database')
+    field = WorkPackageCustomField.find_by_name('Database')
     field.update_attribute(:is_required, true)
 
     issue = Issue.new.tap do |i|
@@ -83,8 +81,8 @@ class IssueTest < ActiveSupport::TestCase
     issues = Issue.visible(User.anonymous).all
     assert issues.any?
     assert_nil issues.detect {|issue| !issue.project.is_public?}
-    # Anonymous user should not see issues without permission
-    Role.anonymous.remove_permission!(:view_issues)
+    # Anonymous user should not see work units without permission
+    Role.anonymous.remove_permission!(:view_work_packages)
     issues = Issue.visible(User.anonymous).all
     assert issues.empty?
   end
@@ -97,7 +95,7 @@ class IssueTest < ActiveSupport::TestCase
     assert issues.any?
     assert_nil issues.detect {|issue| !issue.project.is_public?}
     # Non member user should not see issues without permission
-    Role.non_member.remove_permission!(:view_issues)
+    Role.non_member.remove_permission!(:view_work_packages)
     user.reload
     issues = Issue.visible(user).all
     assert issues.empty?
@@ -122,7 +120,7 @@ class IssueTest < ActiveSupport::TestCase
   end
 
   def test_errors_full_messages_should_include_custom_fields_errors
-    field = IssueCustomField.find_by_name('Database')
+    field = WorkPackageCustomField.find_by_name('Database')
 
     issue = Issue.new.tap do |i|
       i.force_attributes = { :project_id => 1,
@@ -142,7 +140,7 @@ class IssueTest < ActiveSupport::TestCase
   end
 
   def test_update_issue_with_required_custom_field
-    field = IssueCustomField.find_by_name('Database')
+    field = WorkPackageCustomField.find_by_name('Database')
     field.update_attribute(:is_required, true)
 
     issue = Issue.find(1)
@@ -162,7 +160,7 @@ class IssueTest < ActiveSupport::TestCase
 
   def test_should_not_update_attributes_if_custom_fields_validation_fails
     issue = Issue.find(1)
-    field = IssueCustomField.find_by_name('Database')
+    field = WorkPackageCustomField.find_by_name('Database')
     assert issue.available_custom_fields.include?(field)
 
     issue.custom_field_values = { field.id => 'Invalid' }
@@ -174,7 +172,7 @@ class IssueTest < ActiveSupport::TestCase
   end
 
   def test_should_not_recreate_custom_values_objects_on_update
-    field = IssueCustomField.find_by_name('Database')
+    field = WorkPackageCustomField.find_by_name('Database')
 
     issue = Issue.find(1)
     issue.custom_field_values = { field.id => 'PostgreSQL' }
@@ -608,7 +606,7 @@ class IssueTest < ActiveSupport::TestCase
     issue = FactoryGirl.create :issue
     user = FactoryGirl.create :user, :member_in_project => issue.project
     Watcher.create!(:user => user, :watchable => issue)
-    issue.project.members.first.roles.first.remove_permission! :view_issues
+    issue.project.members.first.roles.first.remove_permission! :view_work_packages
     issue.reload
     assert issue.watched_by?(user)
     assert !issue.watcher_recipients.include?(user.mail)
@@ -617,7 +615,7 @@ class IssueTest < ActiveSupport::TestCase
   def test_issue_destroy
     Issue.find(1).destroy
     assert_nil Issue.find_by_id(1)
-    assert_nil TimeEntry.find_by_issue_id(1)
+    assert_nil TimeEntry.find_by_work_package_id(1)
   end
 
   def test_blocked
@@ -768,7 +766,7 @@ class IssueTest < ActiveSupport::TestCase
   end
 
   def test_journalized_description
-    IssueCustomField.delete_all
+    WorkPackageCustomField.delete_all
 
     i = Issue.first
     old_description = i.description
@@ -776,15 +774,15 @@ class IssueTest < ActiveSupport::TestCase
 
     i.init_journal(User.find(2))
     i.description = new_description
-    assert_difference 'IssueJournal.count', 1 do
+    assert_difference 'WorkPackageJournal.count', 1 do
       i.save!
     end
 
-    journal = IssueJournal.first(:order => 'id DESC')
+    journal = WorkPackageJournal.first(:order => 'id DESC')
     assert_equal i, journal.journaled
     assert journal.changed_data.has_key? "description"
-    assert_equal old_description, journal.old_value("description")
-    assert_equal new_description, journal.value("description")
+    assert_equal old_description, journal.old_value_for("description")
+    assert_equal new_description, journal.new_value_for("description")
   end
 
   def test_all_dependent_issues
@@ -1013,7 +1011,7 @@ class IssueTest < ActiveSupport::TestCase
   def test_recently_updated_with_limit_scopes
     #should return the last updated issue
     assert_equal 1, Issue.recently_updated.with_limit(1).length
-    assert_equal Issue.find(:first, :order => "updated_on DESC"), Issue.recently_updated.with_limit(1).first
+    assert_equal Issue.find(:first, :order => "updated_at DESC"), Issue.recently_updated.with_limit(1).first
   end
 
   def test_on_active_projects_scope

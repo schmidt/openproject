@@ -1,24 +1,27 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
 class RolesController < ApplicationController
+  include PaginationHelper
+
   layout 'admin'
 
-  before_filter :require_admin
+  before_filter :require_admin, :except => [:autocomplete_for_role]
 
   def index
-    @role_pages, @roles = paginate :roles, :per_page => 25, :order => 'builtin, position'
+    @roles = Role.order('builtin, position')
+                 .page(page_param)
+                 .per_page(per_page_param)
+
     render :action => "index", :layout => false if request.xhr?
   end
 
@@ -88,5 +91,20 @@ class RolesController < ApplicationController
 
     flash[:notice] = l(:notice_successful_update)
     redirect_to :action => 'index'
+  end
+
+  def autocomplete_for_role
+    size = params[:page_limit].to_i
+    page = params[:page].to_i
+
+    @roles = Role.paginated_search(params[:q], { :page => page, :page_limit => size })
+    # we always get all the items on a page, so just check if we just got the last
+    @more = @roles.total_pages > page
+    @total = @roles.total_entries
+
+    respond_to do |format|
+      format.json
+    end
+
   end
 end

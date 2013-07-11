@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -22,6 +20,7 @@ class Issues::ReportsControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = Issues::ReportsController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -38,7 +37,7 @@ class Issues::ReportsControllerTest < ActionController::TestCase
 
     [:issues_by_tracker, :issues_by_version, :issues_by_category, :issues_by_assigned_to,
      :issues_by_author, :issues_by_subproject].each do |ivar|
-      should assign_to ivar
+      should_assign_to ivar
       should "set a value for #{ivar}" do
         assert assigns[ivar.to_s].present?
       end
@@ -54,10 +53,10 @@ class Issues::ReportsControllerTest < ActionController::TestCase
 
         should respond_with :success
         should render_template :report_details
-        should assign_to :field
-        should assign_to :rows
-        should assign_to :data
-        should assign_to :report_title
+        should_assign_to :field
+        should_assign_to :rows
+        should_assign_to :data
+        should_assign_to :report_title
       end
     end
 

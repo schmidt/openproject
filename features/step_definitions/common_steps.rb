@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 # "Then I should see 5 articles"
 Then /^I should see (\d+) ([^\" ]+)(?: within "([^\"]*)")?$/ do |number, name, selector|
   with_scope(selector) do
@@ -18,17 +29,6 @@ Then /^I should not see(?: (\d+))? ([^\" ]+)(?: within "([^\"]*)")?$/ do |number
       assert page.has_no_css?(".#{name.singularize}", options)
     end
   end
-end
-
-Around('@changes_environment') do |scenario, block|
-  saved_env = ENV["RAILS_ENV"]
-  block.call
-  ENV["RAILS_ENV"] = saved_env
-end
-
-
-Then /^I am in "([^\"]*)" mode$/ do |env|
-  ENV["RAILS_ENV"] = env
 end
 
 Given /^the [pP]roject(?: "([^\"]+?)")? uses the following trackers:$/ do |project, table|

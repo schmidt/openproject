@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -105,11 +103,16 @@ class CustomField < ActiveRecord::Base
       end
     else
       locale = obj if obj.is_a?(String) || obj.is_a?(Symbol)
-      attribute = possible_values(locale)
+      attribute = possible_values(:locale => locale)
       attribute
     end
   end
 
+  ##
+  # Returns possible values for this custom field.
+  # Options may be a user, or options suitable for ActiveRecord#read_attribute.
+  # read_attribute is localized - to get values for a specific locale pass the following options hash
+  # :locale => <locale (-> :en, :de, ...)>
   def possible_values(obj=nil)
     case field_format
     when 'user'
@@ -156,20 +159,23 @@ class CustomField < ActiveRecord::Base
   # objects by their value of the custom field.
   # Returns false, if the custom field can not be used for sorting.
   def order_statement
+    customized_class = self.class.customized_class
+    klass = (customized_class.superclass && !(customized_class.superclass == ActiveRecord::Base)) ? customized_class.superclass : customized_class
+
     case field_format
       when 'string', 'text', 'list', 'date', 'bool'
         # COALESCE is here to make sure that blank and NULL values are sorted equally
         "COALESCE((SELECT cv_sort.value FROM #{CustomValue.table_name} cv_sort" +
-          " WHERE cv_sort.customized_type='#{self.class.customized_class.name}'" +
-          " AND cv_sort.customized_id=#{self.class.customized_class.table_name}.id" +
+          " WHERE cv_sort.customized_type='#{klass.name}'" +
+          " AND cv_sort.customized_id=#{klass.table_name}.id" +
           " AND cv_sort.custom_field_id=#{id} LIMIT 1), '')"
       when 'int', 'float'
         # Make the database cast values into numeric
         # Postgresql will raise an error if a value can not be casted!
         # CustomValue validations should ensure that it doesn't occur
         "(SELECT CAST(cv_sort.value AS decimal(60,3)) FROM #{CustomValue.table_name} cv_sort" +
-          " WHERE cv_sort.customized_type='#{self.class.customized_class.name}'" +
-          " AND cv_sort.customized_id=#{self.class.customized_class.table_name}.id" +
+          " WHERE cv_sort.customized_type='#{klass.name}'" +
+          " AND cv_sort.customized_id=#{klass.table_name}.id" +
           " AND cv_sort.custom_field_id=#{id} AND cv_sort.value <> '' AND cv_sort.value IS NOT NULL LIMIT 1)"
       else
         nil

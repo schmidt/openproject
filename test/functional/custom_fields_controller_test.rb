@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -22,6 +20,7 @@ class CustomFieldsControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = CustomFieldsController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -29,7 +28,7 @@ class CustomFieldsControllerTest < ActionController::TestCase
   end
 
   def test_get_new_issue_custom_field
-    get :new, :type => 'IssueCustomField'
+    get :new, :type => 'WorkPackageCustomField'
     assert_response :success
     assert_template 'new'
     assert_tag :select,
@@ -55,7 +54,7 @@ class CustomFieldsControllerTest < ActionController::TestCase
 
   def test_post_new_list_custom_field
     assert_difference 'CustomField.count' do
-      post :new, :type => "IssueCustomField",
+      post :new, :type => "WorkPackageCustomField",
                  :custom_field => {:name => "test_post_new_list",
                                    :default_value => "",
                                    :min_length => "0",
@@ -69,8 +68,8 @@ class CustomFieldsControllerTest < ActionController::TestCase
                                    :field_format => "list",
                                    :tracker_ids => ["1", ""]}
     end
-    assert_redirected_to '/custom_fields?tab=IssueCustomField'
-    field = IssueCustomField.find_by_name('test_post_new_list')
+    assert_redirected_to '/custom_fields?tab=WorkPackageCustomField'
+    field = WorkPackageCustomField.find_by_name('test_post_new_list')
     assert_not_nil field
     assert_equal ["0.1", "0.2"], field.possible_values
     assert_equal 1, field.trackers.size

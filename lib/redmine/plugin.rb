@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -155,63 +153,27 @@ module Redmine #:nodoc:
       self.id.to_s <=> plugin.id.to_s
     end
 
-    # Sets a requirement on the ChiliProject version.
+    # Sets a requirement on the OpenProject version.
     # Raises a PluginRequirementError exception if the requirement is not met.
     #
     # It uses the same syntax as rubygems requirements.
     # Examples
-    #   # Requires exactly ChiliProject 1.1.1
-    #   requires_chiliproject "1.1.1"
-    #   requires_chiliproject "= 1.1.1"
+    #   # Requires exactly OpenProject 1.1.1
+    #   requires_openproject "1.1.1"
+    #   requires_openproject "= 1.1.1"
 
-    #   # Requires ChiliProject 1.1.x
-    #   requires_chiliproject "~> 1.1.0"
+    #   # Requires OpenProject 1.1.x
+    #   requires_openproject "~> 1.1.0"
 
-    #   # Requires ChiliProject between 1.1.0 and 1.1.5 or higher
-    #   requires_chiliproject ">= 1.1.0", "<= 1.1.5"
+    #   # Requires OpenProject between 1.1.0 and 1.1.5 or higher
+    #   requires_openproject ">= 1.1.0", "<= 1.1.5"
 
-    def requires_chiliproject(*args)
+    def requires_openproject(*args)
       required_version = Gem::Requirement.new(*args)
-      chili_version = Gem::Version.new(ChiliProject::VERSION.to_semver)
+      op_version = Gem::Version.new(OpenProject::VERSION.to_semver)
 
-      unless required_version.satisfied_by? chili_version
-        raise PluginRequirementError.new("#{id} plugin requires ChiliProject version #{required_version} but current version is #{chili_version}.")
-      end
-      true
-    end
-
-    # Sets a requirement on Redmine version.
-    # Raises a PluginRequirementError exception if the requirement is not met
-    #
-    # THIS IS A REDMINE COMPATIBILITY INTERFACE
-    #
-    # Examples
-    #   # Requires Redmine 0.7.3 or higher
-    #   requires_redmine :version_or_higher => '0.7.3'
-    #   requires_redmine '0.7.3'
-    #
-    #   # Requires a specific Redmine version
-    #   requires_redmine :version => '0.7.3'              # 0.7.3 only
-    #   requires_redmine :version => ['0.7.3', '0.8.0']   # 0.7.3 or 0.8.0
-    def requires_redmine(arg)
-      arg = { :version_or_higher => arg } unless arg.is_a?(Hash)
-      arg.assert_valid_keys(:version, :version_or_higher)
-
-      current = Redmine::VERSION.to_a
-      arg.each do |k, v|
-        v = [] << v unless v.is_a?(Array)
-        versions = v.collect {|s| s.split('.').collect(&:to_i)}
-        case k
-        when :version_or_higher
-          raise ArgumentError.new("wrong number of versions (#{versions.size} for 1)") unless versions.size == 1
-          unless (current <=> versions.first) >= 0
-            raise PluginRequirementError.new("#{id} plugin requires Redmine #{v} or higher but current is #{current.join('.')}")
-          end
-        when :version
-          unless versions.include?(current.slice(0,3))
-            raise PluginRequirementError.new("#{id} plugin requires one the following Redmine versions: #{v.join(', ')} but current is #{current.join('.')}")
-          end
-        end
+      unless required_version.satisfied_by? op_version
+        raise PluginRequirementError.new("#{id} plugin requires OpenProject version #{required_version} but current version is #{op_version}.")
       end
       true
     end
@@ -254,7 +216,7 @@ module Redmine #:nodoc:
 
     # Adds an item to the given +menu+.
     # The +id+ parameter (equals to the project id) is automatically added to the url.
-    #   menu :project_menu, :plugin_example, { :controller => 'example', :action => 'say_hello' }, :caption => 'Sample'
+    #   menu :project_menu, :plugin_example, { :controller => '/example', :action => 'say_hello' }, :caption => 'Sample'
     #
     # +name+ parameter can be: :top_menu, :account_menu, :application_menu or :project_menu
     #
@@ -401,78 +363,6 @@ module Redmine #:nodoc:
         all.each do |plugin|
           plugin.mirror_assets
         end
-      end
-    end
-
-    # The directory containing this plugin's migrations (<tt>plugin/db/migrate</tt>)
-    def migration_directory
-      File.join(Rails.root, 'vendor/plugins', id.to_s, 'db', 'migrate')
-    end
-
-    # Returns the version number of the latest migration for this plugin. Returns
-    # nil if this plugin has no migrations.
-    def latest_migration
-      migrations.last
-    end
-
-    # Returns the version numbers of all migrations for this plugin.
-    def migrations
-      migrations = Dir[migration_directory+"/*.rb"]
-      migrations.map { |p| File.basename(p).match(/0*(\d+)\_/)[1].to_i }.sort
-    end
-
-    # Migrate this plugin to the given version
-    def migrate(version = nil)
-      puts "Migrating #{id} (#{name})..."
-      Redmine::Plugin::Migrator.migrate_plugin(self, version)
-    end
-
-    # Migrates all plugins or a single plugin to a given version
-    # Exemples:
-    #   Plugin.migrate
-    #   Plugin.migrate('sample_plugin')
-    #   Plugin.migrate('sample_plugin', 1)
-    #
-    def self.migrate(name=nil, version=nil)
-      if name.present?
-        find(name).migrate(version)
-      else
-        all.each do |plugin|
-          plugin.migrate
-        end
-      end
-    end
-
-    class Migrator < ActiveRecord::Migrator
-      # We need to be able to set the 'current' plugin being migrated.
-      cattr_accessor :current_plugin
-
-      class << self
-        # Runs the migrations from a plugin, up (or down) to the version given
-        def migrate_plugin(plugin, version)
-          self.current_plugin = plugin
-          require 'ruby-debug'; debugger
-          return if current_version(plugin) == version
-          migrate(plugin.migration_directory, version)
-        end
-
-        def current_version(plugin=current_plugin)
-          # Delete migrations that don't match .. to_i will work because the number comes first
-          ::ActiveRecord::Base.connection.select_values(
-            "SELECT version FROM #{schema_migrations_table_name}"
-          ).delete_if{ |v| v.match(/-#{plugin.id}/) == nil }.map(&:to_i).max || 0
-        end
-      end
-
-      def migrated
-        sm_table = self.class.schema_migrations_table_name
-        ::ActiveRecord::Base.connection.select_values(
-          "SELECT version FROM #{sm_table}"
-        ).delete_if{ |v| v.match(/-#{current_plugin.id}/) == nil }.map(&:to_i).sort
-      end
-
-      def record_version_state_after_migrating(version)
-        super(version.to_s + "-" + current_plugin.id.to_s)
       end
     end
   end

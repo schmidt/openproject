@@ -1,8 +1,20 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <h2><%= l(:label_board_plural) %></h2>
 
 <table class="list boards">
   <thead><tr>
-    <th><%= l(:label_board) %></th>
+    <th><%= Board.name.humanize %></th>
     <th><%= l(:label_topic_plural) %></th>
     <th><%= l(:label_message_plural) %></th>
     <th><%= l(:label_message_last) %></th>
@@ -30,11 +42,11 @@
 </table>
 
 <%= other_formats_links do |f| %>
-	<%= f.link_to 'Atom', :url => {:controller => 'activities', :action => 'index', :id => @project, :show_messages => 1, :key => User.current.rss_key} %>
+	<%= f.link_to 'Atom', :url => {:controller => '/activities', :action => 'index', :id => @project, :show_messages => 1, :key => User.current.rss_key} %>
 <% end %>
 
 <% content_for :header_tags do %>
-  <%= auto_discovery_link_tag(:atom, {:controller => 'activities', :action => 'index', :id => @project, :format => 'atom', :show_messages => 1, :key => User.current.rss_key}) %>
+  <%= auto_discovery_link_tag(:atom, {:controller => '/activities', :action => 'index', :id => @project, :format => 'atom', :show_messages => 1, :key => User.current.rss_key}) %>
 <% end %>
 
 <% html_title l(:label_board_plural) %>

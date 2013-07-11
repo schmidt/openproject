@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,10 +19,11 @@ class WelcomeControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = WelcomeController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
-    Setting.available_languages = [:en, :fr, :"zh-TW"]
+    Setting.available_languages = [:en, :de]
     User.current = nil
   end
 
@@ -39,23 +38,23 @@ class WelcomeControllerTest < ActionController::TestCase
 
   def test_browser_language
     Setting.default_language = 'en'
-    @request.env['HTTP_ACCEPT_LANGUAGE'] = 'fr,fr-fr;q=0.8,en-us;q=0.5,en;q=0.3'
+    @request.env['HTTP_ACCEPT_LANGUAGE'] = 'de,de-de;q=0.8,en-us;q=0.5,en;q=0.3'
     get :index
-    assert_equal :fr, @controller.current_language
+    assert_equal :de, @controller.current_language
   end
 
   def test_browser_language_alternate
     Setting.default_language = 'en'
-    @request.env['HTTP_ACCEPT_LANGUAGE'] = 'zh-TW'
+    @request.env['HTTP_ACCEPT_LANGUAGE'] = 'de'
     get :index
-    assert_equal :"zh-TW", @controller.current_language
+    assert_equal :"de", @controller.current_language
   end
 
   def test_browser_language_alternate_not_valid
     Setting.default_language = 'en'
-    @request.env['HTTP_ACCEPT_LANGUAGE'] = 'fr-CA'
+    @request.env['HTTP_ACCEPT_LANGUAGE'] = 'de-CA'
     get :index
-    assert_equal :fr, @controller.current_language
+    assert_equal :de, @controller.current_language
   end
 
   def test_robots

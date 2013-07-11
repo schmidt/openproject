@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -49,31 +47,6 @@ namespace :redmine do
       PluginSourceAnnotationExtractor.enumerate 'call_hook'
     end
 
-    desc 'Migrates installed plugins.'
-    task :migrate => :environment do
-      name = ENV['NAME']
-      version = nil
-      version_string = ENV['VERSION']
-      if version_string
-        if version_string =~ /^\d+$/
-          version = version_string.to_i
-          if name.nil?
-            abort "The VERSION argument requires a plugin NAME."
-          end
-        else
-          abort "Invalid VERSION #{version_string} given."
-        end
-      end
-
-      begin
-        Redmine::Plugin.migrate(name, version)
-      rescue Redmine::PluginNotFound
-        abort "Plugin #{name} was not found."
-      end
-
-      Rake::Task["db:schema:dump"].invoke
-    end
-
     desc 'Copies plugins assets into the public directory.'
     task :assets => :environment do
       name = ENV['NAME']
@@ -113,14 +86,6 @@ namespace :redmine do
         t.verbose = true
         t.test_files = FileList["plugins/#{ENV['NAME'] || '*'}/test/integration/**/*_test.rb"]
       end
-    end
-  end
-end
-
-namespace :db do
-  namespace :migrate do
-    task :plugins do
-      #noop
     end
   end
 end

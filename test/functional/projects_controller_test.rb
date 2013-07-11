@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -23,6 +21,7 @@ class ProjectsControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = ProjectsController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -150,7 +149,7 @@ class ProjectsControllerTest < ActionController::TestCase
             :custom_field_values => { '3' => 'Beta' },
             :tracker_ids => ['1', '3'],
             # an issue custom field that is not for all project
-            :issue_custom_field_ids => ['9'],
+            :work_package_custom_field_ids => ['9'],
             :enabled_module_names => ['issue_tracking', 'news', 'repository']
           }
         assert_redirected_to '/projects/blog/settings'
@@ -165,7 +164,7 @@ class ProjectsControllerTest < ActionController::TestCase
         assert_equal 'Beta', project.custom_value_for(3).value
         assert_equal [1, 3], project.trackers.map(&:id).sort
         assert_equal ['issue_tracking', 'news', 'repository'], project.enabled_module_names.sort
-        assert project.issue_custom_fields.include?(IssueCustomField.find(9))
+        assert project.work_package_custom_fields.include?(WorkPackageCustomField.find(9))
       end
 
       should "create a new subproject" do

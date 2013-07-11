@@ -1,89 +1,147 @@
-# --- Instructions ---
-# Sort the contents of this file into a Spork.prefork and a Spork.each_run
-# block.
+#-- copyright
+# OpenProject is a project management system.
 #
-# The Spork.prefork block is run only once when the spork server is started.
-# You typically want to place most of your (slow) initializer code in here, in
-# particular, require'ing any 3rd-party gems that you don't normally modify
-# during development.
+# Copyright (C) 2012-2013 the OpenProject Team
 #
-# The Spork.each_run block is run each time you run your specs.  In case you
-# need to load files that tend to change during development, require them here.
-# With Rails, your application modules are loaded automatically, so sometimes
-# this block can remain empty.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
 #
-# Note: You can modify files loaded *from* the Spork.each_run block without
-# restarting the spork server.  However, this file itself will not be reloaded,
-# so if you change any of the code inside the each_run block, you still need to
-# restart the server.  In general, if you have non-trivial code in this file,
-# it's advisable to move it into a separate file so you can easily edit it
-# without restarting spork.  (For example, with RSpec, you could move
-# non-trivial code into a file spec/support/my_helper.rb, making sure that the
-# spec/support/* files are require'd from inside the each_run block.)
-#
-# Any code that is left outside the two blocks will be run during preforking
-# *and* during each_run -- that's probably not what you want.
-#
-# These instructions should self-destruct in 10 seconds.  If they don't, feel
-# free to delete them.
+# See doc/COPYRIGHT.rdoc for more details.
+#++
 
 require 'rubygems'
-require 'spork'
 
-#uncomment the following line to use spork with the debugger
-#require 'spork/ext/ruby-debug'
+# This file is copied to spec/ when you run 'rails generate rspec:install'
+ENV["RAILS_ENV"] ||= 'test'
 
-Spork.prefork do
-  # Loading more in this block will cause your tests to run faster. However,
-  # if you change any configuration or code from libraries loaded here, you'll
-  # need to restart spork for it take effect.
+require 'coveralls'
+require 'simplecov_openproject_profile'
+Coveralls.wear_merged!('openproject')
 
-  # This file is copied to spec/ when you run 'rails generate rspec:install'
-  ENV["RAILS_ENV"] ||= 'test'
-  require File.expand_path("../../config/environment", __FILE__)
-  require 'rspec/rails'
-  require 'rspec/autorun'
-  require 'capybara/rails'
+require File.expand_path("../../config/environment", __FILE__)
+require 'rspec/rails'
 
-  # Requires supporting ruby files with custom matchers and macros, etc,
-  # in spec/support/ and its subdirectories.
-  Dir[Rails.root.join("spec/support/**/*.rb")].each {|f| require f}
+require 'rspec/autorun'
+require 'rspec/example_disabler'
+require 'capybara/rails'
 
-  RSpec.configure do |config|
-    # ## Mock Framework
-    #
-    # If you prefer to use mocha, flexmock or RR, uncomment the appropriate line:
-    #
-    # config.mock_with :mocha
-    # config.mock_with :flexmock
-    # config.mock_with :rr
+# Requires supporting ruby files with custom matchers and macros, etc,
+# in spec/support/ and its subdirectories.
+Dir[Rails.root.join("spec/support/**/*.rb")].each {|f| require f}
 
-    # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
-    config.fixture_path = "#{::Rails.root}/spec/fixtures"
+RSpec.configure do |config|
+  # ## Mock Framework
+  #
+  # If you prefer to use mocha, flexmock or RR, uncomment the appropriate line:
+  #
+  # config.mock_with :mocha
+  # config.mock_with :flexmock
+  # config.mock_with :rr
+  config.mock_with :rspec
 
-    # If you're not using ActiveRecord, or you'd prefer not to run each of your
-    # examples within a transaction, remove the following line or assign false
-    # instead of true.
-    config.use_transactional_fixtures = true
+  # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
+  config.fixture_path = "#{::Rails.root}/spec/fixtures"
 
-    # If true, the base class of anonymous controllers will be inferred
-    # automatically. This will be the default behavior in future versions of
-    # rspec-rails.
-    config.infer_base_class_for_anonymous_controllers = false
+  # If you're not using ActiveRecord, or you'd prefer not to run each of your
+  # examples within a transaction, remove the following line or assign false
+  # instead of true.
+  config.use_transactional_fixtures = true
 
-    # Run specs in random order to surface order dependencies. If you find an
-    # order dependency and want to debug it, you can fix the order by providing
-    # the seed, which is printed after each run.
-    #     --seed 1234
-    config.order = "random"
+  # If true, the base class of anonymous controllers will be inferred
+  # automatically. This will be the default behavior in future versions of
+  # rspec-rails.
+  config.infer_base_class_for_anonymous_controllers = false
 
-    config.treat_symbols_as_metadata_keys_with_true_values = true
-    config.filter_run :focus => true
-    config.run_all_when_everything_filtered = true
+  # Run specs in random order to surface order dependencies. If you find an
+  # order dependency and want to debug it, you can fix the order by providing
+  # the seed, which is printed after each run.
+  #     --seed 1234
+  config.order = "random"
+
+  config.treat_symbols_as_metadata_keys_with_true_values = true
+  config.run_all_when_everything_filtered = true
+
+  config.after(:each) do
+    OpenProject::RSpecLazinessWarn.warn_if_user_current_set(example)
+  end
+
+  config.after(:suite) do
+    [User, Project, Issue].each do |cls|
+      raise "your specs leave a #{cls} in the DB\ndid you use before(:all) instead of before or forget to kill the instances in a after(:all)?" if cls.count > 0
+    end
   end
 end
 
-Spork.each_run do
-  # This code will be run each time you run your specs.
-  FactoryGirl.reload
+# load disable_specs.rbs from plugins
+Rails.application.config.plugins_to_test_paths.each do |dir|
+  disable_specs_file = File.join(dir, 'spec', 'disable_specs.rb')
+  if File.exists?(disable_specs_file)
+    puts 'Loading ' + disable_specs_file
+    require disable_specs_file
+  end
+end
+
+module OpenProject::RSpecLazinessWarn
+
+  def self.warn_if_user_current_set(example)
+    # Using the hacky way of getting current_user to avoid under the hood creation of AnonymousUser
+    # which might break other tests and at least leaves this user in the db after the test is run.
+    unless User.instance_variable_get(:@current_user).nil?
+
+      # we only want an abbreviated_stacktrace because the logfiles
+      # might otherwise not be capable to show all the warnings.
+      # Thus we only take the callers that are part of the user code.
+      file_roots = Rails::Application::Railties.engines.map { |e| e.root.to_s } << Rails.root.to_s
+      abbreviated_stacktrace = example.metadata[:caller].select { |s| file_roots.any?{ |root| s.include?(root) } }
+
+      # we only want to show the more verbose warning once
+      if self.warned
+        warn <<-DOC
+
+              ============================================================================================
+              #{ example.full_description }
+              ============================================================================================
+              This spec also leaves User.current in an unclean state.
+              ============================================================================================
+              #{ abbreviated_stacktrace.join("\n              ") }
+              ============================================================================================
+        DOC
+      else
+        warn <<-DOC
+
+                ============================================================================================
+                #{ example.full_description }
+                ============================================================================================
+                This spec leaves User.current in an unclean state, creating a dependency to other specs.
+
+                It sets User.current to a value other than User.anonymous but does not clean up after the
+                spec is run. User.current saves this value in an instance variable of the User class.
+                This class instance variable is not removed between tests.
+
+                So please go ahead and set User.current to nil afterwards.
+                ============================================================================================
+
+                Abbreviated stacktrace:
+
+                #{ abbreviated_stacktrace.join("\n              ") }
+
+                ============================================================================================
+
+
+        DOC
+
+        self.warned = true
+      end
+
+      User.current = nil
+    end
+  end
+
+
+  protected
+
+  class << self
+    attr_accessor :warned
+  end
+
 end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -120,14 +118,13 @@ class Redmine::I18nTest < ActiveSupport::TestCase
   end
 
   def test_valid_language
-    Setting.available_languages = [:fr, :zh, :"zh-TW"]
+    Setting.available_languages = [:de, :zh]
 
-    to_test = {'fr' => :fr,
-               'Fr' => :fr,
-               'zh' => :zh,
-               'zh-tw' => :"zh-TW",
-               'zh-TW' => :"zh-TW",
-               'zh-ZZ' => nil }
+    to_test = {'de' => :de,
+               'DE' => :de,
+               'De' => :de,
+               'de-ZZ' => nil,
+               'zh' => nil }
 
     to_test.each {|lang, expected| assert_equal expected, find_language(lang)}
   end
@@ -136,13 +133,13 @@ class Redmine::I18nTest < ActiveSupport::TestCase
     ::I18n.backend.store_translations(:en, {:untranslated => "Untranslated string"})
     ::I18n.locale = 'en'
     assert_equal "Untranslated string", l(:untranslated)
-    ::I18n.locale = 'fr'
+    ::I18n.locale = 'de'
     assert_equal "Untranslated string", l(:untranslated)
 
-    ::I18n.backend.store_translations(:fr, {:untranslated => "Pas de traduction"})
+    ::I18n.backend.store_translations(:de, {:untranslated => "Keine Übersetzung"})
     ::I18n.locale = 'en'
     assert_equal "Untranslated string", l(:untranslated)
-    ::I18n.locale = 'fr'
-    assert_equal "Pas de traduction", l(:untranslated)
+    ::I18n.locale = 'de'
+    assert_equal "Keine Übersetzung", l(:untranslated)
   end
 end

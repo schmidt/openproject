@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,6 +19,7 @@ class WikiControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = WikiController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -146,7 +145,7 @@ class WikiControllerTest < ActionController::TestCase
     assert_template 'edit'
 
     assert_error_tag :descendant => {:content => /Comment is too long/}
-    assert_tag :tag => 'textarea', :attributes => {:id => 'content_text'}, :content => 'edited'
+    assert_tag :tag => 'textarea', :attributes => {:id => 'content_text'}, :content => /edited/
     assert_tag :tag => 'input', :attributes => {:id => 'content_lock_version', :value => '1'}
   end
 
@@ -282,9 +281,9 @@ class WikiControllerTest < ActionController::TestCase
 
   def test_rename_with_redirect
     @request.session[:user_id] = 2
-    post :rename, :project_id => 1, :id => 'Another_page',
-                            :wiki_page => { :title => 'Another renamed page',
-                                            :redirect_existing_links => 1 }
+    put :rename, :project_id => 1, :id => 'Another_page',
+                 :wiki_page => { :title => 'Another renamed page',
+                                 :redirect_existing_links => 1 }
     assert_redirected_to :action => 'show', :project_id => 'ecookbook', :id => 'Another_renamed_page'
     wiki = Project.find(1).wiki
     # Check redirects
@@ -294,9 +293,9 @@ class WikiControllerTest < ActionController::TestCase
 
   def test_rename_without_redirect
     @request.session[:user_id] = 2
-    post :rename, :project_id => 1, :id => 'Another_page',
-                            :wiki_page => { :title => 'Another renamed page',
-                                            :redirect_existing_links => "0" }
+    put :rename, :project_id => 1, :id => 'Another_page',
+                 :wiki_page => { :title => 'Another renamed page',
+                                 :redirect_existing_links => "0" }
     assert_redirected_to :action => 'show', :project_id => 'ecookbook', :id => 'Another_renamed_page'
     wiki = Project.find(1).wiki
     # Check that there's no redirects
@@ -305,16 +304,20 @@ class WikiControllerTest < ActionController::TestCase
 
   def test_rename_with_parent_assignment
     @request.session[:user_id] = 2
-    post :rename, :project_id => 1, :id => 'Another_page',
-      :wiki_page => { :title => 'Another page', :redirect_existing_links => "0", :parent_id => '4' }
+    put :rename, :project_id => 1, :id => 'Another_page',
+                 :wiki_page => { :title => 'Another page',
+                                 :redirect_existing_links => "0",
+                                 :parent_id => '4' }
     assert_redirected_to :action => 'show', :project_id => 'ecookbook', :id => 'Another_page'
     assert_equal WikiPage.find(4), WikiPage.find_by_title('Another_page').parent
   end
 
   def test_rename_with_parent_unassignment
     @request.session[:user_id] = 2
-    post :rename, :project_id => 1, :id => 'Child_1',
-      :wiki_page => { :title => 'Child 1', :redirect_existing_links => "0", :parent_id => '' }
+    put :rename, :project_id => 1, :id => 'Child_1',
+                 :wiki_page => { :title => 'Child 1',
+                                 :redirect_existing_links => "0",
+                                 :parent_id => '' }
     assert_redirected_to :action => 'show', :project_id => 'ecookbook', :id => 'Child_1'
     assert_nil WikiPage.find_by_title('Child_1').parent
   end
@@ -396,8 +399,8 @@ class WikiControllerTest < ActionController::TestCase
       end
 
       should respond_with :success
-      should assign_to :pages
-      should respond_with_content_type "text/html"
+      should_assign_to :pages
+      should_respond_with_content_type "text/html"
       should "export all of the wiki pages to a single html file" do
         assert_select "a[name=?]", "CookBook_documentation"
         assert_select "a[name=?]", "Another_page"
@@ -422,8 +425,8 @@ class WikiControllerTest < ActionController::TestCase
     end
 
     should respond_with :success
-    should assign_to :pages
-    should assign_to :pages_by_date
+    should_assign_to :pages
+    should_assign_to :pages_by_date
     should render_template 'wiki/date_index'
 
     should "include atom link" do

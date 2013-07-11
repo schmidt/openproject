@@ -1,48 +1,65 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <%= error_messages_for 'user' %>
 
 <!--[form:user]-->
 <div class="box tabular">
-<p><%= f.text_field :login, :required => true, :size => 25  %></p>
-<p><%= f.text_field :firstname, :required => true %></p>
-<p><%= f.text_field :lastname, :required => true %></p>
-<p><%= f.text_field :mail, :required => true %></p>
-<p><%= f.select :language, lang_options_for_select %></p>
-<% if Setting.openid? %>
-<p><%= f.text_field :identity_url  %></p>
-<% end %>
+  <p><%= f.text_field :login, :required => true, :size => 25  %></p>
+  <p><%= f.text_field :firstname, :required => true %></p>
+  <p><%= f.text_field :lastname, :required => true %></p>
+  <p><%= f.text_field :mail, :required => true %></p>
+  <p><%= f.select :language, lang_options_for_select %></p>
+  <% if Setting.openid? %>
+  <p><%= f.text_field :identity_url  %></p>
+  <% end %>
 
-<% @user.custom_field_values.each do |value| %>
-	<p><%= custom_field_tag_with_label :user, value %></p>
-<% end %>
+  <% @user.custom_field_values.each do |value| %>
+    <p><%= custom_field_tag_with_label :user, value %></p>
+  <% end %>
 
-<p><%= f.check_box :admin, :disabled => (@user == User.current) %></p>
-<%= call_hook(:view_users_form, :user => @user, :form => f) %>
+  <p><%= f.check_box :admin, :disabled => (@user == User.current) %></p>
+  <%= call_hook(:view_users_form, :user => @user, :form => f) %>
 </div>
 
 <div class="box tabular">
-  <h3><%=l(:field_ui, :app_title => Setting.app_title)%></h3>
+  <h3><%=l(:label_ui, :app_title => Setting.app_title)%></h3>
   <%= render :partial => "users/impaired_settings" %>
 </div>
 
 <div class="box tabular">
-<h3><%=l(:label_authentication)%></h3>
-<% unless @auth_sources.empty? %>
-<p><%= f.select :auth_source_id, ([[l(:label_internal), ""]] + @auth_sources.collect { |a| [a.name, a.id] }), {}, :onchange => "if (this.value=='') {Element.show('password_fields');} else {Element.hide('password_fields');}" %></p>
-<% end %>
-<div id="password_fields" style="<%= 'display:none;' if @user.auth_source %>">
-<p><%= f.password_field :password, :required => true, :size => 25, :autocomplete => :off %><br />
-<%= password_complexity_requirements %></p>
-<p><%= f.password_field :password_confirmation, :required => true, :size => 25, :autocomplete => :off %></p>
-</div>
+  <h3><%=l(:label_authentication)%></h3>
+  <% unless @auth_sources.empty? %>
+    <p><%= f.select :auth_source_id, ([[l(:label_internal), ""]] + @auth_sources.collect { |a| [a.name, a.id] }), {}, :onchange => "if (this.value=='') {Element.show('password_fields');} else {Element.hide('password_fields');}" %></p>
+  <% end %>
+  <div id="password_fields" style="<%= 'display:none;' if @user.auth_source %>">
+    <p>
+      <%= f.password_field :password, :required => true, :size => 25 %><br />
+      <%= password_complexity_requirements %>
+    </p>
+    <p><%= f.password_field :password_confirmation, :required => true, :size => 25 %></p>
+    <p>
+      <%= f.check_box :force_password_change %>
+    </p>
+  </div>
 </div>
 
 <div class="box">
-<h3><%=l(:field_mail_notification)%></h3>
-<%= render :partial => 'users/mail_notifications' %>
+  <h3><%= User.human_attribute_name(:mail_notification) %></h3>
+  <%= render :partial => 'users/mail_notifications' %>
 </div>
 
 <div class="box tabular">
-<h3><%=l(:label_preferences)%></h3>
-<%= render :partial => 'users/preferences' %>
+  <h3><%=l(:label_preferences)%></h3>
+  <%= render :partial => 'users/preferences' %>
 </div>
 <!--[eoform:user]-->

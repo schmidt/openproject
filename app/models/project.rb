@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -27,18 +25,28 @@ class Project < ActiveRecord::Base
 
   # Specific overidden Activities
   has_many :time_entry_activities
-  has_many :members, :include => [:user, :roles], :conditions => "#{User.table_name}.type='User' AND #{User.table_name}.status=#{User::STATUS_ACTIVE}"
+  has_many :members, :include => [:user, :roles], :conditions => "#{User.table_name}.type='User' AND #{User.table_name}.status=#{User::STATUSES[:active]}"
+  has_many :assignable_members,
+           :class_name => 'Member',
+           :include => [:user, :roles],
+           :conditions => ["#{User.table_name}.type=? AND #{User.table_name}.status=? AND roles.assignable = ?",
+                           'User',
+                           User::STATUSES[:active],
+                           true]
   has_many :memberships, :class_name => 'Member'
   has_many :member_principals, :class_name => 'Member',
                                :include => :principal,
-                               :conditions => "#{Principal.table_name}.type='Group' OR (#{Principal.table_name}.type='User' AND (#{Principal.table_name}.status=#{User::STATUS_ACTIVE} OR #{Principal.table_name}.status=#{User::STATUS_REGISTERED}))"
+                               :conditions => "#{Principal.table_name}.type='Group' OR " +
+                                              "(#{Principal.table_name}.type='User' AND " +
+                                              "(#{Principal.table_name}.status=#{User::STATUSES[:active]} OR " +
+                                              "#{Principal.table_name}.status=#{User::STATUSES[:registered]}))"
   has_many :users, :through => :members
   has_many :principals, :through => :member_principals, :source => :principal
 
   has_many :enabled_modules, :dependent => :delete_all
   has_and_belongs_to_many :trackers, :order => "#{Tracker.table_name}.position"
-  has_many :issues, :dependent => :destroy, :order => "#{Issue.table_name}.created_on DESC", :include => [:status, :tracker]
-  has_many :issue_changes, :through => :issues, :source => :journals
+  has_many :work_packages, :dependent => :destroy, :order => "#{WorkPackage.table_name}.created_at DESC", :include => [:status, :tracker]
+  has_many :work_package_changes, :through => :work_packages, :source => :journals
   has_many :versions, :dependent => :destroy, :order => "#{Version.table_name}.effective_date DESC, #{Version.table_name}.name DESC"
   has_many :time_entries, :dependent => :delete_all
   has_many :queries, :dependent => :delete_all
@@ -49,9 +57,9 @@ class Project < ActiveRecord::Base
   has_one :repository, :dependent => :destroy
   has_many :changesets, :through => :repository
   has_one :wiki, :dependent => :destroy
-  # Custom field for the project issues
-  has_and_belongs_to_many :issue_custom_fields,
-                          :class_name => 'IssueCustomField',
+  # Custom field for the project work units
+  has_and_belongs_to_many :work_package_custom_fields,
+                          :class_name => 'WorkPackageCustomField',
                           :order => "#{CustomField.table_name}.position",
                           :join_table => "#{table_name_prefix}custom_fields_projects#{table_name_suffix}",
                           :association_foreign_key => 'custom_field_id'
@@ -62,8 +70,8 @@ class Project < ActiveRecord::Base
 
   acts_as_customizable
   acts_as_searchable :columns => ["#{table_name}.name", "#{table_name}.identifier", "#{table_name}.description", "#{table_name}.summary"], :project_key => 'id', :permission => nil
-  acts_as_event :title => Proc.new {|o| "#{l(:label_project)}: #{o.name}"},
-                :url => Proc.new {|o| {:controller => 'projects', :action => 'show', :id => o}},
+  acts_as_event :title => Proc.new {|o| "#{Project.model_name.human}: #{o.name}"},
+                :url => Proc.new {|o| {:controller => '/projects', :action => 'show', :id => o}},
                 :author => nil
 
   attr_protected :status
@@ -82,9 +90,153 @@ class Project < ActiveRecord::Base
   before_destroy :delete_all_members
 
   scope :has_module, lambda { |mod| { :conditions => ["#{Project.table_name}.id IN (SELECT em.project_id FROM #{EnabledModule.table_name} em WHERE em.name=?)", mod.to_s] } }
-  scope :active, where(:status => STATUS_ACTIVE)
-  scope :public, where(:is_public => true)
+  scope :active, lambda { |*args| where(:status => STATUS_ACTIVE) }
+  scope :public, lambda { |*args| where(:is_public => true) }
   scope :visible, lambda { { :conditions => Project.visible_by(User.current) } }
+
+  # timelines stuff
+
+  extend Pagination::Model
+
+  scope :like, lambda { |q|
+    s = "%#{q.to_s.strip.downcase}%"
+    { :conditions => ["LOWER(name) LIKE :s", {:s => s}],
+      :order => "name" }
+  }
+
+  scope :selectable_projects
+
+  belongs_to :project_type, :class_name => "::ProjectType"
+
+  belongs_to :responsible,  :class_name => "User"
+
+  has_many :timelines,         :class_name => "::Timeline",
+                                         :dependent  => :destroy
+  has_many :planning_elements, :class_name => "::PlanningElement",
+                                         :dependent  => :destroy
+  has_many :scenarios,         :class_name => "::Scenario",
+                                         :dependent  => :destroy
+
+
+  has_many :reportings_via_source, :class_name  => "::Reporting",
+                                             :foreign_key => 'project_id',
+                                             :dependent   => :delete_all
+  has_many :reportings_via_target, :class_name  => "::Reporting",
+                                             :foreign_key => 'reporting_to_project_id',
+                                             :dependent   => :delete_all
+
+  has_many :reporting_to_projects, :through => :reportings_via_source,
+                                             :source  => :reporting_to_project
+
+  has_many :project_a_associations, :class_name  => "::ProjectAssociation",
+                                              :foreign_key => 'project_a_id',
+                                              :dependent   => :delete_all
+  has_many :project_b_associations, :class_name  => "::ProjectAssociation",
+                                              :foreign_key => 'project_b_id',
+                                              :dependent   => :delete_all
+
+  has_many :associated_a_projects, :through => :project_a_associations,
+                                             :source  => :project_b
+  has_many :associated_b_projects, :through => :project_b_associations,
+                                             :source  => :project_a
+
+
+  has_many :enabled_planning_element_types, :class_name  => "::EnabledPlanningElementType",
+                                                      :dependent => :delete_all
+
+  has_many :planning_element_types, :through => :enabled_planning_element_types,
+                                              :source  => :planning_element_type
+
+
+  include TimelinesCollectionProxy
+
+  collection_proxy :project_associations, :for => [:project_a_associations,
+                                                             :project_b_associations] do
+    def visible(user = User.current)
+      all.select { |assoc| assoc.visible?(user) }
+    end
+  end
+
+  collection_proxy :associated_projects, :for => [:associated_a_projects,
+                                                            :associated_b_projects] do
+    def visible(user = User.current)
+      all.select { |other| other.visible?(user) }
+    end
+  end
+
+  collection_proxy :reportings, :for => [:reportings_via_source,
+                                                   :reportings_via_target],
+                                          :leave_public => true
+
+  after_save :assign_default_planning_element_types_as_enabled_planning_element_types
+
+  safe_attributes 'project_type_id',
+                  'planning_element_type_ids',
+                  'responsible_id'
+
+  def associated_project_candidates(user = User.current)
+    # TODO: Check if admins shouldn't see all projects here
+    projects = Project.visible.all
+    projects.delete(self)
+    projects -= associated_projects
+    projects.select{|p| p.allows_association?}
+  end
+
+  def associated_project_candidates_by_type(user = User.current)
+    # TODO: values need sorting by project tree
+    associated_project_candidates(user).group_by(&:project_type)
+  end
+
+  def project_associations_by_type(user = User.current)
+    # TODO: values need sorting by project tree
+    project_associations.visible.group_by do |a|
+      a.project(self).project_type
+    end
+  end
+
+  def reporting_to_project_candidates(user = User.current)
+    # TODO: Check if admins shouldn't see all projects here
+    projects = Project.visible.all
+    projects.delete(self)
+    projects -= reporting_to_projects
+    projects
+  end
+
+  def visible?(user = User.current)
+    self.active? and (self.is_public? or user.admin? or user.member_of?(self))
+  end
+
+  def allows_association?
+    if self.project_type.present?
+      self.project_type.allows_association
+    else
+      true
+    end
+  end
+
+  def assign_default_planning_element_types_as_enabled_planning_element_types
+    return if enabled_planning_element_types.present?
+    return if project_type.blank?
+
+    self.planning_element_types = project_type.planning_element_types
+  end
+
+  def has_many_dependent_for_planning_elements
+    # Overwrites :dependent => :destroy - before_destroy callback
+    # since we need to call the destroy! method instead of the destroy
+    # method which just moves the element to the recycle bin
+    planning_elements.each {|element| element.destroy!}
+  end
+
+  def self.selectable_projects
+    Project.visible.select {|p| User.current.member_of? p }.sort_by(&:to_s)
+  end
+
+  def self.search_scope(query)
+    visible.like(query)
+  end
+
+  # end timelines
 
   def initialize(attributes = nil, options = {})
     super
@@ -447,7 +599,7 @@ class Project < ActiveRecord::Base
 
   # Users issues can be assigned to
   def assignable_users
-    members.select {|m| m.roles.detect {|role| role.assignable?}}.collect {|m| m.user}.sort
+    assignable_members.map(&:user).sort
   end
 
   # Returns the mail adresses of users that should be always notified on project events
@@ -463,8 +615,8 @@ class Project < ActiveRecord::Base
 
   # Returns an array of all custom fields enabled for project issues
   # (explictly associated custom fields and custom fields enabled for all projects)
-  def all_issue_custom_fields
-    @all_issue_custom_fields ||= (IssueCustomField.for_all + issue_custom_fields).uniq.sort
+  def all_work_package_custom_fields
+    @all_work_package_custom_fields ||= (WorkPackageCustomField.for_all + work_package_custom_fields).uniq.sort
   end
 
   def project
@@ -502,7 +654,7 @@ class Project < ActiveRecord::Base
   # The earliest start date of a project, based on it's issues and versions
   def start_date
     [
-     issues.minimum('start_date'),
+     work_packages.minimum('start_date'),
      shared_versions.collect(&:effective_date),
      shared_versions.collect(&:start_date)
     ].flatten.compact.min
@@ -511,7 +663,7 @@ class Project < ActiveRecord::Base
   # The latest due date of an issue or version
   def due_date
     [
-     issues.maximum('due_date'),
+     work_packages.maximum('due_date'),
      shared_versions.collect(&:effective_date),
      shared_versions.collect {|v| v.fixed_issues.maximum('due_date')}
     ].flatten.compact.max
@@ -541,7 +693,7 @@ class Project < ActiveRecord::Base
 
   # Return true if this project is allowed to do the specified action.
   # action can be:
-  # * a parameter-like Hash (eg. :controller => 'projects', :action => 'edit')
+  # * a parameter-like Hash (eg. :controller => '/projects', :action => 'edit')
   # * a permission Symbol (eg. :edit_project)
   def allows_to?(action)
     if action.is_a? Hash
@@ -579,7 +731,7 @@ class Project < ActiveRecord::Base
     'custom_field_values',
     'custom_fields',
     'tracker_ids',
-    'issue_custom_field_ids'
+    'work_package_custom_field_ids'
 
   safe_attributes 'enabled_module_names',
     :if => lambda {|project, user| project.new_record? || user.allowed_to?(:select_project_modules, project) }
@@ -617,7 +769,7 @@ class Project < ActiveRecord::Base
   def copy(project, options={})
     project = project.is_a?(Project) ? project : Project.find(project)
 
-    to_be_copied = %w(wiki versions issue_categories issues members queries boards)
+    to_be_copied = %w(wiki versions issue_categories work_packages members queries boards)
     to_be_copied = to_be_copied & options[:only].to_a unless options[:only].nil?
 
     Project.transaction do
@@ -645,7 +797,7 @@ class Project < ActiveRecord::Base
         copy.enabled_modules = project.enabled_modules
         copy.trackers = project.trackers
         copy.custom_values = project.custom_values.collect {|v| v.clone}
-        copy.issue_custom_fields = project.issue_custom_fields
+        copy.work_package_custom_fields = project.work_package_custom_fields
         return copy
       else
         return nil
@@ -737,7 +889,7 @@ class Project < ActiveRecord::Base
       project.wiki.pages.each do |page|
         # Skip pages without content
         next if page.content.nil?
-        new_wiki_content = WikiContent.new(page.content.attributes.dup.except("id", "page_id", "updated_on"))
+        new_wiki_content = WikiContent.new(page.content.attributes.dup.except("id", "page_id", "updated_at"))
         new_wiki_page = WikiPage.new(page.attributes.dup.except("id", "wiki_id", "created_on", "parent_id"))
         new_wiki_page.content = new_wiki_content
         wiki.pages << new_wiki_page
@@ -758,7 +910,7 @@ class Project < ActiveRecord::Base
   def copy_versions(project)
     project.versions.each do |version|
       new_version = Version.new
-      new_version.attributes = version.attributes.dup.except("id", "project_id", "created_on", "updated_on")
+      new_version.attributes = version.attributes.dup.except("id", "project_id", "created_on", "updated_at")
       self.versions << new_version
     end
   end
@@ -773,14 +925,14 @@ class Project < ActiveRecord::Base
   end
 
   # Copies issues from +project+
-  def copy_issues(project)
+  def copy_work_packages(project)
     # Stores the source issue id as a key and the copied issues as the
     # value.  Used to map the two togeather for issue relations.
-    issues_map = {}
+    work_packages_map = {}
 
     # Get issues sorted by root_id, lft so that parent issues
     # get copied before their children
-    project.issues.reorder('root_id, lft').each do |issue|
+    project.work_packages.reorder('root_id, lft').each do |issue|
       new_issue = Issue.new
       new_issue.copy_from(issue)
       new_issue.project = self
@@ -796,22 +948,22 @@ class Project < ActiveRecord::Base
       end
       # Parent issue
       if issue.parent_id
-        if copied_parent = issues_map[issue.parent_id]
+        if copied_parent = work_packages_map[issue.parent_id]
           new_issue.parent_issue_id = copied_parent.id
         end
       end
 
-      self.issues << new_issue
+      self.work_packages << new_issue
       if new_issue.new_record?
-        logger.info "Project#copy_issues: issue ##{issue.id} could not be copied: #{new_issue.errors.full_messages}" if logger && logger.info
+        logger.info "Project#copy_work_packages: work unit ##{issue.id} could not be copied: #{new_issue.errors.full_messages}" if logger && logger.info
       else
-        issues_map[issue.id] = new_issue unless new_issue.new_record?
+        work_packages_map[issue.id] = new_issue unless new_issue.new_record?
       end
     end
 
     # Relations after in case issues related each other
-    project.issues.each do |issue|
-      new_issue = issues_map[issue.id]
+    project.work_packages.each do |issue|
+      new_issue = work_packages_map[issue.id]
       unless new_issue
         # Issue was not copied
         next
@@ -820,8 +972,8 @@ class Project < ActiveRecord::Base
       # Relations
       issue.relations_from.each do |source_relation|
         new_issue_relation = IssueRelation.new
-        new_issue_relation.attributes = source_relation.attributes.dup.except("id", "issue_from_id", "issue_to_id")
-        new_issue_relation.issue_to = issues_map[source_relation.issue_to_id]
+        new_issue_relation.force_attributes = source_relation.attributes.dup.except("id", "work_package_from_id", "work_package_to_id")
+        new_issue_relation.issue_to = work_packages_map[source_relation.issue_to_id]
         if new_issue_relation.issue_to.nil? && Setting.cross_project_issue_relations?
           new_issue_relation.issue_to = source_relation.issue_to
         end
@@ -830,8 +982,8 @@ class Project < ActiveRecord::Base
 
       issue.relations_to.each do |source_relation|
         new_issue_relation = IssueRelation.new
-        new_issue_relation.attributes = source_relation.attributes.dup.except("id", "issue_from_id", "issue_to_id")
-        new_issue_relation.issue_from = issues_map[source_relation.issue_from_id]
+        new_issue_relation.force_attributes = source_relation.attributes.dup.except("id", "work_package_from_id", "work_package_to_id")
+        new_issue_relation.issue_from = work_packages_map[source_relation.issue_from_id]
         if new_issue_relation.issue_from.nil? && Setting.cross_project_issue_relations?
           new_issue_relation.issue_from = source_relation.issue_from
         end

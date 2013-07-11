@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -96,25 +94,11 @@ module ApplicationHelper
 
   #returns a class name based on the user's status
   def user_status_class(user)
-    case user.status
-      when User::STATUS_ACTIVE
-        "status_active"
-      when User::STATUS_REGISTERED
-        "status_registered"
-      when User::STATUS_LOCKED
-        "status_locked"
-    end
+    'status_' + user.status_name
   end
 
   def user_status_i18n(user)
-    case user.status
-      when User::STATUS_ACTIVE
-        l(:status_active)
-      when User::STATUS_REGISTERED
-        l(:status_registered)
-      when User::STATUS_LOCKED
-        l(:status_locked)
-    end
+    l(('status_' + user.status_name).to_sym)
   end
 
   # Displays a link to +issue+ with its subject.
@@ -137,12 +121,13 @@ module ApplicationHelper
       end
     end
     closed = issue.closed? ? content_tag(:span, l(:label_closed_issues), :class => "hidden-for-sighted") : ""
-    s = link_to "#{closed}#{h(options[:before_text].to_s)}#{h(issue.tracker)} ##{issue.id}".html_safe,
+    s = ActiveSupport::SafeBuffer.new
+    s << "#{issue.project} - " if options[:project]
+    s << link_to("#{closed}#{h(options[:before_text].to_s)}#{h(issue.tracker)} ##{issue.id}".html_safe,
                 issue,
                 :class => issue.css_classes,
-                :title => h(title)
-    s << ": #{h subject}" if subject
-    s = "#{h issue.project} - " + s if options[:project]
+                :title => h(title))
+    s << ": #{subject}" if subject
     s
   end
 
@@ -153,8 +138,17 @@ module ApplicationHelper
   def link_to_attachment(attachment, options={})
     text = options.delete(:text) || attachment.filename
     action = options.delete(:download) ? 'download' : 'show'
+    only_path = options.delete(:only_path) { true }
 
-    link_to(h(text), {:controller => 'attachments', :action => action, :id => attachment, :filename => attachment.filename }, options)
+    link_to h(text),
+            {:controller => '/attachments',
+             :action => action,
+             :id => attachment,
+             :filename => attachment.filename,
+             :host => Setting.host_name,
+             :protocol => Setting.protocol,
+             :only_path => only_path },
+            options
   end
 
   # Generates a link to a SCM revision
@@ -164,7 +158,7 @@ module ApplicationHelper
     text = options.delete(:text) || format_revision(revision)
     rev = revision.respond_to?(:identifier) ? revision.identifier : revision
 
-    link_to(h(text), {:controller => 'repositories', :action => 'revision', :id => project, :rev => rev},
+    link_to(h(text), {:controller => '/repositories', :action => 'revision', :id => project, :rev => rev},
             :title => l(:label_revision_id, format_revision(revision)))
   end
 
@@ -172,7 +166,7 @@ module ApplicationHelper
   def link_to_message(message, options={}, html_options = nil)
     link_to(
       h(truncate(message.subject, :length => 60)),
-      { :controller => 'messages', :action => 'show',
+      { :controller => '/messages', :action => 'show',
         :board_id => message.board_id,
         :id => message.root,
         :r => (message.parent_id && message.id),
@@ -240,7 +234,7 @@ module ApplicationHelper
   end
 
   def format_activity_description(text)
-    h(truncate(text.to_s, :length => 120).gsub(%r{[\r\n]*<(pre|code)>.*$}m, '...')).gsub(/[\r\n]+/, "<br />")
+    h(truncate(text.to_s, :length => 120).gsub(%r{[\r\n]*<(pre|code)>.*$}m, '...')).gsub(/[\r\n]+/, "<br />").html_safe
   end
 
   def format_version_name(version)
@@ -307,12 +301,12 @@ module ApplicationHelper
       end
 
       level_prefix = ''
-      level_prefix = '&nbsp;' * 3 * element[:level] + '&#187; ' if element[:level] > 0
+      level_prefix = ('&nbsp;' * 3 * element[:level] + '&#187; ').html_safe if element[:level] > 0
 
       tag_options.merge!(yield(element[:project])) if block_given?
 
       content_tag('option', level_prefix + h(element[:project].name), tag_options)
-    end.join('')
+    end.join('').html_safe
   end
 
   # Yields the given block for each project with its level in the tree
@@ -397,7 +391,7 @@ module ApplicationHelper
   def time_tag(time)
     text = distance_of_time_in_words(Time.now, time)
     if @project
-      link_to(text, {:controller => 'activities', :action => 'index', :id => @project, :from => time.to_date}, :title => format_time(time))
+      link_to(text, {:controller => '/activities', :action => 'index', :id => @project, :from => time.to_date}, :title => format_time(time))
     else
       content_tag('label', text, :title => format_time(time), :class => "timestamp")
     end
@@ -411,52 +405,6 @@ module ApplicationHelper
     path.to_s.split(%r{[/\\]}).select {|p| !p.blank?}
   end
 
-  def pagination_links_full(paginator, count=nil, options={})
-    page_param = options.delete(:page_param) || :page
-    per_page_links = options.delete(:per_page_links)
-
-    # options for the underlying classic pagination
-    ignored_options = [:window_size,
-                       :always_show_anchors,
-                       :link_to_current_page,
-                       :name,
-                       :prefix,
-                       :suffix]
-
-    url_param = options.reject{ |key, value| ignored_options.include?(key) }
-
-    # don't reuse query params if filters are present
-    url_param.merge!(:fields => nil, :values => nil, :operators => nil) if params.delete(:set_filter)
-
-    html = ''
-    if paginator.current.previous
-      html << link_to_content_update(l(:label_previous), url_param.merge(page_param => paginator.current.previous), :class => 'navigate-left') + ' '
-    end
-
-    html << (pagination_links_each(paginator, options) do |n|
-      link_to_content_update(n.to_s, url_param.merge(page_param => n))
-    end || '')
-
-    if paginator.current.next
-      html << ' ' + link_to_content_update((l(:label_next)), url_param.merge(page_param => paginator.current.next), :class => 'navigate-right')
-    end
-
-    unless count.nil?
-      html << " (#{paginator.current.first_item}-#{paginator.current.last_item}/#{count})"
-      if per_page_links != false && links = per_page_links(paginator.items_per_page)
-	      html << " | #{links}"
-      end
-    end
-
-    html.html_safe
-  end
-
-  def per_page_links(selected=nil)
-    links = Setting.per_page_options_array.collect do |n|
-      n == selected ? n : link_to_content_update(n, params.merge(:per_page => n))
-    end
-    links.size > 1 ? l(:label_display_per_page, links.join(', ')) : nil
-  end
 
   def reorder_links(name, url, options = {})
     method = options[:method] || :post
@@ -554,9 +502,12 @@ module ApplicationHelper
       raise ArgumentError, 'invalid arguments to textilizable'
     end
     return '' if text.blank?
+
+    edit = !!options.delete(:edit)
+    # don't return html in edit mode when textile or text formatting is enabled
+    return text if edit && Setting.text_formatting.to_s != 'xml'
     project = options[:project] || @project || (obj && obj.respond_to?(:project) ? obj.project : nil)
     only_path = options.delete(:only_path) == false ? false : true
-    edit = !!options.delete(:edit)
 
     text = Redmine::WikiFormatting.to_html(Setting.text_formatting, text, :object => obj, :attribute => attr, :edit => edit) { |macro, args| exec_macro(macro, obj, args, :view => self, :edit => edit) }
 
@@ -651,7 +602,7 @@ module ApplicationHelper
         attachments ||= (options[:attachments] || obj.attachments).sort_by(&:created_on).reverse
         # search for the picture in attachments
         if found = attachments.detect { |att| att.filename.downcase == filename }
-          image_url = url_for :only_path => only_path, :controller => 'attachments', :action => 'download', :id => found
+          image_url = url_for :only_path => only_path, :controller => '/attachments', :action => 'download', :id => found
           desc = found.description.to_s.gsub('"', '')
           if !desc.blank? && alttext.blank?
             alt = " title=\"#{desc}\" alt=\"#{desc}\""
@@ -698,7 +649,7 @@ module ApplicationHelper
             when :anchor; "##{title}"   # used for single-file wiki export
             else
               wiki_page_id = page.present? ? Wiki.titleize(page) : nil
-              url_for(:only_path => only_path, :controller => 'wiki', :action => 'show', :project_id => link_project, :id => wiki_page_id, :anchor => anchor)
+              url_for(:only_path => only_path, :controller => '/wiki', :action => 'show', :project_id => link_project, :id => wiki_page_id, :anchor => anchor)
             end
           link_to(h(title || page), url, :class => ('wiki-page' + (wiki_page ? '' : ' new')))
         else
@@ -754,7 +705,7 @@ module ApplicationHelper
         if prefix.nil? && sep == 'r'
           # project.changesets.visible raises an SQL error because of a double join on repositories
           if project && project.repository && (changeset = Changeset.visible.find_by_repository_id_and_revision(project.repository.id, identifier))
-            link = link_to(h("#{project_prefix}r#{identifier}"), {:only_path => only_path, :controller => 'repositories', :action => 'revision', :id => project, :rev => changeset.revision},
+            link = link_to(h("#{project_prefix}r#{identifier}"), {:only_path => only_path, :controller => '/repositories', :action => 'revision', :id => project, :rev => changeset.revision},
                                       :class => 'changeset',
                                       :title => truncate_single_line(changeset.comments, :length => 100))
           end
@@ -763,18 +714,18 @@ module ApplicationHelper
           case prefix
           when nil
             if issue = Issue.visible.find_by_id(oid, :include => :status)
-              link = link_to("##{oid}", {:only_path => only_path, :controller => 'issues', :action => 'show', :id => oid},
+              link = link_to("##{oid}", {:only_path => only_path, :controller => '/issues', :action => 'show', :id => oid},
                                         :class => issue.css_classes,
                                         :title => "#{truncate(issue.subject, :length => 100)} (#{issue.status.name})")
             end
           when 'document'
             if document = Document.visible.find_by_id(oid)
-              link = link_to h(document.title), {:only_path => only_path, :controller => 'documents', :action => 'show', :id => document},
+              link = link_to h(document.title), {:only_path => only_path, :controller => '/documents', :action => 'show', :id => document},
                                                 :class => 'document'
             end
           when 'version'
             if version = Version.visible.find_by_id(oid)
-              link = link_to h(version.name), {:only_path => only_path, :controller => 'versions', :action => 'show', :id => version},
+              link = link_to h(version.name), {:only_path => only_path, :controller => '/versions', :action => 'show', :id => version},
                                               :class => 'version'
             end
           when 'message'
@@ -789,11 +740,13 @@ module ApplicationHelper
         elsif sep == '##'
           oid = identifier.to_i
           if issue = Issue.visible.find_by_id(oid, :include => :status)
+            extend IssuesHelper # TODO: remove me from here
             link = issue_quick_info(issue)
           end
         elsif sep == '###'
           oid = identifier.to_i
           if issue = Issue.visible.find_by_id(oid, :include => :status)
+            extend IssuesHelper # TODO: remove me from here
             link = issue_quick_info_with_description(issue)
           end
         elsif sep == ':'
@@ -802,17 +755,17 @@ module ApplicationHelper
           case prefix
           when 'document'
             if project && document = project.documents.visible.find_by_title(name)
-              link = link_to h(document.title), {:only_path => only_path, :controller => 'documents', :action => 'show', :id => document},
+              link = link_to h(document.title), {:only_path => only_path, :controller => '/documents', :action => 'show', :id => document},
                                                 :class => 'document'
             end
           when 'version'
             if project && version = project.versions.visible.find_by_name(name)
-              link = link_to h(version.name), {:only_path => only_path, :controller => 'versions', :action => 'show', :id => version},
+              link = link_to h(version.name), {:only_path => only_path, :controller => '/versions', :action => 'show', :id => version},
                                               :class => 'version'
             end
           when 'commit'
             if project && project.repository && (changeset = Changeset.visible.find(:first, :conditions => ["repository_id = ? AND scmid LIKE ?", project.repository.id, "#{name}%"]))
-              link = link_to h("#{project_prefix}#{name}"), {:only_path => only_path, :controller => 'repositories', :action => 'revision', :id => project, :rev => changeset.identifier},
+              link = link_to h("#{project_prefix}#{name}"), {:only_path => only_path, :controller => '/repositories', :action => 'revision', :id => project, :rev => changeset.identifier},
                                            :class => 'changeset',
                                            :title => truncate_single_line(h(changeset.comments), :length => 100)
             end
@@ -820,7 +773,7 @@ module ApplicationHelper
             if project && project.repository && User.current.allowed_to?(:browse_repository, project)
               name =~ %r{^[/\\]*(.*?)(@([0-9a-f]+))?(#(L\d+))?$}
               path, rev, anchor = $1, $3, $5
-              link = link_to h("#{project_prefix}#{prefix}:#{name}"), {:controller => 'repositories', :action => 'entry', :id => project,
+              link = link_to h("#{project_prefix}#{prefix}:#{name}"), {:controller => '/repositories', :action => 'entry', :id => project,
                                                       :path => to_path_param(path),
                                                       :rev => rev,
                                                       :anchor => anchor,
@@ -830,7 +783,7 @@ module ApplicationHelper
           when 'attachment'
             attachments = options[:attachments] || (obj && obj.respond_to?(:attachments) ? obj.attachments : nil)
             if attachments && attachment = attachments.detect {|a| a.filename == name }
-              link = link_to h(attachment.filename), {:only_path => only_path, :controller => 'attachments', :action => 'download', :id => attachment},
+              link = link_to h(attachment.filename), {:only_path => only_path, :controller => '/attachments', :action => 'download', :id => attachment},
                                                      :class => 'attachment'
             end
           when 'project'
@@ -923,11 +876,10 @@ module ApplicationHelper
     content_tag("label", label_text)
   end
 
-  def labelled_tabular_form_for(record_or_name_or_array, *args, &proc)
-    options = args.extract_options!
-    options[:html] ||= {}
+  def labelled_tabular_form_for(record, options = {}, &block)
+    options.reverse_merge!(:builder => TabularFormBuilder, :lang => current_language, :html => {})
     options[:html][:class] = 'tabular' unless options[:html].has_key?(:class)
-    form_for(*(args << options.merge(:builder => TabularFormBuilder, :lang => current_language, :as => record_or_name_or_array)), &proc)
+    form_for(record, options, &block)
   end
 
   def back_url_hidden_field_tag
@@ -1083,18 +1035,17 @@ module ApplicationHelper
     tags = ''
     tags += javascript_tag(%Q{
       window.openProject = new OpenProject({
-        urlRoot : '#{Redmine::Utils.relative_url_root}'
+        urlRoot : '#{Redmine::Utils.relative_url_root}',
+        loginUrl: '#{url_for :controller => "/account", :action => "login"}'
       });
     })
-
     unless User.current.pref.warn_on_leaving_unsaved == '0'
-      tags += javascript_tag("Event.observe(window, 'load', function(){ new WarnLeavingUnsaved('#{escape_javascript( l(:text_warn_on_leaving_unsaved) )}'); });")
+      tags += javascript_tag("jQuery(function(){ new WarnLeavingUnsaved('#{escape_javascript( l(:text_warn_on_leaving_unsaved) )}'); });")
     end
 
     if User.current.impaired? and accessibility_js_enabled?
       tags += javascript_include_tag("accessibility.js")
     end
-
 
     tags.html_safe
   end
@@ -1156,13 +1107,125 @@ module ApplicationHelper
   #
   # Returns the footer text displayed in the layout file.
   #
-  def layout_footer_text
-    content_tag :div, :class => 'bgl' do
-      content_tag :div, :class => 'bgr' do
-        raw t(:text_powered_by, :link => link_to(Redmine::Info.app_name, Redmine::Info.url))
+  def footer_content
+    elements = []
+    unless OpenProject::Footer.content.nil?
+      OpenProject::Footer.content.each do |name, value|
+        content = value.respond_to?(:call) ? value.call : value
+        if content
+          elements << content_tag(:span, content, :class => "footer_#{name}")
+        end
+      end
+    end
+    elements << I18n.t(:text_powered_by, :link => link_to(Redmine::Info.app_name, Redmine::Info.url))
+    elements.join(", ").html_safe
+  end
+
+  # start timelines stuff
+  #
+  def link_to_planning_element(planning_element, options = {})
+    return if planning_element.new_record?
+
+    options = options.stringify_keys
+    options.assert_valid_keys("include_id", "include_name", "text")
+
+    options.reverse_merge!("include_id"   => true,
+                           "include_name" => true)
+
+    if options["text"].blank?
+      text = []
+
+      text << "*#{planning_element.id}" if options["include_id"]
+      text << "#{planning_element.subject}" if options["include_name"]
+
+      text = text.join(" ")
+    else
+      text = options[:text]
+    end
+
+    link_to(h(text),
+            project_planning_element_path(planning_element.project, planning_element),
+            :title => planning_element.subject)
+  end
+
+  def planning_element_quick_info(planning_element)
+    start_date_change = ""
+    end_date_change = ""
+
+    journals = planning_element.journals.find(:all, :conditions => ["created_at >= ?", Date.today.to_time - 7.day], :order => "created_at desc")
+
+    journals.each do |journal|
+      break if !start_date_change.empty? and !end_date_change.empty?
+
+      if start_date_change.empty?
+        unless journal.changes["start_date"].nil?
+          unless journal.changes["start_date"].first.nil?
+            start_date_change = " (<del>#{journal.changes["start_date"].first}</del>)"
+          end
+        end
+      end
+
+      if end_date_change.empty?
+        unless journal.changes["end_date"].nil?
+          unless journal.changes["end_date"].first.nil?
+            end_date_change = " (<del>#{journal.changes["end_date"].first}</del>)"
+          end
+        end
+      end
+    end
+
+    link = link_to(h("*#{planning_element.id} #{planning_element.planning_element_status.nil? ? "" : planning_element.planning_element_status.name + ":"} #{planning_element.subject} "),
+                   project_planning_element_path(planning_element.project, planning_element),
+                   :title => h("#{truncate(planning_element.subject, :length => 100)} #{planning_element.planning_element_status.nil? ? "" :
+                               "(" + planning_element.planning_element_status.name + ")"}"))
+    link += "#{planning_element.start_date.nil? ? "[?]" : planning_element.start_date.to_s}#{start_date_change} – #{planning_element.end_date.nil? ? "[?]" :
+      planning_element.end_date.to_s}#{end_date_change}"
+    link += "#{planning_element.responsible.nil? ? "" : h(" (#{planning_element.responsible.to_s})")}"
+
+    return link
+  end
+
+  def planning_element_quick_info_with_description(planning_element, lines)
+    description_lines = planning_element.description.to_s.lines.to_a[0,lines]
+
+    if description_lines[lines-1] && planning_element.description.to_s.lines.to_a.size > lines
+      description_lines[lines-1].strip!
+
+      while !description_lines[lines-1].end_with?("...") do
+        description_lines[lines-1] = description_lines[lines-1] + "."
+      end
+    end
+
+    planning_element_quick_info(planning_element) +
+      content_tag(:div, textilizable("\n" + description_lines.to_s), :class => "indent")
+  end
+
+  def parse_redmine_links_with_planning_element_links(text, project, obj, attr, only_path, options)
+    parse_redmine_links_without_planning_element_links(text, project, obj, attr, only_path, options)
+    text.gsub!(%r{(?:\W|^|\A)((\*+)(\d+))(?:\W|$|\z)}) do |match|
+      text, stars, id = $1, $2, $3
+      planning_element = PlanningElement.without_deleted.visible.find_by_id(id)
+
+      if planning_element.present?
+        if stars == "*"
+          match.sub(text, link_to_planning_element(planning_element, :include_name => false))
+        elsif stars == "**"
+          replace = planning_element_quick_info(planning_element)
+          match.sub(text, replace)
+        elsif stars == "***"
+          replace = planning_element_quick_info_with_description(planning_element,3)
+          match.sub(text, replace)
+        end
+      else
+        match
       end
     end
   end
+
+  #TODO remove method chain!
+  alias_method_chain :parse_redmine_links, :planning_element_links
+
+  # end timelines stuff
 
   private
 
@@ -1177,17 +1240,13 @@ module ApplicationHelper
   end
 
   def password_complexity_requirements
-    raw "<em>" + l(:text_caracters_minimum, :count => Setting.password_min_length) + "</em>"
+    rules = OpenProject::Passwords::Evaluator.rules_description
+    # use 0..0, so this doesn't fail if rules is an empty string
+    rules[0] = rules[0..0].upcase
+
+    s = raw "<em>" + OpenProject::Passwords::Evaluator.min_length_description + "</em>"
+    s += raw "<br /><em>" + rules + "</em>" unless rules.empty?
+    s
   end
 
-  def breadcrumb_paths(*args)
-    if args.nil?
-      nil
-    elsif args.empty?
-      @breadcrumb_paths ||= [default_breadcrumb]
-    else
-      @breadcrumb_paths ||= []
-      @breadcrumb_paths += args
-    end
-  end
 end

@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 class WikiMenuItem < ActiveRecord::Base
   belongs_to :wiki
   belongs_to :parent, :class_name => 'WikiMenuItem'
@@ -18,10 +29,6 @@ class WikiMenuItem < ActiveRecord::Base
   validates_uniqueness_of :title, :scope => :wiki_id
 
   validates_presence_of :name
-
-  def after_initialize
-    self.options ||= Hash.new
-  end
 
   def item_class
     title.dasherize

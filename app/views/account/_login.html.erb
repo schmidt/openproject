@@ -1,20 +1,35 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <div id="nav-login-content">
-  <%= form_tag({:controller => "account", :action=> "login"}) do %>
+  <%= form_tag({:controller => '/account', :action=> "login"},
+               :autocomplete => 'off') do %>
     <%= back_url_to_current_page_hidden_field_tag %>
     <table>
       <tr>
-        <td><label for="username-pulldown"><%= l(:field_login) %></label></td>
-        <td><label for="password-pulldown"><%= l(:field_password) %></label></td>
+        <td><label for="username-pulldown"><%= User.human_attribute_name :login %></label></td>
+        <td><label for="password-pulldown"><%= User.human_attribute_name :password %></label></td>
       </tr>
       <tr>
         <td><%= text_field_tag 'username', nil, :id => 'username-pulldown' %></td>
-        <td><%= password_field_tag 'password', nil, :id => 'password-pulldown' %></td>
+        <td><%= password_field_tag 'password',
+                                   nil,
+                                   :id => 'password-pulldown' %></td>
         <td><input type="submit" name="login" value="<%=l(:button_login)%>" /></td>
       </tr>
     </table>
     <div id = "optional_login_fields" style = "top = 10px; white-space:nowrap">
       <% if Setting.openid? %>
-        <%= text_field_tag "openid_url", nil, :placeholder => l(:field_identity_url) %>
+        <%= text_field_tag "openid_url", nil, :placeholder => User.human_attribute_name(:identity_url) %>
       <% end %>
 
       <% if Setting.autologin? %>
@@ -22,12 +37,12 @@
       <% end %>
 
       <% if Setting.lost_password? %>
-        <%= link_to l(:label_password_lost), {:controller => 'account', :action => 'lost_password'} %>
+        <%= link_to l(:label_password_lost), {:controller => '/account', :action => 'lost_password'} %>
       <% end %>
 
       <% if !User.current.logged? && Setting.self_registration? %>
         <%= "|" if Setting.lost_password? %>
-         <%= link_to l(:label_register), { :controller => 'account', :action => 'register' } %>
+         <%= link_to l(:label_register), { :controller => '/account', :action => 'register' } %>
       <% end %>
     </div>
   <% end %>

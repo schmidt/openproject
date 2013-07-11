@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -39,6 +37,7 @@ class WikiController < ApplicationController
   verify :method => :post, :only => :create,            :render => {:nothing => true, :status => :method_not_allowed}
 
   include AttachmentsHelper
+  include PaginationHelper
 
   attr_reader :page, :related_page
 
@@ -198,7 +197,7 @@ class WikiController < ApplicationController
     @page.redirect_existing_links = true
     # used to display the *original* title if some AR validation errors occur
     @original_title = @page.pretty_title
-    if request.post? && @page.update_attributes(params[:wiki_page])
+    if request.put? && @page.update_attributes(params[:wiki_page])
       flash[:notice] = l(:notice_successful_update)
       redirect_to :action => 'show', :project_id => @project, :id => @page.title
     end
@@ -211,16 +210,13 @@ class WikiController < ApplicationController
 
   # show page history
   def history
-    @version_count = @page.content.versions.count
-    @version_pages = Paginator.new self, @version_count, per_page_option, params['p']
     # don't load text
-    @versions = @page.content.versions.find :all,
-                                            :select => "id, user_id, notes, created_at, version",
-                                            :order => 'version DESC',
-                                            :limit  =>  @version_pages.items_per_page + 1,
-                                            :offset =>  @version_pages.current.offset
+    @versions = @page.content.versions.select("id, user_id, notes, created_at, version")
+                                      .order('version DESC')
+                                      .page(params[:page])
+                                      .per_page(per_page_param)
 
-    render :layout => false if request.xhr?
+    render :layout => !request.xhr?
   end
 
   def diff
@@ -341,5 +337,9 @@ private
 
   def load_pages_for_index
     @pages = @wiki.pages.with_updated_on.all(:order => 'title', :include => {:wiki => :project})
+  end
+
+  def default_breadcrumb
+    Wiki.name.humanize
   end
 end

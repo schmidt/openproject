@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -30,9 +28,9 @@ class Issues::ContextMenusController < ApplicationController
     @projects = @issues.collect(&:project).compact.uniq
     @project = @projects.first if @projects.size == 1
 
-    @can = {:edit => User.current.allowed_to?(:edit_issues, @projects),
+    @can = {:edit => User.current.allowed_to?(:edit_work_packages, @projects),
             :log_time => (@project && User.current.allowed_to?(:log_time, @project)),
-            :update => (User.current.allowed_to?(:edit_issues, @projects) || (User.current.allowed_to?(:change_status, @projects) && !@allowed_statuses.blank?)),
+            :update => (User.current.allowed_to?(:edit_work_packages, @projects) || (User.current.allowed_to?(:change_status, @projects) && !@allowed_statuses.blank?)),
             :move => (@project && User.current.allowed_to?(:move_issues, @project)),
             :copy => (@issue && @project.trackers.include?(@issue.tracker) && User.current.allowed_to?(:add_issues, @project)),
             :delete => User.current.allowed_to?(:delete_issues, @projects)

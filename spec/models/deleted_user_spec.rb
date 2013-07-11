@@ -1,6 +1,21 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe DeletedUser do
+  before do
+    User.delete_all
+  end
+
   let(:user) { DeletedUser.new }
 
   describe :admin do
@@ -45,7 +60,7 @@ describe DeletedUser do
       let(:u2) { FactoryGirl.build(:deleted_user) }
 
       before do
-        u1.save
+        u1.save!
         u2.save
       end
 

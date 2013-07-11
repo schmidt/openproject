@@ -1,7 +1,23 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe ProjectsController do
-  before :each do
+  before do
+    Role.delete_all
+    User.delete_all
+  end
+
+  before do
     @controller.stub!(:set_localization)
 
     @role = FactoryGirl.create(:non_member)
@@ -12,7 +28,7 @@ describe ProjectsController do
   end
 
   describe 'show' do
-    integrate_views
+    render_views
 
     describe 'without wiki' do
       before do
@@ -32,9 +48,7 @@ describe ProjectsController do
       it 'renders main menu without wiki menu item' do
         get 'show', @params
 
-        response.should have_tag('#main-menu') do
-          without_tag 'a.Wiki'
-        end
+        assert_select "#main-menu a.Wiki", false # assert_no_select
       end
     end
 
@@ -55,9 +69,7 @@ describe ProjectsController do
         it 'renders main menu with wiki menu item' do
           get 'show', @params
 
-          response.should have_tag('#main-menu') do
-            with_tag 'a.Wiki', :content => 'Wiki'
-          end
+          assert_select "#main-menu a.Wiki", 'Wiki'
         end
       end
 
@@ -76,17 +88,13 @@ describe ProjectsController do
         it 'renders main menu with wiki menu item' do
           get 'show', @params
 
-          response.should have_tag('#main-menu') do
-            with_tag 'a.Example', :content => 'Example'
-          end
+          assert_select "#main-menu a.Example", 'Example'
         end
 
         it 'renders main menu with sub wiki menu item' do
           get 'show', @params
 
-          response.should have_tag('#main-menu') do
-            with_tag 'a.Sub', :content => 'Sub'
-          end
+          assert_select "#main-menu a.Sub", 'Sub'
         end
       end
     end

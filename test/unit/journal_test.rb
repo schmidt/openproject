@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -17,7 +15,8 @@ class JournalTest < ActiveSupport::TestCase
   fixtures :all
 
   def setup
-    @journal = IssueJournal.find(1)
+    super
+    @journal = WorkPackageJournal.find(1)
   end
 
   def test_journalized_is_an_issue
@@ -84,7 +83,7 @@ class JournalTest < ActiveSupport::TestCase
     @user = User.generate!
     @project = Project.generate!
     @issue = Issue.generate_for_project!(@project).reload
-    start = @issue.updated_on
+    start = @issue.updated_at
     sleep(1) # TODO: massive hack to make sure the timestamps are different. switch to timecop later
 
     assert_difference("Journal.count") do
@@ -92,7 +91,7 @@ class JournalTest < ActiveSupport::TestCase
       @issue.save
     end
 
-    assert_not_equal start, @issue.reload.updated_on
+    assert_not_equal start, @issue.reload.updated_at
   end
 
   test "accessing #journaled on a Journal should not error (parent class)" do

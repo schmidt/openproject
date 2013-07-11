@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 #-- encoding: UTF-8
 # ActsAsWatchable
 module Redmine
@@ -8,6 +19,21 @@ module Redmine
       end
 
       module ClassMethods
+        # Marks an ActiveRecord::Model as watchable
+        # A watchable model has association with users (watchers) who wish to be informed of changes on it.
+        #
+        # This also creates the routes necessary for watching/unwatching by adding the model's name to routes. This
+        # e.g leads to the following routes when marking issues as watchable:
+        #   POST:     issues/1/watch
+        #   DELETE:   issues/1/unwatch
+        #   GET/POST: issues/1/watchers/new
+        #   DELETE:   issues/1/watchers/1
+        # Use the :route_prefix option to change the model prefix, e.g. from issues to tickets
+        #
+        # params:
+        #   options:
+        #     route_prefix: overrides the route calculation which would normally use the models name.
+
         def acts_as_watchable(options = {})
           return if self.included_modules.include?(Redmine::Acts::Watchable::InstanceMethods)
           class_eval do
@@ -54,7 +80,9 @@ module Redmine
         # Removes user from the watchers list
         def remove_watcher(user)
           return nil unless user && user.is_a?(User)
-          Watcher.delete_all "watchable_type = '#{self.class}' AND watchable_id = #{self.id} AND user_id = #{user.id}"
+          watchers_to_delete = self.watchers.find_all{|watcher| watcher.user == user}
+          watchers_to_delete.each{|watcher| watcher.delete}
+          watchers_to_delete.count
         end
 
         # Adds/removes watcher

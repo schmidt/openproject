@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -317,8 +315,8 @@ class QueryTest < ActiveSupport::TestCase
 
   def test_invalid_query_should_raise_query_statement_invalid_error
     q = Query.new
-    assert_raise Query::StatementInvalid do
-      q.issues(:conditions => "foo = 1")
+    assert_raise ActiveRecord::StatementInvalid do
+      q.issues(:conditions => "foo = 1").all
     end
   end
 

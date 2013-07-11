@@ -1,0 +1,25 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
+<% if content_for?(:action_menu_main) %>
+  <ul class="action_menu_main">
+    <%= content_for :action_menu_main %>
+    <% if content_for?(:action_menu_more) %>
+      <li class="drop-down">
+        <a href="javascript:" class="icon icon-more"><%= l(:more_actions) %></a>
+        <ul class="action_menu_more" style="display:none;">
+          <%= content_for :action_menu_more %>
+        </ul>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

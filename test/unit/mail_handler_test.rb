@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -19,6 +17,7 @@ class MailHandlerTest < ActiveSupport::TestCase
   FIXTURES_PATH = File.dirname(__FILE__) + '/../fixtures/mail_handler'
 
   def setup
+    super
     ActionMailer::Base.deliveries.clear
     Setting.notified_events = Redmine::Notifiable.all.collect(&:name)
   end
@@ -26,7 +25,7 @@ class MailHandlerTest < ActiveSupport::TestCase
   def test_add_issue
     ActionMailer::Base.deliveries.clear
     # This email contains: 'Project: onlinestore'
-    issue = submit_email('ticket_on_given_project.eml')
+    issue = submit_email('ticket_on_given_project.eml', :allow_override => 'fixed_version')
     assert issue.is_a?(Issue)
     assert !issue.new_record?
     issue.reload
@@ -246,7 +245,7 @@ class MailHandlerTest < ActiveSupport::TestCase
   end
 
   def test_add_issue_with_localized_attributes
-    User.find_by_mail('jsmith@somenet.foo').update_attribute 'language', 'fr'
+    User.find_by_mail('jsmith@somenet.foo').update_attribute 'language', 'de'
     issue = submit_email('ticket_with_localized_attributes.eml', :allow_override => 'tracker,category,priority')
     assert issue.is_a?(Issue)
     assert !issue.new_record?
@@ -341,27 +340,27 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal User.find_by_login('jsmith'), journal.user
     assert_equal Issue.find(2), journal.journaled
     assert_match /This is reply/, journal.notes
-    assert_equal 'Feature request', journal.issue.tracker.name
+    assert_equal 'Feature request', journal.work_package.tracker.name
   end
 
   test "reply to issue update (Journal) by message_id" do
     journal = submit_email('ticket_reply_by_message_id.eml')
-    assert journal.is_a?(IssueJournal), "Email was a #{journal.class}"
+    assert journal.is_a?(WorkPackageJournal), "Email was a #{journal.class}"
     assert_equal User.find_by_login('jsmith'), journal.user
     assert_equal Issue.find(2), journal.journaled
     assert_match /This is reply/, journal.notes
-    assert_equal 'Feature request', journal.issue.tracker.name
+    assert_equal 'Feature request', journal.work_package.tracker.name
   end
 
   def test_add_issue_note_with_attribute_changes
     # This email contains: 'Status: Resolved'
     journal = submit_email('ticket_reply_with_status.eml')
-    assert journal.is_a?(Journal)
+    assert journal.is_a?(WorkPackageJournal)
     issue = Issue.find(journal.journaled.id)
     assert_equal User.find_by_login('jsmith'), journal.user
     assert_equal Issue.find(2), journal.journaled
     assert_match /This is reply/, journal.notes
-    assert_equal 'Feature request', journal.issue.tracker.name
+    assert_equal 'Feature request', journal.work_package.tracker.name
     assert_equal IssueStatus.find_by_name("Resolved"), issue.status
     assert_equal '2010-01-01', issue.start_date.to_s
     assert_equal '2010-12-31', issue.due_date.to_s
@@ -383,8 +382,8 @@ class MailHandlerTest < ActiveSupport::TestCase
     journal = submit_email('ticket_reply.eml', :issue => {:tracker => 'Support request', :priority => 'High'})
     assert journal.is_a?(Journal)
     assert_match /This is reply/, journal.notes
-    assert_equal 'Feature request', journal.issue.tracker.name
-    assert_equal 'Normal', journal.issue.priority.name
+    assert_equal 'Feature request', journal.work_package.tracker.name
+    assert_equal 'Normal', journal.work_package.priority.name
   end
 
   def test_reply_to_a_message

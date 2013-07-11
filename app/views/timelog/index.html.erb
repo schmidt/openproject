@@ -1,5 +1,17 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <div class="contextual">
-  <%= link_to_if User.current.allowed_to?({ :controller => 'timelog', :action => 'new' }, @project),
+  <%= link_to_if User.current.allowed_to?({ :controller => '/timelog', :action => 'new' }, @project),
                  l(:button_log_time),
                  polymorphic_new_time_entry_path(@issue || @project),
                  :class => 'icon icon-time-add' %>
@@ -19,7 +31,8 @@
 
 <% unless @entries.empty? %>
 <%= render :partial => 'list', :locals => { :entries => @entries }%>
-<p class="pagination"><%= pagination_links_full @entry_pages, @entry_count %></p>
+
+<%= pagination_links_full @entries %>
 
 <%= other_formats_links do |f| %>
 	<%= f.link_to 'Atom', :url => params.merge({:issue_id => @issue, :key => User.current.rss_key}) %>

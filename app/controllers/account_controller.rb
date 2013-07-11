@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -37,11 +35,12 @@ class AccountController < ApplicationController
   def lost_password
     redirect_to(home_url) && return unless Setting.lost_password?
     if params[:token]
-      @token = Token.find_by_action_and_value("recovery", params[:token])
+      @token = Token.find_by_action_and_value("recovery", params[:token].to_s)
       redirect_to(home_url) && return unless @token and !@token.expired?
       @user = @token.user
       if request.post?
         @user.password, @user.password_confirmation = params[:new_password], params[:new_password_confirmation]
+        @user.force_password_change = false
         if @user.save
           @token.destroy
           flash[:notice] = l(:notice_account_password_updated)
@@ -89,7 +88,7 @@ class AccountController < ApplicationController
           session[:auth_source_registration] = nil
           self.logged_user = @user
           flash[:notice] = l(:notice_account_activated)
-          redirect_to :controller => 'my', :action => 'account'
+          redirect_to :controller => '/my', :action => 'account'
         end
       else
         @user.login = params[:user][:login]
@@ -110,7 +109,7 @@ class AccountController < ApplicationController
   # Token based account activation
   def activate
     redirect_to(home_url) && return unless Setting.self_registration? && params[:token]
-    token = Token.find_by_action_and_value('register', params[:token])
+    token = Token.find_by_action_and_value('register', params[:token].to_s)
     redirect_to(home_url) && return unless token and !token.expired?
     user = token.user
     redirect_to(home_url) && return unless user.registered?
@@ -120,6 +119,35 @@ class AccountController < ApplicationController
       flash[:notice] = l(:notice_account_activated)
     end
     redirect_to :action => 'login'
+  end
+
+  # Process a password change form, used when the user is forced
+  # to change the password.
+  # When making changes here, also check MyController.change_password
+  def change_password
+    @user = User.find_by_login(params[:username])
+    @username = @user.login
+
+    # A JavaScript hides the force_password_change field for external
+    # auth sources in the admin UI, so this shouldn't normally happen.
+    return if redirect_if_password_change_not_allowed(@user)
+
+    if @user.check_password?(params[:password])
+      @user.password = params[:new_password]
+      @user.password_confirmation = params[:new_password_confirmation]
+      @user.force_password_change = false
+      if @user.save
+
+        result = password_authentication(params[:username], params[:new_password])
+        # password_authentication resets session including flash notices,
+        # so set afterwards.
+        flash[:notice] = l(:notice_account_password_updated)
+        return result
+      end
+    else
+      invalid_credentials
+    end
+    render 'my/password'
   end
 
   private
@@ -136,17 +164,23 @@ class AccountController < ApplicationController
     if Setting.openid? && using_open_id?
       open_id_authenticate(params[:openid_url])
     else
-      password_authentication
+      password_authentication(params[:username], params[:password])
     end
   end
 
-  def password_authentication
-    user = User.try_to_login(params[:username], params[:password])
-
+  def password_authentication(username, password)
+    user = User.try_to_login(username, password)
     if user.nil?
-      u = User.find_by_login(params[:username])
-      if u && !u.active? && u.check_password?(params[:password])
-        inactive_account
+      user = User.find_by_login(username)
+      if user and user.check_password?(password)
+        if not user.active?
+          inactive_account
+        elsif user.force_password_change
+          return if redirect_if_password_change_not_allowed(user)
+          render_force_password_change
+        else
+          invalid_credentials
+        end
       else
         invalid_credentials
       end
@@ -171,7 +205,7 @@ class AccountController < ApplicationController
           user.login = registration['nickname'] unless registration['nickname'].nil?
           user.mail = registration['email'] unless registration['email'].nil?
           user.firstname, user.lastname = registration['fullname'].split(' ') unless registration['fullname'].nil?
-          user.random_password
+          user.random_password!
           user.register
 
           case Setting.self_registration
@@ -212,10 +246,10 @@ class AccountController < ApplicationController
     if user.first_login
       user.update_attribute(:first_login, false)
 
-      redirect_to :controller => "my", :action => "first_login", :back_url => params[:back_url]
+      redirect_to :controller => "/my", :action => "first_login", :back_url => params[:back_url]
     else
 
-      redirect_back_or_default :controller => 'my', :action => 'page'
+      redirect_back_or_default :controller => '/my', :action => 'page'
     end
   end
 
@@ -248,6 +282,22 @@ class AccountController < ApplicationController
     flash.now[:error] = l(:notice_account_inactive)
   end
 
+  def redirect_if_password_change_not_allowed(user)
+    logger.warn "Password change for user '#{user}' forced, but user is not allowed to change password"
+    if user and not user.change_password_allowed?
+      flash[:error] = l(:notice_can_t_change_password)
+      redirect_to :action => 'login'
+      return true
+    end
+    false
+  end
+
+  def render_force_password_change
+    flash[:error] = l(:notice_account_new_password_forced)
+    @username = params[:username]
+    render 'my/password'
+  end
+
   # Register a user for email activation.
   #
   # Pass a block for behavior when a user fails to save
@@ -272,7 +322,7 @@ class AccountController < ApplicationController
     if user.save
       self.logged_user = user
       flash[:notice] = l(:notice_account_activated)
-      redirect_to :controller => 'my', :action => 'account'
+      redirect_to :controller => '/my', :action => 'account'
     else
       yield if block_given?
     end

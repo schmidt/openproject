@@ -1,4 +1,16 @@
-<%= labelled_tabular_form_for :project, @project, :url => project_path(@project), :html => {:method => (@project.new_record? ? :post : :put) } do |f| %>
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
+<%= labelled_tabular_form_for @project do |f| %>
 <%= render :partial => 'form', :locals => { :f => f } %>
 <%= submit_tag l(:button_save) %>
 <% end %>

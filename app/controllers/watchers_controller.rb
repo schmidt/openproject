@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -17,7 +15,7 @@ class WatchersController < ApplicationController
   before_filter :find_watched_by_id, :only => [:destroy]
   before_filter :find_project
   before_filter :require_login, :check_project_privacy, :only => [:watch, :unwatch]
-  before_filter :authorize, :only => [:new, :destroy]
+  before_filter :authorize, :only => [:new, :create, :destroy]
 
   def watch
     if @watched.respond_to?(:visible?) && !@watched.visible?(User.current)
@@ -35,6 +33,7 @@ class WatchersController < ApplicationController
     @watcher = Watcher.new(params[:watcher])
     @watcher.watchable = @watched
     @watcher.save if request.post?
+
     respond_to do |format|
       format.html { redirect_to :back }
       format.js do
@@ -46,6 +45,9 @@ class WatchersController < ApplicationController
   rescue ::ActionController::RedirectBackError
     render :text => 'Watcher added.', :layout => true
   end
+
+  # TODO: remove this and replace with proper action
+  alias :create :new
 
   def destroy
     @watched.set_watcher(@watch.user, false)

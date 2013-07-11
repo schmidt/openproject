@@ -11,9 +11,9 @@ roles_001:
     - :manage_members
     - :manage_versions
     - :manage_categories
-    - :view_issues
+    - :view_work_packages
     - :add_issues
-    - :edit_issues
+    - :edit_work_packages
     - :manage_issue_relations
     - :manage_subtasks
     - :add_issue_notes
@@ -24,7 +24,6 @@ roles_001:
     - :delete_issue_watchers
     - :manage_public_queries
     - :save_queries
-    - :view_gantt
     - :view_calendar
     - :log_time
     - :view_time_entries
@@ -66,9 +65,9 @@ roles_002:
     - :manage_members
     - :manage_versions
     - :manage_categories
-    - :view_issues
+    - :view_work_packages
     - :add_issues
-    - :edit_issues
+    - :edit_work_packages
     - :manage_issue_relations
     - :manage_subtasks
     - :add_issue_notes
@@ -76,7 +75,6 @@ roles_002:
     - :delete_issues
     - :view_issue_watchers
     - :save_queries
-    - :view_gantt
     - :view_calendar
     - :log_time
     - :view_time_entries
@@ -111,15 +109,14 @@ roles_003:
     - :manage_members
     - :manage_versions
     - :manage_categories
-    - :view_issues
+    - :view_work_packages
     - :add_issues
-    - :edit_issues
+    - :edit_work_packages
     - :manage_issue_relations
     - :add_issue_notes
     - :move_issues
     - :view_issue_watchers
     - :save_queries
-    - :view_gantt
     - :view_calendar
     - :log_time
     - :view_time_entries
@@ -146,14 +143,13 @@ roles_004:
   builtin: 1
   permissions: |
     ---
-    - :view_issues
+    - :view_work_packages
     - :add_issues
-    - :edit_issues
+    - :edit_work_packages
     - :manage_issue_relations
     - :add_issue_notes
     - :move_issues
     - :save_queries
-    - :view_gantt
     - :view_calendar
     - :log_time
     - :view_time_entries
@@ -177,9 +173,8 @@ roles_005:
   builtin: 2
   permissions: |
     ---
-    - :view_issues
+    - :view_work_packages
     - :add_issue_notes
-    - :view_gantt
     - :view_calendar
     - :view_time_entries
     - :view_documents

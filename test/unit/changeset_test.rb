@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -15,10 +13,6 @@ require File.expand_path('../../test_helper', __FILE__)
 
 class ChangesetTest < ActiveSupport::TestCase
   fixtures :all
-
-  def setup
-    super
-  end
 
   def test_ref_keywords_any
     ActionMailer::Base.deliveries.clear
@@ -93,7 +87,7 @@ class ChangesetTest < ActiveSupport::TestCase
       assert_equal [1], c.issue_ids.sort
 
       time = TimeEntry.first(:order => 'id desc')
-      assert_equal 1, time.issue_id
+      assert_equal 1, time.work_package_id
       assert_equal 1, time.project_id
       assert_equal 2, time.user_id
       assert_equal expected_hours, time.hours, "@#{syntax} should be logged as #{expected_hours} hours but was #{time.hours}"
@@ -122,7 +116,7 @@ class ChangesetTest < ActiveSupport::TestCase
     assert Issue.find(2).closed?
 
     times = TimeEntry.all(:order => 'id desc', :limit => 2)
-    assert_equal [1, 2], times.collect(&:issue_id).sort
+    assert_equal [1, 2], times.collect(&:work_package_id).sort
   end
 
   def test_ref_keywords_any_line_start

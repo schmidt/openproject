@@ -1,15 +1,26 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require_dependency 'journal_formatter/base'
 
 class OpenProject::JournalFormatter::Diff < JournalFormatter::Base
-  unloadable
+  # unloadable
 
-  def render(key, values, no_html = false)
-    render_ternary_detail_text(key, values.last, values.first, no_html)
+  def render(key, values, options = { :no_html => false })
+    render_ternary_detail_text(key, values.last, values.first, options[:no_html])
   end
 
   private
 
-  def label(key, no_html)
+  def label(key, no_html = false)
     label = super key
 
     no_html ?
@@ -33,8 +44,12 @@ class OpenProject::JournalFormatter::Diff < JournalFormatter::Base
     end
   end
 
+  # url_for wants to access the controller method, which we do not have in our Diff class.
+  # see: http://stackoverflow.com/questions/3659455/is-there-a-new-syntax-for-url-for-in-rails-3
+  def controller; @controller; end
+
   def link(key, no_html)
-    url_attr = { :controller => 'journals',
+    url_attr = { :controller => '/journals',
                  :action => 'diff',
                  :id => @journal.id,
                  :field => key.downcase,
@@ -44,8 +59,7 @@ class OpenProject::JournalFormatter::Diff < JournalFormatter::Base
     # skip_relative_url_root => true
     # option. But this method is flawed in 2.3
     # revise when on 3.2
-                 :host => Setting.host_name.gsub(Redmine::Utils.relative_url_root, "") }
-
+                 :host => Setting.host_name.gsub(Redmine::Utils.relative_url_root.to_s, "") }
 
     if no_html
       url_for url_attr

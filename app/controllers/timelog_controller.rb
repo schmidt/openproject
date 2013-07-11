@@ -1,19 +1,19 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
 class TimelogController < ApplicationController
   menu_item :issues
+
+  before_filter :disable_api
   before_filter :find_project, :only => [:new, :create]
   before_filter :find_time_entry, :only => [:show, :edit, :update, :destroy]
   before_filter :authorize, :except => [:index]
@@ -23,6 +23,7 @@ class TimelogController < ApplicationController
   include SortHelper
   include TimelogHelper
   include CustomFieldsHelper
+  include PaginationHelper
 
   def index
     sort_init 'spent_on', 'desc'
@@ -30,12 +31,12 @@ class TimelogController < ApplicationController
                 'user' => 'user_id',
                 'activity' => 'activity_id',
                 'project' => "#{Project.table_name}.name",
-                'issue' => 'issue_id',
+                'work_package' => 'work_package_id',
                 'hours' => 'hours'
 
     cond = ARCondition.new
     if @issue
-      cond << "#{Issue.table_name}.root_id = #{@issue.root_id} AND #{Issue.table_name}.lft >= #{@issue.lft} AND #{Issue.table_name}.rgt <= #{@issue.rgt}"
+      cond << "#{WorkPackage.table_name}.root_id = #{@issue.root_id} AND #{WorkPackage.table_name}.lft >= #{@issue.lft} AND #{WorkPackage.table_name}.rgt <= #{@issue.rgt}"
     elsif @project
       cond << @project.project_condition(Setting.display_subprojects_issues?)
     end
@@ -46,31 +47,21 @@ class TimelogController < ApplicationController
     respond_to do |format|
       format.html {
         # Paginate results
-        @entry_count = TimeEntry.visible.count(:include => [:project, :issue], :conditions => cond.conditions)
-        @entry_pages = Paginator.new self, @entry_count, per_page_option, params['page']
-        @entries = TimeEntry.visible.find(:all,
-                                  :include => [:project, :activity, :user, {:issue => :tracker}],
-                                  :conditions => cond.conditions,
-                                  :order => sort_clause,
-                                  :limit  =>  @entry_pages.items_per_page,
-                                  :offset =>  @entry_pages.current.offset)
-        @total_hours = TimeEntry.visible.sum(:hours, :include => [:project, :issue], :conditions => cond.conditions).to_f
+        @entry_count = TimeEntry.visible.count(:include => [:project, :work_package], :conditions => cond.conditions)
+
+        @entries = TimeEntry.visible.includes(:project, :activity, :user, {:work_package => :tracker})
+                                    .where(cond.conditions)
+                                    .order(sort_clause)
+                                    .page(params[:page])
+                                    .per_page(per_page_param)
+
+        @total_hours = TimeEntry.visible.sum(:hours, :include => [:project, :work_package], :conditions => cond.conditions).to_f
 
         render :layout => !request.xhr?
       }
-      format.api  {
-        @entry_count = TimeEntry.visible.count(:include => [:project, :issue], :conditions => cond.conditions)
-        @entry_pages = Paginator.new self, @entry_count, per_page_option, params['page']
-        @entries = TimeEntry.visible.find(:all,
-                                  :include => [:project, :activity, :user, {:issue => :tracker}],
-                                  :conditions => cond.conditions,
-                                  :order => sort_clause,
-                                  :limit  =>  @entry_pages.items_per_page,
-                                  :offset =>  @entry_pages.current.offset)
-      }
       format.atom {
         entries = TimeEntry.visible.find(:all,
-                                 :include => [:project, :activity, :user, {:issue => :tracker}],
+                                 :include => [:project, :activity, :user, {:work_package => :tracker}],
                                  :conditions => cond.conditions,
                                  :order => "#{TimeEntry.table_name}.created_on DESC",
                                  :limit => Setting.feeds_limit.to_i)
@@ -79,7 +70,7 @@ class TimelogController < ApplicationController
       format.csv {
         # Export all entries
         @entries = TimeEntry.visible.find(:all,
-                                  :include => [:project, :activity, :user, {:issue => [:tracker, :assigned_to, :priority]}],
+                                  :include => [:project, :activity, :user, {:work_package => [:tracker, :assigned_to, :priority]}],
                                   :conditions => cond.conditions,
                                   :order => sort_clause)
         send_data(entries_to_csv(@entries), :type => 'text/csv; header=present', :filename => 'timelog.csv')
@@ -91,12 +82,11 @@ class TimelogController < ApplicationController
     respond_to do |format|
       # TODO: Implement html response
       format.html { render :nothing => true, :status => 406 }
-      format.api
     end
   end
 
   def new
-    @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => User.current.today)
+    @time_entry ||= TimeEntry.new(:project => @project, :work_package=> @issue, :user => User.current, :spent_on => User.current.today)
     @time_entry.safe_attributes = params[:time_entry]
 
     call_hook(:controller_timelog_edit_before_save, { :params => params, :time_entry => @time_entry })
@@ -104,7 +94,7 @@ class TimelogController < ApplicationController
   end
 
   def create
-    @time_entry ||= TimeEntry.new(:project => @project, :issue => @issue, :user => User.current, :spent_on => User.current.today)
+    @time_entry ||= TimeEntry.new(:project => @project, :work_package => @issue, :user => User.current, :spent_on => User.current.today)
     @time_entry.safe_attributes = params[:time_entry]
 
     call_hook(:controller_timelog_edit_before_save, { :params => params, :time_entry => @time_entry })
@@ -115,12 +105,10 @@ class TimelogController < ApplicationController
           flash[:notice] = l(:notice_successful_update)
           redirect_back_or_default :action => 'index', :project_id => @time_entry.project
         }
-        format.api  { render :action => 'show', :status => :created, :location => time_entry_url(@time_entry) }
       end
     else
       respond_to do |format|
         format.html { render :action => 'edit' }
-        format.api  { render_validation_errors(@time_entry) }
       end
     end
   end
@@ -142,12 +130,10 @@ class TimelogController < ApplicationController
           flash[:notice] = l(:notice_successful_update)
           redirect_back_or_default :action => 'index', :project_id => @time_entry.project
         }
-        format.api  { head :ok }
       end
     else
       respond_to do |format|
         format.html { render :action => 'edit' }
-        format.api  { render_validation_errors(@time_entry) }
       end
     end
   end
@@ -159,7 +145,6 @@ class TimelogController < ApplicationController
           flash[:notice] = l(:notice_successful_delete)
           redirect_to :back
         }
-        format.api  { head :ok }
       end
     else
       respond_to do |format|
@@ -167,7 +152,6 @@ class TimelogController < ApplicationController
           flash[:error] = l(:notice_unable_delete_time_entry)
           redirect_to :back
         }
-        format.api  { render_validation_errors(@time_entry) }
       end
     end
   rescue ::ActionController::RedirectBackError
@@ -190,6 +174,9 @@ private
     if (issue_id = (params[:issue_id] || params[:time_entry] && params[:time_entry][:issue_id])).present?
       @issue = Issue.find(issue_id)
       @project = @issue.project
+    elsif (work_package_id = (params[:work_package_id] || params[:time_entry] && params[:time_entry][:work_package_id])).present?
+      @issue = WorkPackage.find(work_package_id)
+      @project = @issue.project
     elsif (project_id = (params[:project_id] || params[:time_entry] && params[:time_entry][:project_id])).present?
       @project = Project.find(project_id)
     else
@@ -203,6 +190,9 @@ private
   def find_optional_project
     if !params[:issue_id].blank?
       @issue = Issue.find(params[:issue_id])
+      @project = @issue.project
+    elsif !params[:work_package_id].blank?
+      @issue = WorkPackage.find(params[:work_package_id])
       @project = @issue.project
     elsif !params[:project_id].blank?
       @project = Project.find(params[:project_id])

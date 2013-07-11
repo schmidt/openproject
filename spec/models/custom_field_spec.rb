@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe CustomField do
@@ -42,8 +53,14 @@ describe CustomField do
         before do
           I18n.locale = :de
           field2.name = "taken_name"
-          field2.save!
+
+          # this fields needs an explicit english translations
+          # otherwise it falls back using the german one
           I18n.locale = :en
+          field2.name = "unique_name"
+
+          field2.save!
+
           field.name = "taken_name"
         end
 
@@ -61,7 +78,7 @@ describe CustomField do
       end
 
       after do
-        I18n.locale = nil
+        I18n.locale = :en
       end
 
       it "should return english name when in locale en" do
@@ -88,7 +105,7 @@ describe CustomField do
       it { field.should have(1).translations }
       it { field.name(:de).should == "Feld" }
       it { field.default_value(:de).should == "zwei" }
-      it { field.possible_values(:de).should == ["eins", "zwei", "drei"] }
+      it { field.possible_values(:locale => :de).should == ["eins", "zwei", "drei"] }
     end
 
     describe "WHEN providing a hash with only a locale" do
@@ -177,17 +194,17 @@ describe CustomField do
         I18n.locale = :en
         field.possible_values = ["one", "two", "three"]
 
-        I18n.locale = :fr
-        field.possible_values = "un\ndeux\ntrois"
-
         I18n.locale = :de
         field.save!
         field.reload
       end
 
-      it { field.possible_values(:en).should == ["one", "two", "three"] }
-      it { field.possible_values(:de).should == ["eins", "zwei", "drei"] }
-      it { field.possible_values(:fr).should == ["un", "deux", "trois"] }
+      after do
+        I18n.locale = :en
+      end
+
+      it { field.possible_values(:locale => :en).should == ["one", "two", "three"] }
+      it { field.possible_values(:locale => :de).should == ["eins", "zwei", "drei"] }
     end
   end
 

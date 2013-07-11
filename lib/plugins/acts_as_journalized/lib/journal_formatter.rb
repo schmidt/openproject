@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 #-- encoding: UTF-8
 # This file is part of the acts_as_journalized plugin for the redMine
 # project management software
@@ -37,12 +48,11 @@ module JournalFormatter
   end
 
   def self.register_formatted_field(klass, field, formatter)
-    field_key = field.is_a?(Regexp) ? field : Regexp.new(field.to_s)
+    field_key = field.is_a?(Regexp) ? field : Regexp.new("^#{field}$")
 
-    registered_fields[klass].merge!(field => formatter)
+    registered_fields[klass].merge!(field_key => formatter)
   end
 
-  # TODO: Document Formatters (can take up to three params, value, journaled, field ...)
   def self.default_formatters
     { :plaintext => JournalFormatter::Plaintext,
       :datetime => JournalFormatter::Datetime,
@@ -57,7 +67,7 @@ module JournalFormatter
     hash[klass] = {}
   end
 
-  def render_detail(detail, no_html=false)
+  def render_detail(detail, options = { :no_html => false })
     if detail.respond_to? :to_ary
       key = detail.first
       values = detail.last
@@ -70,7 +80,7 @@ module JournalFormatter
 
     return nil if formatter.nil?
 
-    formatter.render(key, values, no_html)
+    formatter.render(key, values, options).html_safe
   end
 
   def formatter_instance(formatter_key)
@@ -78,7 +88,7 @@ module JournalFormatter
     # This is especially true for associations created by plugins. Those are sometimes nameed according to
     # the schema "association_name[n]" or "association_name_[n]" where n is an integer representing an id.
     # Using regexp we are able to handle those fields with the rest.
-    formatter = JournalFormatter.registered_fields[self.class.name.to_sym].keys.detect{ |k| formatter_key.match(k.to_s) }
+    formatter = JournalFormatter.registered_fields[self.class.name.to_sym].keys.detect{ |k| formatter_key.match(k) }
 
     return nil if formatter.nil?
 

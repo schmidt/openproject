@@ -1,7 +1,18 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe CustomFieldsController do
-  let(:custom_field) { FactoryGirl.stub(:custom_field) }
+  let(:custom_field) { FactoryGirl.build(:custom_field) }
 
   before do
     @controller.stub!(:authorize)
@@ -21,10 +32,10 @@ describe CustomFieldsController do
       let(:params) { { "custom_field" => { "translations_attributes" => { "0" => { "name" => de_name, "locale" => "de" }, "1" => { "name" => en_name, "locale" => "en" } } } } }
 
       before do
-        post :edit, params
+        put :edit, params
       end
 
-      it { response.should be_success }
+      it { response.should be_redirect }
       it { custom_field.name(:de).should == de_name }
       it { custom_field.name(:en).should == en_name }
     end
@@ -35,10 +46,10 @@ describe CustomFieldsController do
       let(:params) { { "custom_field" => { "translations_attributes" => { "0" => { "name" => de_name, "locale" => "de" }, "1" => { "name" => en_name, "locale" => "en" } } } } }
 
       before do
-        post :edit, params
+        put :edit, params
       end
 
-      it { response.should be_success }
+      it { response.should be_redirect }
       it { custom_field.name(:de).should == en_name }
       it { custom_field.name(:en).should == en_name }
     end
@@ -52,7 +63,7 @@ describe CustomFieldsController do
     describe "WITH all ok params" do
       let(:de_name) { "Ticket Feld" }
       let(:en_name) { "Issue Field" }
-      let(:params) { { "type" => "IssueCustomField",
+      let(:params) { { "type" => "WorkPackageCustomField",
                        "custom_field" => { "translations_attributes" => { "0" => { "name" => de_name, "locale" => "de" }, "1" => { "name" => en_name, "locale" => "en" } } } } }
 
       before do
@@ -67,7 +78,7 @@ describe CustomFieldsController do
     describe "WITH one empty name params" do
       let(:en_name) { "Issue Field" }
       let(:de_name) { "" }
-      let(:params) { { "type" => "IssueCustomField",
+      let(:params) { { "type" => "WorkPackageCustomField",
                        "custom_field" => { "translations_attributes" => { "0" => { "name" => de_name, "locale" => "de" }, "1" => { "name" => en_name, "locale" => "en" } } } } }
 
       before do

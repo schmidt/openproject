@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -15,6 +13,7 @@
 class UsersController < ApplicationController
   layout 'admin'
 
+  before_filter :disable_api
   before_filter :require_admin, :except => [:show, :deletion_info, :destroy]
   before_filter :find_user, :only => [:show,
                                       :edit,
@@ -31,17 +30,11 @@ class UsersController < ApplicationController
 
   include SortHelper
   include CustomFieldsHelper
+  include PaginationHelper
 
   def index
     sort_init 'login', 'asc'
     sort_update %w(login firstname lastname mail admin created_on last_login_on)
-
-    case params[:format]
-    when 'xml', 'json'
-      @offset, @limit = api_offset_and_limit
-    else
-      @limit = per_page_option
-    end
 
     scope = User
     scope = scope.in_group(params[:group_id].to_i) if params[:group_id].present?
@@ -54,21 +47,16 @@ class UsersController < ApplicationController
       c << ["LOWER(login) LIKE ? OR LOWER(firstname) LIKE ? OR LOWER(lastname) LIKE ? OR LOWER(mail) LIKE ?", name, name, name, name]
     end
 
-    @user_count = scope.count(:conditions => c.conditions)
-    @user_pages = Paginator.new self, @user_count, @limit, params['page']
-    @offset ||= @user_pages.current.offset
-    @users =  scope.find :all,
-                        :order => sort_clause,
-                        :conditions => c.conditions,
-                        :limit  =>  @limit,
-                        :offset =>  @offset
+    @users = scope.order(sort_clause)
+                  .where(c.conditions)
+                  .page(page_param)
+                  .per_page(per_page_param)
 
     respond_to do |format|
       format.html {
         @groups = Group.all.sort
         render :layout => !request.xhr?
       }
-      format.api
     end
   end
 
@@ -88,7 +76,6 @@ class UsersController < ApplicationController
 
     respond_to do |format|
       format.html { render :layout => 'base' }
-      format.api
     end
   end
 
@@ -123,7 +110,6 @@ class UsersController < ApplicationController
             edit_user_path(@user)
           )
         }
-        format.api  { render :action => 'show', :status => :created, :location => user_url(@user) }
       end
     else
       @auth_sources = AuthSource.find(:all)
@@ -132,7 +118,6 @@ class UsersController < ApplicationController
 
       respond_to do |format|
         format.html { render :action => 'new' }
-        format.api  { render_validation_errors(@user) }
       end
     end
   end
@@ -151,7 +136,8 @@ class UsersController < ApplicationController
       @user.password, @user.password_confirmation = params[:user][:password], params[:user][:password_confirmation]
     end
     # Was the account actived ? (do it before User#save clears the change)
-    was_activated = (@user.status_change == [User::STATUS_REGISTERED, User::STATUS_ACTIVE])
+    was_activated = (@user.status_change == [User::STATUSES[:registered],
+                                             User::STATUSES[:active]])
     if @user.save
       # TODO: Similar to My#account
       @user.pref.attributes = params[:pref]
@@ -171,7 +157,6 @@ class UsersController < ApplicationController
           flash[:notice] = l(:notice_successful_update)
           redirect_to :back
         }
-        format.api  { head :ok }
       end
     else
       @auth_sources = AuthSource.find(:all)
@@ -181,11 +166,10 @@ class UsersController < ApplicationController
 
       respond_to do |format|
         format.html { render :action => :edit }
-        format.api  { render_validation_errors(@user) }
       end
     end
   rescue ::ActionController::RedirectBackError
-    redirect_to :controller => 'users', :action => 'edit', :id => @user
+    redirect_to :controller => '/users', :action => 'edit', :id => @user
   end
 
   def edit_membership
@@ -193,7 +177,7 @@ class UsersController < ApplicationController
     @membership.save if request.post?
     respond_to do |format|
       if @membership.valid?
-        format.html { redirect_to :controller => 'users', :action => 'edit', :id => @user, :tab => 'memberships' }
+        format.html { redirect_to :controller => '/users', :action => 'edit', :id => @user, :tab => 'memberships' }
         format.js {
           render(:update) {|page|
             page.replace_html "tab-content-memberships", :partial => 'users/memberships'
@@ -213,7 +197,7 @@ class UsersController < ApplicationController
   def destroy
     # as destroying users is a lengthy process we handle it in the background
     # and lock the account now so that no action can be performed with it
-    @user.status = User::STATUS_LOCKED
+    @user.status = User::STATUSES[:locked]
     @user.save
 
     # TODO: use Delayed::Worker.delay_jobs = false in test environment as soon as
@@ -233,9 +217,6 @@ class UsersController < ApplicationController
           redirect_to users_path
         end
       end
-      format.api  do
-        head :ok
-      end
     end
   end
 
@@ -245,7 +226,7 @@ class UsersController < ApplicationController
       @membership.destroy
     end
     respond_to do |format|
-      format.html { redirect_to :controller => 'users', :action => 'edit', :id => @user, :tab => 'memberships' }
+      format.html { redirect_to :controller => '/users', :action => 'edit', :id => @user, :tab => 'memberships' }
       format.js { render(:update) {|page| page.replace_html "tab-content-memberships", :partial => 'users/memberships'} }
     end
   end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -15,11 +13,22 @@
 require 'uri'
 require 'cgi'
 
+# There is a circular dependency chain between User, Principal, and Project
+# If anybody triggers the loading of User first, Rails fails to autoload
+# the three. Defining class User depends on the resolution of the Principal constant.
+# Triggering autoload of the User class does not immediately define the User constant
+# while Principal and Project dont inherit from something undefined.
+# This means they will be defined as constants right after their autoloading
+# was triggered. When Rails discovers it has to load the undefined class User
+# during the load circle while noticing it has already tried to load it (the
+# first load of user), it will complain about user being an undefined constant.
+# Requiring this dependency here ensures Principal is loaded first in development
+# on each request.
+require_dependency 'principal'
+
+
 class ApplicationController < ActionController::Base
-  def current_user
-    User.current # refactor
-  end
-  helper_method :current_user
+  # ensure the OpenProject models are required in the right order (as they have circular dependencies)
 
   class_attribute :_model_object
   class_attribute :_model_scope
@@ -67,7 +76,7 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  before_filter :user_setup, :check_if_login_required, :reset_i18n_fallbacks, :set_localization
+  before_filter :user_setup, :check_if_login_required, :reset_i18n_fallbacks, :set_localization, :check_session_lifetime
 
   rescue_from ActionController::InvalidAuthenticityToken, :with => :invalid_authenticity_token
 
@@ -79,6 +88,20 @@ class ApplicationController < ActionController::Base
   Redmine::Scm::Base.all.each do |scm|
     require "repository/#{scm.underscore}"
   end
+
+  # the current user is a per-session kind of thing and session stuff is controller responsibility.
+  # a globally accessible User.current is a big code smell. when used incorrectly it allows getting
+  # the current user outside of a session scope, i.e. in the model layer, from mailers or in the console
+  # which doesn't make any sense. for model code that needs to be aware of the current user, i.e. when
+  # returning all visible projects for <somebody>, the controller should pass the current user to the model,
+  # instead of letting it fetch it by itself through User.current.
+  # this method acts as a reminder and wants to encourage you to use it.
+  # - Project.visible_by actually allows the controller to pass in a user but it falls back to User.current
+  #   and there are other places in the session-unaware codebase, that rely on User.current.)
+  def current_user
+    User.current
+  end
+  helper_method :current_user
 
   def user_setup
     # Find the current user
@@ -158,11 +181,22 @@ class ApplicationController < ActionController::Base
       if request.get?
         url = url_for(params)
       else
-        url = url_for(:controller => params[:controller], :action => params[:action], :id => params[:id], :project_id => params[:project_id])
+        controller = "/#{params[:controller].to_s}" unless params[:controller].to_s.starts_with?('/')
+        url = url_for(:controller => controller, :action => params[:action], :id => params[:id], :project_id => params[:project_id])
       end
       respond_to do |format|
         format.any(:html, :atom) { redirect_to signin_path(:back_url => url) }
-        format.any(:xml, :js, :json) { head :unauthorized, 'WWW-Authenticate' => 'Basic realm="OpenProject API"' }
+
+        authentication_scheme = if request.headers["X-Authentication-Scheme"] == "Session"
+          'Session'
+        else
+          'Basic'
+        end
+        format.any(:xml, :js, :json)  {
+          head :unauthorized,
+          "Reason" => "login needed",
+          'WWW-Authenticate' => authentication_scheme + ' realm="OpenProject API"' 
+        }
       end
       return false
     end
@@ -444,45 +478,6 @@ class ApplicationController < ActionController::Base
     self.class.accept_key_auth_actions || []
   end
 
-  # Returns the number of objects that should be displayed
-  # on the paginated list
-  def per_page_option
-    per_page = nil
-    if params[:per_page] && Setting.per_page_options_array.include?(params[:per_page].to_s.to_i)
-      per_page = params[:per_page].to_s.to_i
-      session[:per_page] = per_page
-    elsif session[:per_page]
-      per_page = session[:per_page]
-    else
-      per_page = Setting.per_page_options_array.first || 25
-    end
-    per_page
-  end
-
-  # Returns offset and limit used to retrieve objects
-  # for an API response based on offset, limit and page parameters
-  def api_offset_and_limit(options=params)
-    if options[:offset].present?
-      offset = options[:offset].to_i
-      if offset < 0
-        offset = 0
-      end
-    end
-    limit = options[:limit].to_i
-    if limit < 1
-      limit = 25
-    elsif limit > 100
-      limit = 100
-    end
-    if offset.nil? && options[:page].present?
-      offset = (options[:page].to_i - 1) * limit
-      offset = 0 if offset < 0
-    end
-    offset ||= 0
-
-    [offset, limit]
-  end
-
   # qvalues http header parser
   # code taken from webrick
   def parse_qvalues(value)
@@ -510,7 +505,11 @@ class ApplicationController < ActionController::Base
   end
 
   def api_request?
-    %w(xml json).include? params[:format]
+    if params[:format].nil?
+      %w(application/xml application/json).include? request.format.to_s
+    else
+      %w(xml json).include? params[:format]
+    end
   end
 
   # Returns the API key present in the request
@@ -599,5 +598,46 @@ class ApplicationController < ActionController::Base
   end
   helper_method :default_breadcrumb
 
+  def disable_everything_except_api
+    if !api_request?
+      head 410
+      return false
+    end
+    true
+  end
+
+  def disable_api
+    if api_request?
+      head 410
+      return false
+    end
+    true
+  end
   ActiveSupport.run_load_hooks(:application_controller, self)
+
+  def check_session_lifetime
+    session_ttl_value = Setting.session_ttl.to_i
+
+    if Setting.session_ttl_enabled? && session_ttl_value >= 5
+      if session[:updated_at] && User.current.logged? && ((session[:updated_at] + (session_ttl_value * 60)) < Time.now)
+        self.logged_user = nil
+        if request.get?
+          url = url_for(params)
+        else
+          url = url_for(:controller => params[:controller], :action => params[:action], :id => params[:id], :project_id => params[:project_id])
+        end
+
+        flash[:warning] = I18n.t('notice_forced_logout', :ttl_time => Setting.session_ttl)
+        redirect_to(:controller => "account", :action => "login", :back_url => url)
+      else
+        session[:updated_at] = Time.now
+      end
+    end
+  end
+
+  private
+
+  def permitted_params
+    @permitted_params ||= PermittedParams.new(params, current_user)
+  end
 end

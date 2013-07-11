@@ -1,3 +1,15 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <div class="contextual">
   &#171;
   <% unless @changeset.previous.nil? -%>
@@ -13,7 +25,7 @@
   <% end -%>
   &#187;&nbsp;
 
-  <%= form_tag({:controller => 'repositories', :action => 'revision', :id => @project, :rev => nil}, :method => :get) do %>
+  <%= form_tag({:controller => '/repositories', :action => 'revision', :id => @project, :rev => nil}, :method => :get) do %>
     <%= text_field_tag 'rev', @rev, :size => 8 %>
     <%= submit_tag 'OK', :name => nil %>
   <% end %>

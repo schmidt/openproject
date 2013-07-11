@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 FactoryGirl.define do
   factory :custom_field do
     name "Custom Field"
@@ -54,11 +65,11 @@ FactoryGirl.define do
 
     factory :issue_custom_field do
       sequence(:name) { |n| "Issue Custom Field #{n}" }
-      type "IssueCustomField"
+      type "WorkPackageCustomField"
 
       factory :user_issue_custom_field do
         field_format "user"
-        sequence(:name) { |n| "UserIssueCustomField #{n}" }
+        sequence(:name) { |n| "UserWorkPackageCustomField #{n}" }
       end
     end
   end

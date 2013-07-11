@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -33,19 +31,19 @@ module Redmine::MenuManager::MenuHelper
     WikiMenuItem.main_items(project_wiki).each do |main_item|
       Redmine::MenuManager.loose :project_menu do |menu|
         menu.push "#{main_item.item_class}".to_sym,
-          { :controller => 'wiki', :action => 'show', :id => h(main_item.title) },
+          { :controller => '/wiki', :action => 'show', :id => h(main_item.title) },
             :param => :project_id, :caption => main_item.name
 
-        menu.push :"#{main_item.item_class}_new_page", {:action=>"new_child", :controller=>"wiki", :id => h(main_item.title) },
+        menu.push :"#{main_item.item_class}_new_page", {:action=>"new_child", :controller=>"/wiki", :id => h(main_item.title) },
           :param => :project_id, :caption => :create_child_page,
           :parent => "#{main_item.item_class}".to_sym if main_item.new_wiki_page and
             WikiPage.find_by_wiki_id_and_title(project_wiki.id, main_item.title)
 
-        menu.push :"#{main_item.item_class}_toc", {:action => 'index', :controller => 'wiki', :id => h(main_item.title)}, :param => :project_id, :caption => :label_table_of_contents, :parent => "#{main_item.item_class}".to_sym if main_item.index_page
+        menu.push :"#{main_item.item_class}_toc", {:action => 'index', :controller => '/wiki', :id => h(main_item.title)}, :param => :project_id, :caption => :label_table_of_contents, :parent => "#{main_item.item_class}".to_sym if main_item.index_page
 
         main_item.children.each do |child|
           menu.push "#{child.item_class}".to_sym,
-            { :controller => 'wiki', :action => 'show', :id => h(child.title) },
+            { :controller => '/wiki', :action => 'show', :id => h(child.title) },
               :param => :project_id, :caption => child.name, :parent => "#{main_item.item_class}".to_sym
         end
       end

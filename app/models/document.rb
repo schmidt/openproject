@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -18,8 +16,8 @@ class Document < ActiveRecord::Base
   belongs_to :category, :class_name => "DocumentCategory", :foreign_key => "category_id"
   acts_as_attachable :delete_permission => :manage_documents
 
-  acts_as_journalized :event_title => Proc.new {|o| "#{l(:label_document)}: #{o.title}"},
-      :event_url => Proc.new {|o| {:controller => 'documents', :action => 'show', :id => o.journaled_id}},
+  acts_as_journalized :event_title => Proc.new {|o| "#{Document.model_name.human}: #{o.title}"},
+      :event_url => Proc.new {|o| {:controller => '/documents', :action => 'show', :id => o.journaled_id}},
       :event_author => (Proc.new do |o|
         o.attachments.find(:first, :order => "#{Attachment.table_name}.created_on ASC").try(:author)
       end)

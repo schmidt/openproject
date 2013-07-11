@@ -1,18 +1,23 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require File.expand_path('../boot', __FILE__)
 
 require 'rails/all'
 
-# needed?
-# if RUBY_VERSION >= '1.9'
-#   Encoding.default_external = 'UTF-8'
-#   Encoding.default_internal = 'UTF-8'
-# end
-
 if defined?(Bundler)
   # If you precompile assets before deploying to production, use this line
-  Bundler.require(*Rails.groups(:assets => %w(development test)))
+  #Bundler.require(*Rails.groups(:assets => %w(development test)))
   # If you want your assets lazily compiled in production, use this line
-  # Bundler.require(:default, :assets, Rails.env)
+  Bundler.require(:default, :assets, :opf_plugins, Rails.env)
 end
 
 module OpenProject
@@ -42,6 +47,9 @@ module OpenProject
     # The default locale is :en and all translations from config/locales/*.rb,yml are auto loaded.
     # config.i18n.load_path += Dir[Rails.root.join('my', 'locales', '*.{rb,yml}').to_s]
     # config.i18n.default_locale = :de
+
+    # automatically compile translations.js
+    config.middleware.use I18n::JS::Middleware
 
     # Configure the default encoding used in templates for Ruby 1.9.
     config.encoding = "utf-8"
@@ -75,5 +83,8 @@ module OpenProject
 
     # Version of your assets, change this if you want to expire all your assets
     config.assets.version = '1.0'
+
+    # initialize variable for register plugin tests
+    config.plugins_to_test_paths = []
   end
 end

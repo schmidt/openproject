@@ -1,4 +1,13 @@
-require 'iconv'
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
 
 module Redmine
   module CodesetUtil
@@ -49,8 +58,10 @@ module Redmine
       encodings = Setting.repositories_encodings.split(',').collect(&:strip)
       encodings.each do |encoding|
         begin
-          return Iconv.conv('UTF-8', encoding, str)
-        rescue Iconv::Failure
+          str.force_encoding(encoding)
+          utf8 = str.encode('UTF-8')
+          return utf8 if utf8.valid_encoding?
+        rescue
           # do nothing here and try the next encoding
         end
       end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -331,41 +329,41 @@ module Redmine
         y0 = pdf.GetY
 
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_status) + ":","LT")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:status) + ":","LT")
         pdf.SetFontStyle('',9)
         pdf.RDMCell(60,5, issue.status.to_s,"RT")
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_priority) + ":","LT")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:priority) + ":","LT")
         pdf.SetFontStyle('',9)
         pdf.RDMCell(60,5, issue.priority.to_s,"RT")
         pdf.Ln
 
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_author) + ":","L")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:author) + ":","L")
         pdf.SetFontStyle('',9)
         pdf.RDMCell(60,5, issue.author.to_s,"R")
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_category) + ":","L")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:category) + ":","L")
         pdf.SetFontStyle('',9)
         pdf.RDMCell(60,5, issue.category.to_s,"R")
         pdf.Ln
 
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_created_on) + ":","L")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:created_at) + ":","L")
         pdf.SetFontStyle('',9)
-        pdf.RDMCell(60,5, format_date(issue.created_on),"R")
+        pdf.RDMCell(60,5, format_date(issue.created_at),"R")
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_assigned_to) + ":","L")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:assigned_to) + ":","L")
         pdf.SetFontStyle('',9)
         pdf.RDMCell(60,5, issue.assigned_to.to_s,"R")
         pdf.Ln
 
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_updated_on) + ":","LB")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:updated_at) + ":","LB")
         pdf.SetFontStyle('',9)
-        pdf.RDMCell(60,5, format_date(issue.updated_on),"RB")
+        pdf.RDMCell(60,5, format_date(issue.updated_at),"RB")
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_due_date) + ":","LB")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:due_date) + ":","LB")
         pdf.SetFontStyle('',9)
         pdf.RDMCell(60,5, format_date(issue.due_date),"RB")
         pdf.Ln
@@ -378,7 +376,7 @@ module Redmine
         end
 
         pdf.SetFontStyle('B',9)
-        pdf.RDMCell(35,5, l(:field_description) + ":")
+        pdf.RDMCell(35,5, Issue.human_attribute_name(:description) + ":")
         pdf.SetFontStyle('',9)
         pdf.RDMMultiCell(155,5, issue.description.to_s,"BR")
 
@@ -412,7 +410,7 @@ module Redmine
           pdf.Ln
           pdf.SetFontStyle('I',8)
           for detail in journal.details
-            pdf.RDMMultiCell(190,5, "- " + journal.render_detail(detail, true))
+            pdf.RDMMultiCell(190,5, "- " + journal.render_detail(detail, :no_html => true))
             pdf.Ln
           end
           if journal.notes?

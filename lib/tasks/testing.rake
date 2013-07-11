@@ -1,30 +1,21 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-### From http://svn.geekdaily.org/public/rails/plugins/generally_useful/tasks/coverage_via_rcov.rake
+if Rails.env.test?
+  require 'coveralls/rake/task'
+  Coveralls::RakeTask.new
+end
 
 namespace :test do
-  desc 'Measures test coverage'
-  task :coverage do
-    rm_f "coverage"
-    rm_f "coverage.data"
-    rcov = "rcov --rails --aggregate coverage.data --text-summary -Ilib --html"
-    files = Dir.glob("test/**/*_test.rb").join(" ")
-    system("#{rcov} #{files}")
-    system("open coverage/index.html") if PLATFORM['darwin']
-  end
-
   desc 'Run unit and functional scm tests'
   task :scm do
     errors = %w(test:scm:units test:scm:functionals).collect do |task|
@@ -93,5 +84,10 @@ namespace :test do
       t.test_files = FileList['test/functional/repositories*_test.rb']
     end
     Rake::Task['test:scm:functionals'].comment = "Run the scm functional tests"
+  end
+
+  desc 'runs all tests'
+  namespace :suite do
+    task :run => [:cucumber, :spec, :test]
   end
 end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -22,6 +20,7 @@ class SearchControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = SearchController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -47,9 +46,6 @@ class SearchControllerTest < ActionController::TestCase
     assert assigns(:results).include?(Issue.find(2))
     assert assigns(:results).include?(Issue.find(5))
     assert assigns(:results).include?(Changeset.find(101))
-    assert_select "dt.issue-edit" do
-      assert_select "a", :text => /Add ingredients categories/
-    end
 
     assert assigns(:results_by_type).is_a?(Hash)
     assert_equal 5, assigns(:results_by_type)['changesets']
@@ -63,7 +59,7 @@ class SearchControllerTest < ActionController::TestCase
 
     assert assigns(:results).include?(Issue.find(8))
     assert assigns(:results).include?(Issue.find(5))
-    assert_select "dt.issue" do
+    assert_select "dt.work_package" do
       assert_select "a", :text => /Closed/
     end
   end

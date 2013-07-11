@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,6 +19,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
   self.use_transactional_fixtures = false
 
   def setup
+    super
     Issue.delete_all
   end
 
@@ -240,7 +239,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
     issue3.save!
 
     assert_difference 'Issue.count', -2 do
-      assert_difference 'IssueJournal.count', -3 do
+      assert_difference 'WorkPackageJournal.count', -3 do
         Issue.find(issue2.id).destroy
       end
     end
@@ -273,7 +272,7 @@ class IssueNestedSetTest < ActiveSupport::TestCase
 
     total_journals_on_children = leaf.reload.journals.count + child.reload.journals.count
     assert_difference 'Issue.count', -2 do
-      assert_difference 'IssueJournal.count', -total_journals_on_children do
+      assert_difference 'WorkPackageJournal.count', -total_journals_on_children do
         Issue.find(child.id).destroy
       end
     end
@@ -391,11 +390,11 @@ class IssueNestedSetTest < ActiveSupport::TestCase
     i4 = create_issue!(:project_id => p.id, :subject => 'i4', :parent_issue_id => i2.id)
     i5 = create_issue!(:project_id => p.id, :subject => 'i5')
     c = Project.new(:name => 'Copy', :identifier => 'copy', :tracker_ids => [1, 2])
-    c.copy(p, :only => 'issues')
+    c.copy(p, :only => 'work_packages')
     c.reload
 
-    assert_equal 5, c.issues.count
-    ic1, ic2, ic3, ic4, ic5 = c.issues.reorder('subject')
+    assert_equal 5, c.work_packages.count
+    ic1, ic2, ic3, ic4, ic5 = c.work_packages.reorder('subject')
     assert ic1.root?
     assert_equal ic1, ic2.parent
     assert_equal ic1, ic3.parent

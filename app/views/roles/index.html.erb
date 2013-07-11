@@ -1,3 +1,15 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <div class="contextual">
 <%= link_to l(:label_role_new), {:action => 'new'}, :class => 'icon icon-add' %>
 </div>
@@ -6,9 +18,9 @@
 
 <table class="list">
   <thead><tr>
-    <th><%=l(:label_role)%></th>
+    <th><%= Role.model_name.human %></th>
     <th><%=l(:button_sort)%></th>
-	<th></th>
+  <th></th>
   </tr></thead>
   <tbody>
 <% for role in @roles %>
@@ -21,16 +33,16 @@
   </td>
   <td class="buttons">
     <%= link_to(l(:button_delete), role_path(role),
-        													 :method => :delete,
-    															 :confirm => l(:text_are_you_sure),
-    															 :class => 'icon icon-del') unless role.builtin? %>
+                                   :method => :delete,
+                                   :confirm => l(:text_are_you_sure),
+                                   :class => 'icon icon-del') unless role.builtin? %>
   </td>
   </tr>
 <% end %>
   </tbody>
 </table>
 
-<p class="pagination"><%= pagination_links_full @role_pages %></p>
+<%= pagination_links_full @roles %>
 
 <p><%= link_to l(:label_permissions_report), :action => 'report' %></p>
 

@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 Given /^there is 1 group with the following:$/ do |table|
   group = FactoryGirl.build(:group)
 
@@ -25,12 +36,12 @@ Given /^the group "(.+?)" has the following members:$/ do |name, table|
 end
 
 When /^I add the user "(.+)" to the group$/ do |user_login|
-  user = User.find_by_login(user_login)
+  user = User.find_by_login!(user_login)
 
-  raise "Could not find users with login: #{user_login}" if user.nil?
-
-  steps %Q{ When I check "#{user.name}" within "#tab-content-users #users"
-            And I press "Add" }
+  steps %Q{
+    When I check "#{user.name}" within "#tab-content-users #users"
+    And I press "Add" within "#tab-content-users"
+  }
 end
 
 Given /^there is a group named "(.*?)" with the following members:$/ do |name, table|
@@ -39,11 +50,6 @@ Given /^there is a group named "(.*?)" with the following members:$/ do |name, t
   table.raw.flatten.each do |login|
     group.users << User.find_by_login!(login)
   end
-end
-
-When /^I delete the "([^"]*)" membership$/ do |group_name|
-  membership = member_for_login(group_name)
-  step %Q(I follow "Delete" within "#member-#{membership.id}")
 end
 
 When /^I delete "([^"]*)" from the group$/ do |login|

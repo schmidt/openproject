@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -15,14 +13,16 @@ require File.expand_path('../../test_helper', __FILE__)
 
 class CustomFieldUserFormatTest < ActiveSupport::TestCase
   def setup
+    super
     @project = FactoryGirl.create :valid_project
-    role   = FactoryGirl.create :role, :permissions => [:view_issues, :edit_issues]
-    @users = FactoryGirl.create_list(:user, 5, :member_in_project => @project, :member_through_role => role)
+    role   = FactoryGirl.create :role, :permissions => [:view_work_packages, :edit_work_packages]
+    @users = FactoryGirl.create_list(:user, 5)
+    @users.each {|user| @project.add_member!(user, role) }
     @issue = FactoryGirl.create :issue,
         :project => @project,
         :author => @users.first,
         :tracker => @project.trackers.first
-    @field = IssueCustomField.create!(:name => 'Tester', :field_format => 'user')
+    @field = WorkPackageCustomField.create!(:name => 'Tester', :field_format => 'user')
   end
 
   def test_possible_values_with_no_arguments
@@ -31,7 +31,7 @@ class CustomFieldUserFormatTest < ActiveSupport::TestCase
   end
 
   def test_possible_values_with_project_resource
-    possible_values = @field.possible_values(@project.issues.first)
+    possible_values = @field.possible_values(@project.work_packages.first)
     assert possible_values.any?
     assert_equal @project.users.sort.collect(&:id).map(&:to_s), possible_values
   end
@@ -46,7 +46,7 @@ class CustomFieldUserFormatTest < ActiveSupport::TestCase
   end
 
   def test_possible_values_options_with_project_resource
-    possible_values_options = @field.possible_values_options(@project.issues.first)
+    possible_values_options = @field.possible_values_options(@project.work_packages.first)
     assert possible_values_options.any?
     assert_equal @project.users.sort.map {|u| [u.name, u.id.to_s]}, possible_values_options
   end

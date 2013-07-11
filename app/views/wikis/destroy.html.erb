@@ -1,9 +1,21 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <h2><%=l(:label_confirmation)%></h2>
 
 <div class="box"><center>
 <p><strong><%= h(@project.name) %></strong><br /><%=l(:text_wiki_destroy_confirmation)%></p>
 
-<%= form_tag({:controller => 'wikis', :action => 'destroy', :id => @project}) do %>
+<%= form_tag({:controller => '/wikis', :action => 'destroy', :id => @project}) do %>
 <%= hidden_field_tag "confirm", 1 %>
 <%= submit_tag l(:button_delete) %>
 <% end %>

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -27,7 +25,7 @@ class ActivitiesControllerTest < ActionController::TestCase
                :content => /#{1.day.ago.to_date.day}/,
                :sibling => { :tag => "dl",
                  :child => { :tag => "dt",
-                   :attributes => { :class => /issue/ },
+                   :attributes => { :class => /work_package/ },
                    :child => { :tag => "a",
                      :content => /#{ERB::Util.html_escape(IssueStatus.find(2).name)}/
                    }
@@ -45,7 +43,7 @@ class ActivitiesControllerTest < ActionController::TestCase
                :content => /#{3.day.ago.to_date.day}/,
                :sibling => { :tag => "dl",
                  :child => { :tag => "dt",
-                   :attributes => { :class => /issue/ },
+                   :attributes => { :class => /work_package/ },
                    :child => { :tag => "a",
                      :content => /#{ERB::Util.html_escape(Issue.find(1).subject)}/
                    }
@@ -63,7 +61,7 @@ class ActivitiesControllerTest < ActionController::TestCase
                :content => /#{3.day.ago.to_date.day}/,
                :sibling => { :tag => "dl",
                  :child => { :tag => "dt",
-                   :attributes => { :class => /issue/ },
+                   :attributes => { :class => /work_package/ },
                    :child => { :tag => "a",
                      :content => /#{ERB::Util.html_escape(Issue.find(1).subject)}/
                    }
@@ -81,7 +79,7 @@ class ActivitiesControllerTest < ActionController::TestCase
                :content => /#{3.day.ago.to_date.day}/,
                :sibling => { :tag => "dl",
                  :child => { :tag => "dt",
-                   :attributes => { :class => /issue/ },
+                   :attributes => { :class => /work_package/ },
                    :child => { :tag => "a",
                      :content => /#{ERB::Util.html_escape(Issue.find(1).subject)}/
                    }
@@ -95,7 +93,7 @@ class ActivitiesControllerTest < ActionController::TestCase
     assert_template 'common/feed'
     assert_tag :tag => 'entry', :child => {
       :tag => 'link',
-      :attributes => {:href => 'http://test.host/issues/11'}}
+      :attributes => {:href => 'http://test.host/work_packages/show/11'}}
   end
 
 end

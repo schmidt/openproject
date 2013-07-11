@@ -1,7 +1,18 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 Feature: Editing text custom fields
 
   Background:
-    Given I am already logged in as "admin"
+    Given I am admin
     And the following languages are active:
       | en |
       | de |
@@ -13,7 +24,7 @@ Feature: Editing text custom fields
   Scenario: Adding localized default_values
     When I go to the custom fields page
     And I follow "My Custom Field"
-    And I add the english localization of the "default_value" attribute as "default"
+    And I set the english localization of the "default_value" attribute to "default"
     And I add the german localization of the "default_value" attribute as "Standard"
     And I press "Save"
     And I follow "My Custom Field"

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,6 +19,7 @@ class TrackersControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = TrackersController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -40,8 +39,8 @@ class TrackersControllerTest < ActionController::TestCase
     assert_template 'new'
   end
 
-  def test_post_new
-    post :new, :tracker => { :name => 'New tracker', :project_ids => ['1', '', ''], :custom_field_ids => ['1', '6', ''] }
+  def test_post_create
+    post :create, :tracker => { :name => 'New tracker', :project_ids => ['1', '', ''], :custom_field_ids => ['1', '6', ''] }
     assert_redirected_to :action => 'index'
     tracker = Tracker.find_by_name('New tracker')
     assert_equal [1], tracker.project_ids.sort
@@ -49,8 +48,8 @@ class TrackersControllerTest < ActionController::TestCase
     assert_equal 0, tracker.workflows.count
   end
 
-  def test_post_new_with_workflow_copy
-    post :new, :tracker => { :name => 'New tracker' }, :copy_workflow_from => 1
+  def test_post_create_with_workflow_copy
+    post :create, :tracker => { :name => 'New tracker' }, :copy_workflow_from => 1
     assert_redirected_to :action => 'index'
     tracker = Tracker.find_by_name('New tracker')
     assert_equal 0, tracker.projects.count
@@ -77,15 +76,15 @@ class TrackersControllerTest < ActionController::TestCase
                                         :type => 'hidden'}
   end
 
-  def test_post_edit
-    post :edit, :id => 1, :tracker => { :name => 'Renamed',
+  def test_post_update
+    post :update, :id => 1, :tracker => { :name => 'Renamed',
                                         :project_ids => ['1', '2', ''] }
     assert_redirected_to :action => 'index'
     assert_equal [1, 2], Tracker.find(1).project_ids.sort
   end
 
-  def test_post_edit_without_projects
-    post :edit, :id => 1, :tracker => { :name => 'Renamed',
+  def test_post_update_without_projects
+    post :update, :id => 1, :tracker => { :name => 'Renamed',
                                         :project_ids => [''] }
     assert_redirected_to :action => 'index'
     assert Tracker.find(1).project_ids.empty?
@@ -93,7 +92,7 @@ class TrackersControllerTest < ActionController::TestCase
 
   def test_move_lower
    tracker = Tracker.find_by_position(1)
-   post :edit, :id => 1, :tracker => { :move_to => 'lower' }
+   post :update, :id => 1, :tracker => { :move_to => 'lower' }
    assert_equal 2, tracker.reload.position
   end
 

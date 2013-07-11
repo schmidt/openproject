@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -16,7 +14,7 @@ class Version < ActiveRecord::Base
   include Redmine::SafeAttributes
   after_update :update_issues_from_sharing_change
   belongs_to :project
-  has_many :fixed_issues, :class_name => 'Issue', :foreign_key => 'fixed_version_id', :dependent => :nullify
+  has_many :fixed_issues, :class_name => 'WorkPackage', :foreign_key => 'fixed_version_id', :dependent => :nullify
   acts_as_customizable
   acts_as_attachable :view_permission => :view_files,
                      :delete_permission => :manage_files
@@ -33,10 +31,11 @@ class Version < ActiveRecord::Base
   validates_format_of :start_date, :with => /^\d{4}-\d{2}-\d{2}$/, :message => :not_a_date, :allow_nil => true
   validates_inclusion_of :status, :in => VERSION_STATUSES
   validates_inclusion_of :sharing, :in => VERSION_SHARINGS
+  validate :validate_start_date_before_effective_date
 
   scope :open, :conditions => {:status => 'open'}
   scope :visible, lambda {|*args| { :include => :project,
-                                    :conditions => Project.allowed_to_condition(args.first || User.current, :view_issues) } }
+                                    :conditions => Project.allowed_to_condition(args.first || User.current, :view_work_packages) } }
 
   safe_attributes 'name',
     'description',
@@ -50,7 +49,7 @@ class Version < ActiveRecord::Base
 
   # Returns true if +user+ or current user is allowed to view the version
   def visible?(user=User.current)
-    user.allowed_to?(:view_issues, self.project)
+    user.allowed_to?(:view_work_packages, self.project)
   end
 
   # When a version started.
@@ -58,7 +57,10 @@ class Version < ActiveRecord::Base
   # Can either be a set date stored in the database or a dynamic one
   # based on the earlist start_date of the fixed_issues
   def start_date
-    read_attribute(:start_date) || fixed_issues.minimum('start_date')
+    # when self.id is nil (e.g. when self is a new_record),
+    # minimum('start_date') works on all issues with :fixed_version => nil
+    # but we expect only issues belonging to this version
+    read_attribute(:start_date) || fixed_issues.where(Issue.arel_table[:fixed_version_id].not_eq(nil)).minimum('start_date')
   end
 
   def due_date
@@ -73,7 +75,7 @@ class Version < ActiveRecord::Base
 
   # Returns the total reported time for this version
   def spent_hours
-    @spent_hours ||= TimeEntry.sum(:hours, :include => :issue, :conditions => ["#{Issue.table_name}.fixed_version_id = ?", id]).to_f
+    @spent_hours ||= TimeEntry.sum(:hours, :include => :work_package, :conditions => ["#{Issue.table_name}.fixed_version_id = ?", id]).to_f
   end
 
   def closed?
@@ -198,6 +200,12 @@ class Version < ActiveRecord::Base
   end
 
   private
+
+  def validate_start_date_before_effective_date
+    if self.effective_date && self.start_date && self.effective_date < self.start_date
+      errors.add :effective_date, :greater_than_start_date
+    end
+  end
 
   # Update the issue's fixed versions. Used if a version's sharing changes.
   def update_issues_from_sharing_change

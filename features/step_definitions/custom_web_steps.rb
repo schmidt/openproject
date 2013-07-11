@@ -1,16 +1,13 @@
-module Capybara::Node::Finders
- alias old_find find
-
- def find(*args)
-   tries = 0
-   begin
-     old_find(*args)
-   rescue Capybara::ElementNotFound => e
-     tries += 1
-     tries < 3 ? retry : raise(e)
-   end
- end
-end
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
 
 Then /^I should (not )?see "([^"]*)"\s*\#.*$/ do |negative, name|
   steps %Q{
@@ -18,31 +15,17 @@ Then /^I should (not )?see "([^"]*)"\s*\#.*$/ do |negative, name|
   }
 end
 
-Then /^I should (not )?see "([^"]*)" within "([^"]*)"\s*\#.*$/ do |negative, name, scope|
-  steps %Q{
-    Then I should #{negative}see "#{name}" within "#{scope}"
-  }
-end
-
 When /^I click(?:| on) "([^"]*)"$/ do |name|
-  begin
-    steps %Q{
-      When I follow "#{name}"
-    }
-  rescue Capybara::ElementNotFound
-    steps %Q{
-      When I press "#{name}"
-    }
-  end
+  click_link_or_button(name, {:visible => true })
 end
 
 When /^(?:|I )jump to [Pp]roject "([^\"]*)"$/ do |project|
-  begin
-    find(:xpath, '//div[@id="quick-search"]/select[last()]').select project
-  rescue Capybara::ElementNotFound
-    click_link('Projects')
-    find(:css, '#account-nav .chzn-results li', :text => project).click
-  end
+  click_link('Projects')
+  # supports both variants of finding: by class and by id
+  # id is older and can be dropped later
+  project_div = find(:css, '.project-search-results', :text => project) || find(:css, '#project-search-results', :text => project)
+
+  page.execute_script("window.location = jQuery(\"##{project_div[:id]} div[title='#{project}']\").parent().data('select2Data').project.url;")
 end
 
 Then /^"([^"]*)" should be selected for "([^"]*)"$/ do |value, select_id|

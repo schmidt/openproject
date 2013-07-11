@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -20,7 +18,7 @@ class Message < ActiveRecord::Base
   acts_as_attachable
   belongs_to :last_reply, :class_name => 'Message', :foreign_key => 'last_reply_id'
 
-   acts_as_journalized :event_title => Proc.new {|o| "#{o.board.name}: #{o.subject}"},
+  acts_as_journalized :event_title => Proc.new {|o| "#{o.board.name}: #{o.subject}"},
                 :event_description => :content,
                 :event_type => Proc.new {|o| o.parent_id.nil? ? 'message' : 'reply'},
                 :event_url => (Proc.new do |o|
@@ -29,7 +27,7 @@ class Message < ActiveRecord::Base
                     {:id => msg.id}
                   else
                     {:id => msg.parent_id, :r => msg.id, :anchor => "message-#{msg.id}"}
-                  end.reverse_merge :controller => 'messages', :action => 'show', :board_id => msg.board_id
+                  end.reverse_merge :controller => '/messages', :action => 'show', :board_id => msg.board_id
                 end),
                 :activity_find_options => { :include => { :board => :project } }
 
@@ -40,7 +38,7 @@ class Message < ActiveRecord::Base
 
   acts_as_watchable
 
-  attr_protected :locked, :sticky, :author_id
+  attr_protected :author_id
 
   validates_presence_of :board, :subject, :content
   validates_length_of :subject, :maximum => 255

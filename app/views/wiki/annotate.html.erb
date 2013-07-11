@@ -1,3 +1,15 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <div class="contextual">
 <%= link_to(l(:button_edit), {:action => 'edit', :id => @page.title}, :class => 'icon icon-edit') %>
 <%= link_to(l(:label_history), {:action => 'history', :id => @page.title}, :class => 'icon icon-history') %>
@@ -6,7 +18,7 @@
 <h2><%= h(@page.pretty_title) %></h2>
 
 <p>
-<%= l(:label_version) %> <%= link_to h(@annotate.content.version), :action => 'show', :id => @page.title, :version => @annotate.content.version %>
+<%= Version.model_name.human %> <%= link_to h(@annotate.content.version), :action => 'show', :id => @page.title, :version => @annotate.content.version %>
 <em>(<%= h(@annotate.content.author ? @annotate.content.author.name : l(:label_user_anonymous)) %>, <%= format_time(@annotate.content.updated_on) %>)</em>
 </p>
 
@@ -18,7 +30,7 @@
 <% @annotate.lines.each do |line| -%>
 <tr class="bloc-<%= colors[line[0]] %>">
     <th class="line-num"><%= line_num %></th>
-    <td class="revision"><%= link_to line[0], :controller => 'wiki', :action => 'show', :project_id => @project, :id => @page.title, :version => line[0] %></td>
+    <td class="revision"><%= link_to line[0], :controller => '/wiki', :action => 'show', :project_id => @project, :id => @page.title, :version => line[0] %></td>
     <td class="author"><%= h(line[1]) %></td>
     <td class="line-code"><pre><%=h line[2] %></pre></td>
 </tr>

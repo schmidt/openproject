@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -18,10 +16,13 @@ class User < Principal
   include Redmine::SafeAttributes
 
   # Account statuses
-  STATUS_BUILTIN    = 0
-  STATUS_ACTIVE     = 1
-  STATUS_REGISTERED = 2
-  STATUS_LOCKED     = 3
+  # Code accessing the keys assumes they are ordered, which they are since Ruby 1.9
+  STATUSES = {
+    :builtin => 0,
+    :active => 1,
+    :registered => 2,
+    :locked => 3
+  }
 
   USER_FORMATS_STRUCTURE = {
     :firstname_lastname => [:firstname, :lastname],
@@ -66,6 +67,11 @@ class User < Principal
   has_many :watches, :class_name => 'Watcher',
                      :dependent => :delete_all
   has_many :changesets, :dependent => :nullify
+  has_many :passwords, :class_name => 'UserPassword',
+                       :order => 'id DESC',
+                       :readonly => true,
+                       :dependent => :destroy,
+                       :inverse_of => :user
   has_one :preference, :dependent => :destroy, :class_name => 'UserPreference'
   has_one :rss_token, :dependent => :destroy, :class_name => 'Token', :conditions => "action='feeds'"
   has_one :api_token, :dependent => :destroy, :class_name => 'Token', :conditions => "action='api'"
@@ -79,36 +85,38 @@ class User < Principal
   has_many :projects, :through => :memberships
 
   # Active non-anonymous users scope
-  scope :active, :conditions => "#{User.table_name}.status = #{STATUS_ACTIVE}"
-  scope :active_or_registered, :conditions => "#{User.table_name}.status = #{STATUS_ACTIVE} or #{User.table_name}.status = #{STATUS_REGISTERED}"
+  scope :active, :conditions => "#{User.table_name}.status = #{STATUSES[:active]}"
+  scope :active_or_registered, :conditions =>
+          "#{User.table_name}.status = #{STATUSES[:active]} or " + 
+          "#{User.table_name}.status = #{STATUSES[:registered]}"
 
   acts_as_customizable
 
   attr_accessor :password, :password_confirmation
   attr_accessor :last_before_login_on
   # Prevents unauthorized assignments
-  attr_protected :login, :admin, :password, :password_confirmation, :hashed_password
+  attr_protected :login, :admin, :password, :password_confirmation
 
   validates_presence_of :login,
                         :firstname,
                         :lastname,
                         :mail,
-                        :unless => Proc.new { |user| user.is_a?(AnonymousUser) || user.is_a?(DeletedUser) }
+                        :unless => Proc.new { |user| user.is_a?(AnonymousUser) || user.is_a?(DeletedUser) || user.is_a?(SystemUser) }
 
   validates_uniqueness_of :login, :if => Proc.new { |user| !user.login.blank? }, :case_sensitive => false
   validates_uniqueness_of :mail, :allow_blank => true, :case_sensitive => false
   # Login must contain lettres, numbers, underscores only
   validates_format_of :login, :with => /^[a-z0-9_\-@\.]*$/i
-  validates_length_of :login, :maximum => 30
+  validates_length_of :login, :maximum => 256
   validates_length_of :firstname, :lastname, :maximum => 30
   validates_format_of :mail, :with => /^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i, :allow_blank => true
   validates_length_of :mail, :maximum => 60, :allow_nil => true
   validates_confirmation_of :password, :allow_nil => true
   validates_inclusion_of :mail_notification, :in => MAIL_NOTIFICATION_OPTIONS.collect(&:first), :allow_blank => true
 
-  validate :password_not_too_short
+  validate :password_meets_requirements
 
-  before_save :encrypt_password
+  after_save :update_password
   before_create :sanitize_mail_notification_setting
   before_destroy :delete_associated_public_queries
   before_destroy :reassign_associated
@@ -128,10 +136,21 @@ class User < Principal
     true
   end
 
-  # update hashed_password if password was set
-  def encrypt_password
-    if self.password && self.auth_source_id.blank?
-      salt_password(password)
+  def current_password
+    self.passwords.first
+  end
+
+  # create new password if password was set
+  def update_password
+    if password && auth_source_id.blank?
+      new_password = passwords.build()
+      new_password.plain_password = password
+      new_password.save
+
+      # force reload of passwords, so the new password is sorted to the top
+      passwords(true)
+
+      clean_up_former_passwords
     end
   end
 
@@ -192,6 +211,7 @@ class User < Principal
       else
         # authentication with local password
         return nil unless user.check_password?(password)
+        return nil if user.force_password_change
       end
     else
       # user is not yet registered, try to authenticate with available sources
@@ -236,40 +256,44 @@ class User < Principal
     end
   end
 
+  def status_name
+    STATUSES.keys[self.status].to_s
+  end
+
   def active?
-    self.status == STATUS_ACTIVE
+    self.status == STATUSES[:active]
   end
 
   def registered?
-    self.status == STATUS_REGISTERED
+    self.status == STATUSES[:registered]
   end
 
   def locked?
-    self.status == STATUS_LOCKED
+    self.status == STATUSES[:locked]
   end
 
   def activate
-    self.status = STATUS_ACTIVE
+    self.status = STATUSES[:active]
   end
 
   def register
-    self.status = STATUS_REGISTERED
+    self.status = STATUSES[:registered]
   end
 
   def lock
-    self.status = STATUS_LOCKED
+    self.status = STATUSES[:locked]
   end
 
   def activate!
-    update_attribute(:status, STATUS_ACTIVE)
+    update_attribute(:status, STATUSES[:active])
   end
 
   def register!
-    update_attribute(:status, STATUS_REGISTERED)
+    update_attribute(:status, STATUSES[:registered])
   end
 
   def lock!
-    update_attribute(:status, STATUS_LOCKED)
+    update_attribute(:status, STATUSES[:locked])
   end
 
   # Returns true if +clear_password+ is the correct user's password, otherwise false
@@ -277,15 +301,9 @@ class User < Principal
     if auth_source_id.present?
       auth_source.authenticate(self.login, clear_password)
     else
-      User.hash_password("#{salt}#{User.hash_password clear_password}") == hashed_password
+      return false if current_password.nil?
+      current_password.same_as_plain_password?(clear_password)
     end
-  end
-
-  # Generates a random salt and computes hashed_password for +clear_password+
-  # The hashed password is stored in the following form: SHA1(salt + SHA1(password))
-  def salt_password(clear_password)
-    self.salt = User.generate_salt
-    self.hashed_password = User.hash_password("#{salt}#{User.hash_password clear_password}")
   end
 
   # Does the backend storage allow this user to change their password?
@@ -294,15 +312,10 @@ class User < Principal
     return auth_source.allow_password_changes?
   end
 
-  # Generate and set a random password.  Useful for automated user creation
-  # Based on Token#generate_token_value
-  #
-  def random_password
-    chars = ("a".."z").to_a + ("A".."Z").to_a + ("0".."9").to_a
-    password = ''
-    40.times { |i| password << chars[rand(chars.size-1)] }
-    self.password = password
-    self.password_confirmation = password
+  # Generate and set a random password.
+  def random_password!
+    self.password = OpenProject::Passwords::Generator.random_password
+    self.password_confirmation = self.password
     self
   end
 
@@ -447,7 +460,7 @@ class User < Principal
     if admin?
       Project.count
     else
-      Project.all_public.count + memberships.size
+      Project.public.count + memberships.size
     end
   end
 
@@ -475,7 +488,7 @@ class User < Principal
 
   # Return true if the user is allowed to do the specified action on a specific context
   # Action can be:
-  # * a parameter-like Hash (eg. :controller => 'projects', :action => 'edit')
+  # * a parameter-like Hash (eg. :controller => '/projects', :action => 'edit')
   # * a permission Symbol (eg. :edit_project)
   # Context can be:
   # * a project : returns true if user is allowed to do the specified action on this project
@@ -483,6 +496,11 @@ class User < Principal
   # * nil with options[:global] set : check if user has at least one role allowed for this action,
   #   or falls back to Non Member / Anonymous permissions depending if the user is logged
   def allowed_to?(action, context, options={})
+    if action.is_a?(Hash) && action[:controller] && action[:controller].to_s.starts_with?("/")
+      action = action.dup
+      action[:controller] = action[:controller][1..-1]
+    end
+
     if context.is_a?(Project)
       allowed_to_in_project?(action, context, options)
     elsif context.is_a?(Array)
@@ -542,7 +560,7 @@ class User < Principal
   safe_attributes 'firstname', 'lastname', 'mail', 'mail_notification', 'language',
                   'custom_field_values', 'custom_fields', 'identity_url'
 
-  safe_attributes 'status', 'auth_source_id',
+  safe_attributes 'auth_source_id', 'force_password_change', 'status',
     :if => lambda {|user, current_user| current_user.admin?}
 
   safe_attributes 'group_ids',
@@ -613,18 +631,22 @@ class User < Principal
     anonymous_user
   end
 
-  # Salts all existing unsalted passwords
-  # It changes password storage scheme from SHA1(password) to SHA1(salt + SHA1(password))
-  # This method is used in the SaltPasswords migration and is to be kept as is
-  def self.salt_unsalted_passwords!
-    transaction do
-      User.find_each(:conditions => "salt IS NULL OR salt = ''") do |user|
-        next if user.hashed_password.blank?
-        salt = User.generate_salt
-        hashed_password = User.hash_password("#{salt}#{user.hashed_password}")
-        User.update_all("salt = '#{salt}', hashed_password = '#{hashed_password}'", ["id = ?", user.id] )
-      end
+  def self.system
+    system_user = SystemUser.find(:first)
+    if system_user.nil?
+      (system_user = SystemUser.new.tap do |u|
+        u.lastname = 'System'
+        u.login = ''
+        u.firstname = ''
+        u.mail = ''
+        u.admin = false
+        u.status = User::STATUSES[:locked]
+        u.first_login = false
+        u.random_password!
+      end).save
+      raise 'Unable to create the automatic migration user.' if system_user.new_record?
     end
+    system_user
   end
 
   def latest_news(options = {})
@@ -637,25 +659,30 @@ class User < Principal
 
   protected
 
-  # Password length validation based on setting
-  def password_not_too_short
-    minimum_length = Setting.password_min_length.to_i
-    if password.present? && password.size < minimum_length
-      errors.add(:password, :too_short, :count => minimum_length)
-    end
+  # Password requirement validation based on settings
+  def password_meets_requirements
+      # Passwords are stored hashed as UserPasswords,
+      # self.password is only set when it was changed after the last
+      # save. Otherwise, password is nil.
+      unless password.nil? or anonymous?
+        password_errors = OpenProject::Passwords::Evaluator.errors_for_password(self.password)
+        password_errors.each { |error| errors.add(:password, error)}
+
+        if former_passwords_include?(self.password)
+          errors.add(:password,
+                     I18n.t(:reused,
+                            :count => Setting[:password_count_former_banned],
+                            :scope => [:activerecord,
+                                       :errors,
+                                       :models,
+                                       :user,
+                                       :attributes,
+                                       :password]))
+        end
+      end
   end
 
   private
-
-  # Return password digest
-  def self.hash_password(clear_password)
-    Digest::SHA1.hexdigest(clear_password || "")
-  end
-
-  # Returns a 128bits random salt as a hex string (32 chars long)
-  def self.generate_salt
-    SecureRandom.hex(16)
-  end
 
   def initialize_allowance_evaluators
     @registered_allowance_evaluators ||= self.class.registered_allowance_evaluators.collect do |evaluator|
@@ -669,6 +696,20 @@ class User < Principal
 
   def candidates_for_project_allowance project
     @registered_allowance_evaluators.map{ |f| f.project_granting_candidates(project) }.flatten.uniq
+  end
+
+  def former_passwords_include?(password)
+    return false if Setting[:password_count_former_banned].to_i == 0
+    ban_count = Setting[:password_count_former_banned].to_i
+    # make reducing the number of banned former passwords immediately effective
+    # by only checking this number of former passwords
+    passwords[0, ban_count].any?{ |f| f.same_as_plain_password?(password) }
+  end
+
+  def clean_up_former_passwords
+    # minimum 1 to keep the actual user password
+    keep_count = [1, Setting[:password_count_former_banned].to_i].max
+    (passwords[keep_count..-1] || []).each { |p| p.destroy }
   end
 
   def reassign_associated
@@ -745,7 +786,7 @@ class DeletedUser < User
   end
 
   def self.first
-    find_or_create_by_type_and_status(self.to_s, User::STATUS_BUILTIN)
+    find_or_create_by_type_and_status(self.to_s, STATUSES[:builtin])
   end
 
   # Overrides a few properties

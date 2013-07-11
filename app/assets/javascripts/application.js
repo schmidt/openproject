@@ -1,3 +1,14 @@
+//-- copyright
+// OpenProject is a project management system.
+//
+// Copyright (C) 2012-2013 the OpenProject Team
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License version 3.
+//
+// See doc/COPYRIGHT.rdoc for more details.
+//++
+
 // This is a manifest file that'll be compiled into application.js, which will include all the files
 // listed below.
 //
@@ -16,18 +27,21 @@
 //= require jquery_ujs
 //= require jquery_noconflict
 //= require prototype
-//= require prototype_ujs
 //= require effects
 //= require dragdrop
 //= require controls
-//= require breadcrumb
+//= require i18n/translations
 //= require select2
+//= require action_menu
+//= require openproject
+//= require breadcrumb
+//= require findDomElement
 //= require context_menu
 //= require jstoolbar
 //= require calendar
-//= require findDomElement
-
-//#TODO: include <%= i18n_js_tags %>
+//= require ajaxappender
+//= require issues
+//= require settings
 
 //source: http://stackoverflow.com/questions/8120065/jquery-and-prototype-dont-work-together-with-array-prototype-reverse
 if (typeof []._reverse == 'undefined') {
@@ -35,6 +49,14 @@ if (typeof []._reverse == 'undefined') {
 } else {
     jQuery.fn.reverse = Array.prototype._reverse;
 }
+
+jQuery(document).ajaxError(function(event, request, settings) {
+  if (request.status === 401 && /Reason: login needed/.match(request.getAllResponseHeaders())) {
+    if (confirm(I18n.t("js.logoff") + "\r\n" + I18n.t("js.redirect_login"))) {
+      location.href = openProject.loginUrl + "?back_url=" + encodeURIComponent(location.href);
+    }
+  }
+});
 
 
 function checkAll (id, checked) {
@@ -446,30 +468,32 @@ var WarnLeavingUnsaved = Class.create({
  * CVE-2011-0447
  * 2 - shows and hides ajax indicator
  */
-Ajax.Responders.register({
+document.observe("dom:loaded", function() {
+  Ajax.Responders.register({
     onCreate: function(request){
-        var csrf_meta_tag = $$('meta[name=csrf-token]')[0];
+      var csrf_meta_tag = $$('meta[name=csrf-token]')[0];
 
-        if (csrf_meta_tag) {
-            var header = 'X-CSRF-Token',
-                token = csrf_meta_tag.readAttribute('content');
+      if (csrf_meta_tag) {
+        var header = 'X-CSRF-Token',
+        token = csrf_meta_tag.readAttribute('content');
 
-            if (!request.options.requestHeaders) {
-              request.options.requestHeaders = {};
-            }
-            request.options.requestHeaders[header] = token;
-          }
-
-        if ($('ajax-indicator') && Ajax.activeRequestCount > 0) {
-            Element.show('ajax-indicator');
+        if (!request.options.requestHeaders) {
+          request.options.requestHeaders = {};
         }
+        request.options.requestHeaders[header] = token;
+      }
+
+      if ($('ajax-indicator') && Ajax.activeRequestCount > 0) {
+        Element.show('ajax-indicator');
+      }
     },
     onComplete: function(){
-        if ($('ajax-indicator') && Ajax.activeRequestCount == 0) {
-            Element.hide('ajax-indicator');
-        }
-        addClickEventToAllErrorMessages();
+      if ($('ajax-indicator') && Ajax.activeRequestCount == 0) {
+        Element.hide('ajax-indicator');
+      }
+      addClickEventToAllErrorMessages();
     }
+  });
 });
 
 function hideOnLoad() {
@@ -532,8 +556,45 @@ jQuery.viewportHeight = function() {
         document.body.clientHeight;
 };
 
-/* TODO: integrate with existing code and/or refactor */
+
+/*
+* 1 - registers a callback which copies the csrf token into the
+* X-CSRF-Token header with each ajax request.  Necessary to
+* work with rails applications which have fixed
+* CVE-2011-0447
+* 2 - shows and hides ajax indicator
+*/
 jQuery(document).ready(function($) {
+  document.ajaxActive = false;
+  $(document).ajaxSend(function (event, request) {
+    document.ajaxActive = true;
+    var csrf_meta_tag = $('meta[name=csrf-token]');
+
+    if (csrf_meta_tag) {
+      var header = 'X-CSRF-Token',
+      token = csrf_meta_tag.attr('content');
+
+      request.setRequestHeader(header, token);
+    }
+
+    request.setRequestHeader('X-Authentication-Scheme', "Session");
+  });
+  // ajaxStop gets called when ALL Requests finish, so we won't need a counter as in PT
+  $(document).ajaxStop(function () {
+    document.ajaxActive = false;
+    if ($('#ajax-indicator')) {
+      $('#ajax-indicator').hide();
+    }
+    addClickEventToAllErrorMessages();
+  });
+
+    var propagateOpenClose = function () {
+      if ($(this).is(":visible")) {
+        $(this).parents('li.drop-down').trigger("opened");
+      } else {
+        $(this).parents('li.drop-down').trigger("closed");
+      }
+    };
 
   $.extend($.fn.select2.defaults, {
     formatNoMatches: function () {
@@ -556,17 +617,19 @@ jQuery(document).ready(function($) {
   $('#project-search-container .select2-select').each(function (ix, select) {
     var PROJECT_JUMP_BOX_PAGE_SIZE = 50;
 
-    var select2, menu;
-
     select = $(select);
-    menu   = select.parents('li.drop-down');
+    var select2,
+        menu = select.parents('li.drop-down'),
+        that = this;
 
     select.select2({
         formatResult : OpenProject.Helpers.Search.formatter,
         matcher      : OpenProject.Helpers.Search.matcher,
         query        : OpenProject.Helpers.Search.projectQueryWithHierarchy(
                                     jQuery.proxy(openProject, 'fetchProjects'),
-                                    PROJECT_JUMP_BOX_PAGE_SIZE)
+                                    PROJECT_JUMP_BOX_PAGE_SIZE),
+        dropdownCssClass : "project-search-results",
+        containerCssClass : "select2-select",
       }).
       on('change', function (e) {
           if (e.val) {
@@ -575,14 +638,11 @@ jQuery(document).ready(function($) {
         }).
       on('close', function () {
           if (menu.is('.open')) {
-            menu.slideAndFocus();
+            menu.slideAndFocus(that.propagateOpenClose);
           }
         });
 
     select2 = select.data('select2');
-
-    // add custom css styling to result list
-    select2.dropdown.attr("id", "project-search-results");
 
     // Adding an event handler to change select2's default behavior concerning
     // TAB and ESC
@@ -615,6 +675,10 @@ jQuery(document).ready(function($) {
     menu.bind("opened", function () {
       // Open select2 element, when menu is opened
       select2.open();
+
+      setTimeout(function () {
+        $("#select2-drop-mask").hide();
+      }, 50);
 
       // Include input in tab cycle by attaching keydown handlers to previous
       // and next interactive DOM element.
@@ -698,7 +762,7 @@ jQuery(document).ready(function($) {
   $.fn.onClickDropDown = function(){
     var that = this;
     $('html').click(function() {
-      that.find(" > li.drop-down.open").removeClass("open").find("> ul").mySlide();
+      that.find(" > li.drop-down.open").removeClass("open").find("> ul").mySlide(propagateOpenClose);
       that.removeClass("hover");
     });
 
@@ -732,25 +796,12 @@ jQuery(document).ready(function($) {
 
   $.fn.toggleSubmenu = function(menu){
     if (menu.find(" > li.drop-down.open").get(0) !== $(this).get(0)){
-      menu.find(" > li.drop-down.open").removeClass("open").find("> ul").mySlide(function () {
-        if ($(this).is(":visible")) {
-          $(this).parents('li.drop-down').trigger("opened");
-        } else {
-          $(this).parents('li.drop-down').trigger("closed");
-        }
-      });
+      menu.find(" > li.drop-down.open").removeClass("open").find("> ul").mySlide(propagateOpenClose);
     }
 
-    $(this).slideAndFocus(function () {
-      if ($(this).is(":visible")) {
-        $(this).parents('li.drop-down').trigger("opened");
-      } else {
-        $(this).parents('li.drop-down').trigger("closed");
-      }
-    });
+    $(this).slideAndFocus(propagateOpenClose);
     menu.toggleClass("hover");
   };
-
 
 
 	// open and close the main-menu sub-menus
@@ -758,7 +809,7 @@ jQuery(document).ready(function($) {
 		.append("<span class='toggler'></span>")
 		.click(function() {
 
-			$(this).toggleClass("open").parent().find("ul").not("ul ul ul").mySlide();
+			$(this).toggleClass("open").parent().find("ul").not("ul ul ul").mySlide(propagateOpenClose);
 
 			return false;
 	});
@@ -780,13 +831,7 @@ jQuery(document).ready(function($) {
 			$(".title-bar-extras:hidden").slideDown(animationRate);
 		}
 
-		$(this).parent().find("ul").slideToggle(animationRate, function () {
-      if ($(this).is(":visible")) {
-        $(this).parents("li.drop-down").trigger("opened");
-      } else {
-        $(this).parents("li.drop-down").trigger("closed");
-      }
-    });
+		$(this).parent().find("ul").slideToggle(animationRate, propagateOpenClose);
 
 		return false;
 	});
@@ -809,7 +854,6 @@ jQuery(document).ready(function($) {
           return false;
           });
         $("#account-nav").onClickDropDown();
-        $(".action_menu_main").onClickDropDown();
 
 	// deal with potentially problematic super-long titles
 	$(".title-bar h2").css({paddingRight: $(".title-bar-actions").outerWidth() + 15 });
@@ -843,7 +887,7 @@ $(window).bind('resizeEnd', function() {
 
 			if ($(event.target).hasClass("toggler") ) {
                           var menuParent = $(this).toggleClass("open").parent().find("ul").not("ul ul ul");
-                          menuParent.mySlide();
+                          menuParent.mySlide(propagateOpenClose);
                           if ($(this).hasClass("open")) {
                             menuParent.find("li > a:first").focus();
                           }
@@ -901,119 +945,7 @@ $(window).bind('resizeEnd', function() {
         }
 });
 
-/* this could and should be moved into separate file once the asset pipeline
-   is in place */
 
-(function ($) {
-  var append_href,
-      close,
-      dom_identifier = { 'indicator_class': 'ajax_indicator',
-                         'window_class': 'ajax_appended_information',
-                         'trigger_class': 'ajax_append' },
-      i18n = { 'hide': 'Hide' },
-      merge_with_defaults,
-      replace_with_loading,
-      replace_with_close,
-      replace_with_open,
-      slideIn,
-      init;
-
-  close = function () {
-    var close_link = $(this),
-        information_window = close_link.siblings('.' + dom_identifier.window_class);
-
-    replace_with_open(close_link);
-
-    information_window.slideUp();
-  };
-
-  append_href = function (link) {
-    var container,
-        url = link.attr('href');
-
-    container = link.siblings('.' + dom_identifier.window_class);
-
-    if (container.size() > 0) {
-      container.slideDown();
-
-      replace_with_close(link, true);
-    }
-    else {
-      container = $('<div style="display:none" class="' + dom_identifier.window_class + '"></div>'),
-
-      $.ajax({ url: url,
-               headers: { Accept: 'text/javascript' },
-               complete: function (jqXHR) {
-                           container.html(jqXHR.responseText);
-                           slideIn(container);
-                         }
-             });
-
-
-      link.parent().append(container);
-
-      replace_with_loading(link);
-    }
-  };
-
-  replace_with_loading = function (link) {
-    var loading = $('<span class="' + dom_identifier.indicator_class + '"></span>');
-
-    link.hide();
-
-    link.after(loading);
-  };
-
-  replace_with_close = function (to_replace, hide) {
-    var close_link = $('<a href="javascript:void(0)">' + i18n.hide + '</a>');
-
-    to_replace.after(close_link);
-
-    if (hide) {
-      to_replace.hide();
-    }
-    else {
-      to_replace.remove();
-    }
-
-
-    close_link.click(close);
-  };
-
-  replace_with_open = function(to_replace) {
-    var load_link = to_replace.siblings('.' + dom_identifier.trigger_class);
-
-    to_replace.remove();
-
-    /* this link is never removed, only hidden */
-    load_link.show();
-  };
-
-  slideIn = function (container) {
-    container.slideDown();
-
-    replace_with_close(container.siblings('.' + dom_identifier.indicator_class));
-  };
-
-  merge_with_defaults = function (options) {
-    $.extend(dom_identifier, options.dom_identifier);
-    $.extend(i18n, options.i18n);
-  };
-
-  if ($.ajaxAppend) {
-    return;
-  };
-
-  $.ajaxAppend = function (options) {
-    merge_with_defaults(options);
-
-    $('.' + dom_identifier.trigger_class).click(function(link) {
-      append_href($(this));
-
-      return false;
-    });
-  };
-}(jQuery));
 
 var Administration = (function ($) {
   var update_default_language_options,
@@ -1441,7 +1373,7 @@ var SubmitConfirm = (function($) {
 
 var Preview = (function ($) {
   $('document').ready(function() {
-      $('a.preview').click(function() {
+      $('html').on('click','a.preview', function() {
         $.ajax({
           url: $(this).attr('href'),
           type: 'POST',
@@ -1458,3 +1390,5 @@ var Preview = (function ($) {
       });
     });
 })(jQuery);
+
+

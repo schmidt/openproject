@@ -1,3 +1,19 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
+[CustomField, WorkPackageCustomField].each do |const|
+  InstanceFinder.register(const, Proc.new{ |name| const.find_by_name(name) })
+  RouteMap.register(const, "/custom_fields")
+end
+
 Given /^the following (user|issue) custom fields are defined:$/ do |type, table|
   type = (type + "_custom_field").to_sym
 
@@ -10,6 +26,7 @@ Given /^the following (user|issue) custom fields are defined:$/ do |type, table|
       attr_hash[:is_required] = (r[:required] == 'true') if r[:required]
       attr_hash[:editable] = (r[:editable] == 'true') if r[:editable]
       attr_hash[:visible] = (r[:visible] == 'true') if r[:visible]
+      attr_hash[:is_filter] = (r[:is_filter] == 'true') if r[:is_filter]
       attr_hash[:default_value] = r[:default_value] ? r[:default_value] : nil
       attr_hash[:is_for_all] = r[:is_for_all] || true
 
@@ -27,9 +44,19 @@ Given /^the user "(.+?)" has the user custom field "(.+?)" set to "(.+?)"$/ do |
 end
 
 Given /^the custom field "(.+)" is( not)? summable$/ do |field_name, negative|
-  custom_field = IssueCustomField.find_by_name(field_name)
+  custom_field = WorkPackageCustomField.find_by_name(field_name)
 
   Setting.issue_list_summable_columns = negative ?
                                           Setting.issue_list_summable_columns - ["cf_#{custom_field.id}"] :
                                           Setting.issue_list_summable_columns << "cf_#{custom_field.id}"
+end
+
+Given /^the custom field "(.*?)" is activated for tracker "(.*?)"$/ do |field_name, tracker_name|
+  custom_field = WorkPackageCustomField.find_by_name(field_name)
+  tracker = Tracker.find_by_name(tracker_name)
+  custom_field.trackers << tracker
+end
+
+Given /^there are no custom fields$/ do
+  CustomField.destroy_all
 end

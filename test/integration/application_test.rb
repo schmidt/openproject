@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -19,20 +17,14 @@ class ApplicationTest < ActionDispatch::IntegrationTest
   fixtures :all
 
   def test_set_localization
-    Setting.available_languages = [:fr, :en, :it]
+    Setting.available_languages = [:de, :en]
     Setting.default_language = 'en'
 
     # a french user
-    get 'projects', { }, { 'HTTP_ACCEPT_LANGUAGE' => 'fr,fr-fr;q=0.8,en-us;q=0.5,en;q=0.3'}
+    get 'projects', { }, { 'HTTP_ACCEPT_LANGUAGE' => 'de,de-de;q=0.8,en-us;q=0.5,en;q=0.3'}
     assert_response :success
-    assert_tag :tag => 'h2', :content => 'Projets'
-    assert_equal :fr, current_language
-
-    # then an italien user
-    get 'projects', { }, 'HTTP_ACCEPT_LANGUAGE' => 'it;q=0.8,en-us;q=0.5,en;q=0.3'
-    assert_response :success
-    assert_tag :tag => 'h2', :content => 'Progetti'
-    assert_equal :it, current_language
+    assert_tag :tag => 'h2', :content => 'Projekte'
+    assert_equal :de, current_language
 
     # not a supported language: default language should be used
     get 'projects', { }, 'HTTP_ACCEPT_LANGUAGE' => 'zz'

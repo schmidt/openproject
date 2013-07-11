@@ -1,9 +1,21 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require File.expand_path('../../test_helper', __FILE__)
 
 class UserMailerTest < ActionMailer::TestCase
   include ActionDispatch::Assertions::SelectorAssertions
 
-  setup do
+  def setup
+    super
     Setting.mail_from = 'john@doe.com'
     Setting.host_name = 'mydomain.foo'
     Setting.protocol = 'http'
@@ -55,21 +67,7 @@ class UserMailerTest < ActionMailer::TestCase
     Setting.protocol = 'https'
     User.current = FactoryGirl.create(:admin)
 
-    project = FactoryGirl.create(:valid_project)
-    user    = FactoryGirl.create(:user, :member_in_project => project)
-    tracker = FactoryGirl.create(:tracker, :name => 'My Tracker')
-    project.trackers << tracker
-    project.save
-    related_issue = FactoryGirl.create(:issue,
-        :subject => 'My related Ticket',
-        :tracker => tracker,
-        :project => project)
-    issue   = FactoryGirl.create(:issue,
-        :subject => 'My awesome Ticket',
-        :tracker => tracker,
-        :project => project,
-        :description => "This is related to issue ##{related_issue.id}")
-    journal = issue.journals.first
+    project, user, related_issue, issue, changeset, attachment, journal = setup_complex_issue_update
 
     assert UserMailer.issue_updated(user, journal).deliver
     assert last_email
@@ -79,71 +77,63 @@ class UserMailerTest < ActionMailer::TestCase
       assert_select 'a[href=?]',
                     "https://mydomain.foo/issues/#{issue.id}",
                     :text => "My Tracker ##{issue.id}: My awesome Ticket"
-
-      # TODO
+      # link to a description diff
+      assert_select 'li', :text => /Description changed/
+      assert_select 'li>a[href=?]',
+                    "https://mydomain.foo/journals/#{journal.id}/diff/description",
+                    :text => "Details"
       # link to a referenced ticket
       assert_select 'a[href=?][title=?]',
                     "https://mydomain.foo/issues/#{related_issue.id}",
-                    'My related Ticket',
+                    "My related Ticket (#{related_issue.status})",
                     :text => "##{related_issue.id}"
       # link to a changeset
       assert_select 'a[href=?][title=?]',
-                    'https://mydomain.foo/projects/ecookbook/repository/revisions/2',
-                    'This commit fixes #1, #2 and references #1 &amp; #3',
-                    :text => 'r2'
-      # link to a description diff
-      assert_select 'a[href=?][title=?]',
-                    'https://mydomain.foo/journals/diff/3?detail_id=4',
-                    'View differences',
-                    :text => 'diff'
+                    "https://mydomain.foo/projects/#{project.identifier}/repository/revisions/#{changeset.revision}",
+                    'This commit fixes #1, #2 and references #1 and #3',
+                    :text => "r#{changeset.revision}"
       # link to an attachment
       assert_select 'a[href=?]',
-                    'https://mydomain.foo/attachments/download/4/source.rb',
-                    :text => 'source.rb'
+                    "https://mydomain.foo/attachments/#{attachment.id}/download",
+                    :text => "#{attachment.filename}"
     end
   end
 
   def test_generated_links_with_prefix
     Setting.default_language = 'en'
-    relative_url_root = Redmine::Utils.relative_url_root
     Setting.host_name = 'mydomain.foo/rdm'
     Setting.protocol = 'http'
+    User.current = FactoryGirl.create(:admin)
 
-    user    = FactoryGirl.create(:user)
-    tracker = FactoryGirl.create(:tracker, :name => 'My Tracker')
-    issue   = FactoryGirl.create(:issue, :subject => 'My awesome Ticket', :tracker => tracker)
-    journal = issue.journals.first
+    project, user, related_issue, issue, changeset, attachment, journal = setup_complex_issue_update
 
     assert UserMailer.issue_updated(user, journal).deliver
-
-    mail = last_email
+    assert last_email
 
     assert_select_email do
       # link to the main ticket
       assert_select 'a[href=?]',
                     "http://mydomain.foo/rdm/issues/#{issue.id}",
                     :text => "My Tracker ##{issue.id}: My awesome Ticket"
-
-      # TODO
+      # link to a description diff
+      assert_select 'li', :text => /Description changed/
+      assert_select 'li>a[href=?]',
+                    "http://mydomain.foo/rdm/journals/#{journal.id}/diff/description",
+                    :text => "Details"
       # link to a referenced ticket
       assert_select 'a[href=?][title=?]',
-                    'http://mydomain.foo/rdm/issues/1',
-                    'Can\'t print recipes (New)',
-                    :text => '#1'
+                    "http://mydomain.foo/rdm/issues/#{related_issue.id}",
+                    "My related Ticket (#{related_issue.status})",
+                    :text => "##{related_issue.id}"
       # link to a changeset
       assert_select 'a[href=?][title=?]',
-                    'http://mydomain.foo/rdm/projects/ecookbook/repository/revisions/2',
-                    'This commit fixes #1, #2 and references #1 &amp; #3',
-                    :text => 'r2'
-      # link to a description diff
-      assert_select 'a[href=?][title=?]',
-                    'http://mydomain.foo/rdm/journals/diff/3?detail_id=4',
-                    'View differences',
-                    :text => 'diff'
+                    "http://mydomain.foo/rdm/projects/#{project.identifier}/repository/revisions/#{changeset.revision}",
+                    'This commit fixes #1, #2 and references #1 and #3',
+                    :text => "r#{changeset.revision}"
       # link to an attachment
       assert_select 'a[href=?]',
-                    'http://mydomain.foo/rdm/attachments/download/4/source.rb',
-                    :text => 'source.rb'
+                    "http://mydomain.foo/rdm/attachments/#{attachment.id}/download",
+                    :text => "#{attachment.filename}"
     end
   end
 
@@ -154,41 +144,37 @@ class UserMailerTest < ActionMailer::TestCase
     Setting.protocol = 'http'
     Redmine::Utils.relative_url_root = nil
 
-    user    = FactoryGirl.create(:user)
-    tracker = FactoryGirl.create(:tracker, :name => 'My Tracker')
-    issue   = FactoryGirl.create(:issue, :subject => 'My awesome Ticket', :tracker => tracker)
-    journal = issue.journals.first
+    User.current = FactoryGirl.create(:admin)
+
+    project, user, related_issue, issue, changeset, attachment, journal = setup_complex_issue_update
 
     assert UserMailer.issue_updated(user, journal).deliver
-
-    mail = last_email
+    assert last_email
 
     assert_select_email do
       # link to the main ticket
       assert_select 'a[href=?]',
                     "http://mydomain.foo/rdm/issues/#{issue.id}",
                     :text => "My Tracker ##{issue.id}: My awesome Ticket"
-
-      # TODO
+      # link to a description diff
+      assert_select 'li', :text => /Description changed/
+      assert_select 'li>a[href=?]',
+                    "http://mydomain.foo/rdm/journals/#{journal.id}/diff/description",
+                    :text => "Details"
       # link to a referenced ticket
       assert_select 'a[href=?][title=?]',
-                    'http://mydomain.foo/rdm/issues/1',
-                    'Can\'t print recipes (New)',
-                    :text => '#1'
+                    "http://mydomain.foo/rdm/issues/#{related_issue.id}",
+                    "My related Ticket (#{related_issue.status})",
+                    :text => "##{related_issue.id}"
       # link to a changeset
       assert_select 'a[href=?][title=?]',
-                    'http://mydomain.foo/rdm/projects/ecookbook/repository/revisions/2',
-                    'This commit fixes #1, #2 and references #1 &amp; #3',
-                    :text => 'r2'
-      # link to a description diff
-      assert_select 'a[href=?][title=?]',
-                    'http://mydomain.foo/rdm/journals/diff/3?detail_id=4',
-                    'View differences',
-                    :text => 'diff'
+                    "http://mydomain.foo/rdm/projects/#{project.identifier}/repository/revisions/#{changeset.revision}",
+                    'This commit fixes #1, #2 and references #1 and #3',
+                    :text => "r#{changeset.revision}"
       # link to an attachment
       assert_select 'a[href=?]',
-                    'http://mydomain.foo/rdm/attachments/download/4/source.rb',
-                    :text => 'source.rb'
+                    "http://mydomain.foo/rdm/attachments/#{attachment.id}/download",
+                    :text => "#{attachment.filename}"
     end
   ensure
     # restore it
@@ -341,16 +327,16 @@ class UserMailerTest < ActionMailer::TestCase
       issue = FactoryGirl.create(:issue)
       user  = FactoryGirl.create(:user, :mail => 'foo@bar.de', :language => '') # (auto)
       ActionMailer::Base.deliveries.clear
-      with_settings :available_languages => ['en', 'de', 'fr'],
+      with_settings :available_languages => ['en', 'de'],
                     :default_language => 'de' do
-        I18n.locale = 'fr'
+        I18n.locale = 'de'
         assert UserMailer.issue_added(user, issue).deliver
         assert_equal 1, ActionMailer::Base.deliveries.size
         mail = last_email
         assert_equal ['foo@bar.de'], mail.to
         assert !mail.body.encoded.include?('reported')
         assert mail.body.encoded.include?('erstellt')
-        assert_equal :fr, I18n.locale
+        assert_equal :de, I18n.locale
       end
     end
   end
@@ -480,16 +466,16 @@ class UserMailerTest < ActionMailer::TestCase
   end
 
   def test_mailer_should_not_change_locale
-    with_settings :available_languages => ['en', 'it', 'fr'],
+    with_settings :available_languages => ['en', 'de'],
                   :default_language    => 'en' do
-      # Set current language to italian
-      I18n.locale = :it
-      # Send an email to a french user
-      user = FactoryGirl.create(:user, :language => 'fr')
+      # Set current language to english
+      I18n.locale = :en
+      # Send an email to a german user
+      user = FactoryGirl.create(:user, :language => 'de')
       UserMailer.account_activated(user).deliver
       mail = ActionMailer::Base.deliveries.last
-      assert mail.body.encoded.include?('Votre compte')
-      assert_equal :it, I18n.locale
+      assert mail.body.encoded.include?('aktiviert')
+      assert_equal :en, I18n.locale
     end
   end
 
@@ -526,5 +512,42 @@ private
     mail = ActionMailer::Base.deliveries.last
     assert_not_nil mail
     mail
+  end
+
+  def setup_complex_issue_update
+    project = FactoryGirl.create(:valid_project)
+    user    = FactoryGirl.create(:user, :member_in_project => project)
+    tracker = FactoryGirl.create(:tracker, :name => 'My Tracker')
+    project.trackers << tracker
+    project.save
+
+    related_issue = FactoryGirl.create(:issue,
+        :subject => 'My related Ticket',
+        :tracker => tracker,
+        :project => project)
+
+    issue   = FactoryGirl.create(:issue,
+        :subject => 'My awesome Ticket',
+        :tracker => tracker,
+        :project => project,
+        :description => "nothing here yet")
+
+    # now change the issue, to get a nice journal
+    # we create a Filesystem repository for our changeset, so we have to enable it
+    Setting.enabled_scm = Setting.enabled_scm.dup << 'Filesystem' unless Setting.enabled_scm.include?('Filesystem')
+    changeset = FactoryGirl.create :changeset,
+                                   :repository => FactoryGirl.create(:repository, :project => project),
+                                   :comments => 'This commit fixes #1, #2 and references #1 and #3'
+    attachment = FactoryGirl.create(:attachment,
+        :container => issue,
+        :author => issue.author)
+    issue.description = "This is related to issue ##{related_issue.id}\n A reference to a changeset r#{changeset.revision}\n A reference to an attachment attachment:#{attachment.filename}"
+    assert issue.save
+    issue.reload
+    journal = issue.journals.last
+
+    ActionMailer::Base.deliveries = [] # remove issue-created mails
+
+    [project, user, related_issue, issue, changeset, attachment, journal]
   end
 end

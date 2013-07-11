@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 OpenProject::Application.configure do
   # Settings specified here will take precedence over those in config/application.rb
 
@@ -34,4 +45,7 @@ OpenProject::Application.configure do
 
   # Expands the lines which load the assets
   config.assets.debug = true
+
+  # Send mails to browser window
+  config.action_mailer.delivery_method = :letter_opener
 end

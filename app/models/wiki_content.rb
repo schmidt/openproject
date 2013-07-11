@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -28,7 +26,7 @@ class WikiContent < ActiveRecord::Base
 
   acts_as_journalized :event_type => 'wiki-page',
     :event_title => Proc.new {|o| "#{l(:label_wiki_edit)}: #{o.page.title} (##{o.version})"},
-    :event_url => Proc.new {|o| {:controller => 'wiki', :action => 'show', :id => o.page.title, :project_id => o.page.wiki.project, :version => o.version}},
+    :event_url => Proc.new {|o| {:controller => '/wiki', :action => 'show', :id => o.page.title, :project_id => o.page.wiki.project, :version => o.version}},
     :activity_type => 'wiki_edits',
     :activity_permission => :view_wiki_edits,
     :activity_find_options => { :include => { :page => { :wiki => :project } } }

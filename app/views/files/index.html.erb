@@ -1,3 +1,15 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <div class="contextual">
 <%= link_to(l(:label_attachment_new), new_project_file_path(@project), :class => 'icon icon-add') if User.current.allowed_to?(:manage_files, @project) %>
 </div>
@@ -8,9 +20,9 @@
 
 <table class="list files">
   <thead><tr>
-    <%= sort_header_tag('filename', :caption => l(:field_filename)) %>
+    <%= sort_header_tag('filename', :caption => Attachment.human_attribute_name(:filename)) %>
     <%= sort_header_tag('created_on', :caption => l(:label_date), :default_order => 'desc') %>
-    <%= sort_header_tag('size', :caption => l(:field_filesize), :default_order => 'desc') %>
+    <%= sort_header_tag('size', :caption => Attachment.human_attribute_name(:filesize), :default_order => 'desc') %>
     <%= sort_header_tag('downloads', :caption => l(:label_downloads_abbr), :default_order => 'desc') %>
     <th>MD5</th>
     <th></th>
@@ -21,7 +33,7 @@
 	<% if container.is_a?(Version) -%>
   <tr>
   	<th colspan="6" align="left">
-  		<%= link_to(h(container), {:controller => 'versions', :action => 'show', :id => container}, :class => "icon icon-package") %>
+      <%= link_to(h(container), {:controller => '/versions', :action => 'show', :id => container}, :class => "icon icon-package") %>
 		</th>
 	</tr>
 	<% end -%>

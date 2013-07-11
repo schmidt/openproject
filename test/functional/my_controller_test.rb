@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,6 +19,7 @@ class MyControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = MyController.new
     @request    = ActionController::TestRequest.new
     @request.session[:user_id] = 2
@@ -78,35 +77,6 @@ class MyControllerTest < ActionController::TestCase
     # ignored
     assert !user.admin?
     assert user.groups.empty?
-  end
-
-  def test_change_password
-    get :password
-    assert_response :success
-    assert_template 'password'
-
-    # non matching password confirmation
-    post :password, :password => 'jsmith',
-                    :new_password => 'hello',
-                    :new_password_confirmation => 'hello2'
-    assert_response :success
-    assert_template 'password'
-    assert_tag :tag => "div", :attributes => { :class => "errorExplanation" }
-
-    # wrong password
-    post :password, :password => 'wrongpassword',
-                    :new_password => 'hello',
-                    :new_password_confirmation => 'hello'
-    assert_response :success
-    assert_template 'password'
-    assert_equal 'Wrong password', flash[:error]
-
-    # good password
-    post :password, :password => 'jsmith',
-                    :new_password => 'hello',
-                    :new_password_confirmation => 'hello'
-    assert_redirected_to '/my/account'
-    assert User.try_to_login('jsmith', 'hello')
   end
 
   def test_page_layout

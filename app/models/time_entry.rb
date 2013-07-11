@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -17,15 +15,15 @@ class TimeEntry < ActiveRecord::Base
   # could have used polymorphic association
   # project association here allows easy loading of time entries at project level with one database trip
   belongs_to :project
-  belongs_to :issue
+  belongs_to :work_package
   belongs_to :user
   belongs_to :activity, :class_name => 'TimeEntryActivity', :foreign_key => 'activity_id'
 
   attr_protected :project_id, :user_id, :tyear, :tmonth, :tweek
 
   acts_as_customizable
-  acts_as_journalized :event_title => Proc.new {|o| "#{l_hours(o.hours)} (#{(o.issue || o.project).event_title})"},
-                :event_url => Proc.new {|o| {:controller => 'timelog', :action => 'index', :project_id => o.project, :issue_id => o.issue}},
+  acts_as_journalized :event_title => Proc.new {|o| "#{l_hours(o.hours)} (#{(o.work_package || o.project).event_title})"},
+                :event_url => Proc.new {|o| {:controller => '/timelog', :action => 'index', :project_id => o.project, :work_package_id => o.work_package}},
                 :event_author => :user,
                 :event_description => :comments
 
@@ -35,7 +33,7 @@ class TimeEntry < ActiveRecord::Base
 
   validate :validate_hours_are_in_range
   validate :validate_project_is_set
-  validate :validate_consistency_of_issue_id
+  validate :validate_consistency_of_work_package_id
 
   scope :visible, lambda {|*args| {
     :include => :project,
@@ -45,7 +43,7 @@ class TimeEntry < ActiveRecord::Base
   after_initialize :set_default_activity
   before_validation :set_default_project
 
-  safe_attributes 'hours', 'comments', 'issue_id', 'activity_id', 'spent_on', 'custom_field_values'
+  safe_attributes 'hours', 'comments', 'work_package_id', 'activity_id', 'spent_on', 'custom_field_values'
 
   def set_default_activity
     if new_record? && self.activity.nil?
@@ -57,7 +55,7 @@ class TimeEntry < ActiveRecord::Base
   end
 
   def set_default_project
-    self.project ||= issue.project if issue
+    self.project ||= work_package.project if work_package
   end
 
   def hours=(h)
@@ -115,7 +113,7 @@ private
     errors.add :project_id, :invalid if project.nil?
   end
 
-  def validate_consistency_of_issue_id
-    errors.add :issue_id, :invalid if (issue_id && !issue) || (issue && project!=issue.project)
+  def validate_consistency_of_work_package_id
+    errors.add :work_package_id, :invalid if (work_package_id && !work_package) || (work_package && project!=work_package.project)
   end
 end

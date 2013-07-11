@@ -1,3 +1,15 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <% breadcrumb_paths(nil) %>
 <div class="splitcontentleft">
   <div class="wiki"><%= textilizable Setting.welcome_text %></div>
@@ -6,7 +18,7 @@
 	<h3><%=l(:label_news_latest)%></h3>
         <div class="overview">
 		<%= render :partial => 'news/news', :collection => @news %>
-		<%= link_to l(:label_news_view_all), :controller => 'news' %>
+		<%= link_to l(:label_news_view_all), :controller => '/news' %>
 
   </div>
   </div>
@@ -34,8 +46,8 @@
 </div>
 
 <% content_for :header_tags do %>
-<%= auto_discovery_link_tag(:atom, {:controller => 'news', :action => 'index', :key => User.current.rss_key, :format => 'atom'},
+<%= auto_discovery_link_tag(:atom, {:controller => '/news', :action => 'index', :key => User.current.rss_key, :format => 'atom'},
                                    :title => "#{Setting.app_title}: #{l(:label_news_latest)}") %>
-<%= auto_discovery_link_tag(:atom, {:controller => 'activities', :action => 'index', :key => User.current.rss_key, :format => 'atom'},
+<%= auto_discovery_link_tag(:atom, {:controller => '/activities', :action => 'index', :key => User.current.rss_key, :format => 'atom'},
                                    :title => "#{Setting.app_title}: #{l(:label_activity)}") %>
 <% end %>

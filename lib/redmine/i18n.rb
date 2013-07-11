@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -92,6 +90,17 @@ module Redmine
 
     def current_language
       ::I18n.locale
+    end
+
+    # Collects all translations for ActiveRecord attributes
+    def all_attribute_translations(locale = current_locale)
+      @cached_attribute_translations ||= {}
+      @cached_attribute_translations[locale] ||= (
+        general_attributes = ::I18n.t('attributes', :locale => locale)
+        ::I18n.t("activerecord.attributes", :locale => locale).inject(general_attributes) do |attr_t, model_t|
+          attr_t.merge(model_t.last || {})
+        end)
+      @cached_attribute_translations[locale]
     end
   end
 end

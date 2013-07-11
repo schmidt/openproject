@@ -1,29 +1,27 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
 module SettingsHelper
   def administration_settings_tabs
-    tabs = [{:name => 'general', :partial => 'settings/general', :label => :label_general},
-            {:name => 'display', :partial => 'settings/display', :label => :label_display},
-            {:name => 'authentication', :partial => 'settings/authentication', :label => :label_authentication},
-            {:name => 'users', :partial => 'settings/users', :label => :label_user_plural },
-            {:name => 'projects', :partial => 'settings/projects', :label => :label_project_plural},
-            {:name => 'issues', :partial => 'settings/issues', :label => :label_issue_tracking},
-            {:name => 'notifications', :partial => 'settings/notifications', :label => :field_mail_notification},
-            {:name => 'mail_handler', :partial => 'settings/mail_handler', :label => :label_incoming_emails},
-            {:name => 'repositories', :partial => 'settings/repositories', :label => :label_repository_plural}
-            ]
+    [{:name => 'general', :partial => 'settings/general', :label => :label_general},
+     {:name => 'display', :partial => 'settings/display', :label => :label_display},
+     {:name => 'authentication', :partial => 'settings/authentication', :label => :label_authentication},
+     {:name => 'users', :partial => 'settings/users', :label => :label_user_plural },
+     {:name => 'projects', :partial => 'settings/projects', :label => :label_project_plural},
+     {:name => 'issues', :partial => 'settings/issues', :label => :label_issue_tracking},
+     {:name => 'notifications', :partial => 'settings/notifications', :label => Proc.new { User.human_attribute_name(:mail_notification) } },
+     {:name => 'mail_handler', :partial => 'settings/mail_handler', :label => :label_incoming_emails},
+     {:name => 'repositories', :partial => 'settings/repositories', :label => :label_repository_plural}
+    ]
   end
 
   def setting_select(setting, choices, options={})

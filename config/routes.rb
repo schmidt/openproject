@@ -1,31 +1,94 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
+
 OpenProject::Application.routes.draw do
   root :to => 'welcome#index', :as => 'home'
 
-  match '/login'  => 'account#login',  :as => 'signin'
-  match '/logout' => 'account#logout', :as => 'signout'
+  scope :controller => 'account' do
+    get '/account/force_password_change', :action => 'force_password_change'
+    post '/account/change_password', :action => 'change_password'
+    match '/login', :action => 'login',  :as => 'signin', :via => [:get, :post]
+    get '/logout', :action => 'logout', :as => 'signout'
+  end
+
+  namespace :api do
+
+    namespace :v1 do
+      resources :issues
+      resources :news
+      resources :projects do
+        collection do
+          get :level_list
+        end
+
+        resources :issues
+        resources :news
+      end
+      resources :time_entries, :controller => 'timelog'
+      resources :users
+    end
+
+    namespace :v2 do
+
+      resources :authentication
+      resources :planning_element_journals
+      resources :planning_element_statuses
+      resources :colors, :controller => 'planning_element_type_colors'
+      resources :planning_element_types do
+        collection do
+          get :paginate_planning_element_types
+        end
+      end
+      resources :planning_elements
+      resources :project_types do
+        collection do
+          get :paginate_project_types
+        end
+      end
+      resources :reported_project_statuses do
+        collection do
+          get :paginate_reported_project_statuses
+        end
+      end
+      resources :scenarios
+      resources :timelines
+
+      resources :projects do
+        resources :planning_elements
+        resources :reportings do
+          get :available_projects, :on => :collection
+        end
+        resources :project_associations do
+          get :available_projects, :on => :collection
+        end
+      end
+
+    end
+  end
 
   match '/roles/workflow/:id/:role_id/:tracker_id' => 'roles#workflow'
   match '/help/:ctrl/:page' => 'help#index'
+
+  resources :trackers
 
   # only providing routes for journals when there are multiple subclasses of journals
   # all subclasses will look for the journals routes
   resources :journals, :only => [:edit, :update]
 
   # REVIEW: review those wiki routes
-  resource :wiki_menu_item, :path_prefix => "projects/:project_id/wiki/:id", :only => [:edit, :update]
+  scope "projects/:project_id/wiki/:id" do
+    resource :wiki_menu_item, :only => [:edit, :update]
+  end
+
   get   'projects/:project_id/wiki/new' => 'wiki#new', :as => 'wiki_new'
   post  'projects/:project_id/wiki/new' => 'wiki#create', :as => 'wiki_create'
   post  'projects/:project_id/wiki/preview' => 'wiki#preview', :as => 'wiki_preview'
@@ -34,11 +97,11 @@ OpenProject::Application.routes.draw do
   post  'projects/:id/wiki' => 'wikis#edit'
   match 'projects/:id/wiki/destroy' => 'wikis#destroy'
 
-  # generic route for adding/removing watchers
-  # looks to be ressourceful
-  scope ':object_type/:object_id', :constraints => { :object_type => /issues|messages|boards|wikis|wiki_pages|news/,
-                                                     :object_id => /\d+/ } do
-    resources :watchers, :only => [:new]
+  # generic route for adding/removing watchers.
+  # Models declared as acts_as_watchable will be automatically added to
+  # OpenProject::Acts::Watchable::Routes.watched
+  scope ':object_type/:object_id', :constraints => OpenProject::Acts::Watchable::Routes do
+    resources :watchers, :only => [:new, :create]
 
     match '/watch' => 'watchers#watch', :via => :post
     match '/unwatch' => 'watchers#unwatch', :via => :delete
@@ -117,7 +180,7 @@ OpenProject::Application.routes.draw do
         get '/diff/:version/vs/:version_from' => 'wiki#diff', :as => 'wiki_diff'
         get '/diff(/:version)' => 'wiki#diff', :as => 'wiki_diff'
         get '/annotate/:version' => 'wiki#annotate', :as => 'wiki_annotate'
-        match :rename, :via => [:get, :post]
+        match :rename, :via => [:get, :put]
         get :history
         post :preview
         post :protect
@@ -132,7 +195,6 @@ OpenProject::Application.routes.draw do
     get 'wiki' => "wiki#show"
 
     namespace :issues do
-      resources :gantt, :controller => 'gantts', :only => [:index]
       resources :calendar, :controller => 'calendars', :only => [:index]
     end
 
@@ -202,7 +264,6 @@ OpenProject::Application.routes.draw do
   # this is to support global actions on issues and
   # for backwards compatibility
   namespace :issues do
-    resources :gantt, :controller => 'gantts', :only => [:index]
     resources :calendar, :controller => 'calendars', :only => [:index]
 
     # have a global autocompleter for issues
@@ -229,6 +290,7 @@ OpenProject::Application.routes.draw do
       match '/preview' => 'issues/previews#create', :via => :post
       # this route is defined so that it has precedence of the one defined on the collection
       delete :destroy
+      get :quoted
     end
 
     collection do
@@ -246,8 +308,10 @@ OpenProject::Application.routes.draw do
   end
 
   # Misc issue routes. TODO: move into resources
-  match '/issues/:id/quoted' => 'journals#new', :id => /\d+/, :via => :post, :as => 'quoted_issue'
   match '/issues/:id/destroy' => 'issues#destroy', :via => :post # legacy
+
+  # Misc journal routes. TODO: move into resources
+  match '/journals/:id/diff/:field' => 'journals#diff', :via => :get, :as => 'journal_diff'
 
 
   namespace :time_entries do
@@ -344,6 +408,104 @@ OpenProject::Application.routes.draw do
   # alternate routes for the current user
   scope "my" do
     match '/deletion_info' => 'users#deletion_info', :via => :get, :as => 'delete_my_account_info'
+  end
+
+  scope :controller => 'my' do
+    get '/my/password', :action => 'password'
+    post '/my/change_password', :action => 'change_password'
+  end
+
+  get 'authentication' => 'authentication#index'
+
+  resources :colors, :controller => 'planning_element_type_colors' do
+     member do
+       get :confirm_destroy
+       get :move
+       post :move
+     end
+  end
+
+  resources :planning_element_statuses, :controller => 'planning_element_statuses'
+
+  resources :planning_element_types, :controller => 'planning_element_types' do
+    collection do
+      get :paginate_planning_element_types
+    end
+    member do
+      get :confirm_destroy
+      get :move
+      post :move
+    end
+  end
+
+  get 'planning_elements' => 'planning_elements', :action => 'list'
+
+  resources :project_types, :controller => 'project_types' do
+    member do
+      get :confirm_destroy
+      get :move
+      post :move
+    end
+
+    resources :projects, :only => [:index, :show], :controller => 'projects'
+    resources :reported_project_statuses,          :controller => 'reported_project_statuses'
+  end
+
+  resources :projects, :only => [:index, :show], :controller => 'projects' do
+    resources :planning_element_types, :controller => 'planning_element_types' do
+      member do
+        get :confirm_destroy
+        get :move
+        post :move
+      end
+    end
+
+    resources :planning_elements,      :controller => 'planning_elements' do
+      collection do
+        get :all
+        delete :destroy_all
+        get :confirm_destroy_all
+        post :restore_all
+        get :confirm_restore_all
+        get :recycle_bin
+      end
+
+      member do
+        get :confirm_move_to_trash
+        get :confirm_destroy
+        delete :move_to_trash
+        post :restore
+      end
+
+      resources :journals, :controller => 'planning_element_journals',
+                                           :only       => [:index, :create]
+    end
+    resources :project_associations,   :controller => 'project_associations' do
+      get :confirm_destroy, :on => :member
+      get :available_projects, :on => :collection
+    end
+
+    resources :reportings,             :controller => 'reportings' do
+      get :confirm_destroy, :on => :member
+    end
+
+    resources :scenarios,              :controller => 'scenarios' do
+      get :confirm_destroy, :on => :member
+    end
+
+    resources :timelines,              :controller => 'timelines'
+
+    resources :principals, :controller => 'timelines_principals' do
+      collection do
+        get :paginate_principals
+      end
+    end
+  end
+
+  resources :reported_project_statuses, :controller => 'reported_project_statuses' do
+    collection do
+      get :paginate_reported_project_statuses
+    end
   end
 
   # Install the default route as the lowest priority.

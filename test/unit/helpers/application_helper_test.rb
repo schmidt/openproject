@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -26,7 +24,7 @@ class ApplicationHelperTest < ActionView::TestCase
     @project_member = FactoryGirl.create :user,
       :member_in_project => @project,
       :member_through_role => FactoryGirl.create(:role,
-          :permissions => [:view_issues, :edit_issues, :view_documents,
+          :permissions => [:view_work_packages, :edit_work_packages, :view_documents,
                            :browse_repository, :view_changesets, :view_wiki_pages])
 
     @issue = FactoryGirl.create :issue, :project => @project, :author => @project_member, :tracker => @project.trackers.first
@@ -320,13 +318,15 @@ RAW
                  :repository => repository,
                  :comments => 'This commit fixes #1, #2 and references #1 & #3'
     identifier = @project.identifier
-    @project = FactoryGirl.create :valid_project
 
     source_link = link_to("#{identifier}:source:/some/file", {:controller => 'repositories', :action => 'entry', :id => identifier, :path => ['some', 'file']},
       :class => 'source')
     changeset_link = link_to("#{identifier}:r#{changeset.revision}",
       {:controller => 'repositories', :action => 'revision', :id => identifier, :rev => changeset.revision},
       :class => 'changeset', :title => 'This commit fixes #1, #2 and references #1 & #3')
+
+    # textilizable "sees" the text is parses from the_other_project (and not @project)
+    the_other_project = FactoryGirl.create :valid_project
 
     to_test = {
       # documents
@@ -347,13 +347,11 @@ RAW
       "#{identifier}:source:/some/file"       => source_link,
       'invalid:source:/some/file'             => 'invalid:source:/some/file',
     }
-    to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text), "#{text} failed" }
+    to_test.each { |text, result| assert_equal "<p>#{result}</p>", textilizable(text, :project => the_other_project), "#{text} failed" }
   end
 
   def test_redmine_links_git_commit
-    @project = FactoryGirl.create :valid_project
     User.current = @admin
-
     changeset_link = link_to('abcd',
                                {
                                  :controller => 'repositories',

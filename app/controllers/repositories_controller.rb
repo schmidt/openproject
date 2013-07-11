@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -20,6 +18,8 @@ class ChangesetNotFound < Exception; end
 class InvalidRevisionParam < Exception; end
 
 class RepositoriesController < ApplicationController
+  include PaginationHelper
+
   menu_item :repository
   menu_item :settings, :only => :edit
   default_search_scope :changesets
@@ -67,7 +67,7 @@ class RepositoriesController < ApplicationController
 
   def destroy
     @repository.destroy
-    redirect_to :controller => 'projects', :action => 'settings', :id => @project, :tab => 'repository'
+    redirect_to :controller => '/projects', :action => 'settings', :id => @project, :tab => 'repository'
   end
 
   def show
@@ -96,14 +96,9 @@ class RepositoriesController < ApplicationController
   end
 
   def revisions
-    @changeset_count = @repository.changesets.size
-    @changeset_pages = Paginator.new self, @changeset_count,
-                                     per_page_option,
-                                     params['page']
-    @changesets = @repository.changesets.find(:all,
-                       :limit  =>  @changeset_pages.items_per_page,
-                       :offset =>  @changeset_pages.current.offset,
-                       :include => [:user, :repository])
+    @changesets = @repository.changesets.includes(:user, :repository)
+                                        .page(params[:page])
+                                        .per_page(per_page_param)
 
     respond_to do |format|
       format.html { render :layout => false if request.xhr? }

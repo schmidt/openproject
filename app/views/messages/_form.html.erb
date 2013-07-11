@@ -1,9 +1,21 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <%= error_messages_for 'message' %>
 <% replying ||= false %>
 
 <div class="box">
 <!--[form:message]-->
-<p><label for="message_subject"><%= l(:field_subject) %></label><br />
+<p><label for="message_subject"><%= Message.human_attribute_name(:subject) %></label><br />
 <%= f.text_field :subject, :size => 120, :id => "message_subject" %>
 
 <% if !replying && User.current.allowed_to?(:edit_messages, @project) %>
@@ -13,7 +25,7 @@
 </p>
 
 <% if !replying && !@message.new_record? && User.current.allowed_to?(:edit_messages, @project) %>
-	<p><label><%= l(:label_board) %></label><br />
+	<p><label><%= Board.name.humanize %></label><br />
   <%= f.select :board_id, @project.boards.collect {|b| [b.name, b.id]} %></p>
 <% end %>
 

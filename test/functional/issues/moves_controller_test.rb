@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -18,6 +16,7 @@ class Issues::MovesControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     User.current = nil
   end
 
@@ -82,7 +81,7 @@ class Issues::MovesControllerTest < ActionController::TestCase
   def test_bulk_copy_to_another_project
     @request.session[:user_id] = 2
     assert_difference 'Issue.count', 2 do
-      assert_no_difference 'Project.find(1).issues.count' do
+      assert_no_difference 'Project.find(1).work_packages.count' do
         post :create, :ids => [1, 2], :new_project_id => 2, :copy_options => {:copy => '1'}
       end
     end
@@ -94,7 +93,7 @@ class Issues::MovesControllerTest < ActionController::TestCase
       @request.session[:user_id] = 2
       issue_before_move = Issue.find(1)
       assert_difference 'Issue.count', 1 do
-        assert_no_difference 'Project.find(1).issues.count' do
+        assert_no_difference 'Project.find(1).work_packages.count' do
           post :create, :ids => [1], :new_project_id => 2, :copy_options => {:copy => '1'}, :new_tracker_id => '', :assigned_to_id => '', :status_id => '', :start_date => '', :due_date => ''
         end
       end
@@ -111,7 +110,7 @@ class Issues::MovesControllerTest < ActionController::TestCase
 
       @request.session[:user_id] = 2
       assert_difference 'Issue.count', 2 do
-        assert_no_difference 'Project.find(1).issues.count' do
+        assert_no_difference 'Project.find(1).work_packages.count' do
           post :create, :ids => [1, 2], :new_project_id => 2, :copy_options => {:copy => '1'}, :new_tracker_id => '', :assigned_to_id => 4, :status_id => 3, :start_date => '2009-12-01', :due_date => '2009-12-31'
         end
       end

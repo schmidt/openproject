@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -23,6 +21,7 @@ class AttachmentsControllerTest < ActionController::TestCase
   fixtures :all
 
   def setup
+    super
     @controller = AttachmentsController.new
     @request    = ActionController::TestRequest.new
     @response   = ActionController::TestResponse.new
@@ -109,7 +108,7 @@ class AttachmentsControllerTest < ActionController::TestCase
     @request.session[:user_id] = 2
 
     assert_difference 'issue.attachments.count', -1 do
-      post :destroy, :id => 1
+      delete :destroy, :id => 1
     end
     # no referrer
     assert_redirected_to '/projects/ecookbook'
@@ -122,7 +121,7 @@ class AttachmentsControllerTest < ActionController::TestCase
   def test_destroy_wiki_page_attachment
     @request.session[:user_id] = 2
     assert_difference 'Attachment.count', -1 do
-      post :destroy, :id => 3
+      delete :destroy, :id => 3
       assert_response 302
     end
   end
@@ -130,7 +129,7 @@ class AttachmentsControllerTest < ActionController::TestCase
   def test_destroy_project_attachment
     @request.session[:user_id] = 2
     assert_difference 'Attachment.count', -1 do
-      post :destroy, :id => 8
+      delete :destroy, :id => 8
       assert_response 302
     end
   end
@@ -138,13 +137,13 @@ class AttachmentsControllerTest < ActionController::TestCase
   def test_destroy_version_attachment
     @request.session[:user_id] = 2
     assert_difference 'Attachment.count', -1 do
-      post :destroy, :id => 9
+      delete :destroy, :id => 9
       assert_response 302
     end
   end
 
   def test_destroy_without_permission
-    post :destroy, :id => 3
+    delete :destroy, :id => 3
     assert_redirected_to '/login?back_url=http%3A%2F%2Ftest.host%2Fattachments%2F3'
     assert Attachment.find_by_id(3)
   end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -20,10 +18,10 @@ class ApiTest::NewsTest < ActionDispatch::IntegrationTest
     Setting.rest_api_enabled = '1'
   end
 
-  context "GET /news" do
+  context "GET /api/v1/news" do
     context ".xml" do
       should "return news" do
-        get '/news.xml'
+        get '/api/v1/news.xml'
 
         assert_tag :tag => 'news',
           :attributes => {:type => 'array'},
@@ -39,7 +37,7 @@ class ApiTest::NewsTest < ActionDispatch::IntegrationTest
 
     context ".json" do
       should "return news" do
-        get '/news.json'
+        get '/api/v1/news.json'
 
         json = ActiveSupport::JSON.decode(response.body)
         assert_kind_of Hash, json
@@ -50,12 +48,12 @@ class ApiTest::NewsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  context "GET /projects/:project_id/news" do
+  context "GET /api/v1/projects/:project_id/news" do
     context ".xml" do
-      should_allow_api_authentication(:get, "/projects/onlinestore/news.xml")
+      should_allow_api_authentication(:get, "/api/v1/projects/onlinestore/news.xml")
 
       should "return news" do
-        get '/projects/ecookbook/news.xml'
+        get '/api/v1/projects/ecookbook/news.xml'
 
         assert_tag :tag => 'news',
           :attributes => {:type => 'array'},
@@ -70,10 +68,10 @@ class ApiTest::NewsTest < ActionDispatch::IntegrationTest
     end
 
     context ".json" do
-      should_allow_api_authentication(:get, "/projects/onlinestore/news.json")
+      should_allow_api_authentication(:get, "/api/v1/projects/onlinestore/news.json")
 
       should "return news" do
-        get '/projects/ecookbook/news.json'
+        get '/api/v1/projects/ecookbook/news.json'
 
         json = ActiveSupport::JSON.decode(response.body)
         assert_kind_of Hash, json

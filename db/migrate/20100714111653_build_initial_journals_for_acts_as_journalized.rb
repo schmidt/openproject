@@ -1,18 +1,30 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
 class BuildInitialJournalsForActsAsJournalized < ActiveRecord::Migration
+
+  class Issue < ActiveRecord::Base
+    acts_as_journalized :event_title => Proc.new {|o| "#{o.tracker.name} ##{o.journaled_id} (#{o.status}): #{o.subject}"},
+                        :event_type => Proc.new {|o|
+                                                t = 'issue'
+                                                if o.changed_data.empty?
+                                                  t << '-note' unless o.initial?
+                                                else
+                                                  t << (IssueStatus.find_by_id(o.new_value_for(:status_id)).try(:is_closed?) ? '-closed' : '-edit')
+                                                end
+                                                t },
+                      :except => ["root_id"]
+  end
+
   def self.up
     # This is provided here for migrating up after the JournalDetails has been removed
     unless Object.const_defined?("JournalDetails")

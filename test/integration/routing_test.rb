@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -217,8 +215,8 @@ class RoutingTest < ActionDispatch::IntegrationTest
     should route(:post, "/issues/move").to( :controller => 'issues/moves',
                                             :action => 'create')
 
-    should route(:post, "/issues/1/quoted").to( :controller => 'journals',
-                                                :action => 'new',
+    should route(:get, "/issues/1/quoted").to( :controller => 'issues',
+                                                :action => 'quoted',
                                                 :id => '1')
 
     should route(:get, "/issues/calendar").to( :controller => 'issues/calendars',
@@ -226,12 +224,6 @@ class RoutingTest < ActionDispatch::IntegrationTest
     should route(:get, "/projects/project-name/issues/calendar").to( :controller => 'issues/calendars',
                                                                      :action => 'index',
                                                                      :project_id => 'project-name' )
-
-    should route(:get, "/issues/gantt").to( :controller => 'issues/gantts',
-                                            :action => 'index')
-    should route(:get, "/projects/project-name/issues/gantt").to( :controller => 'issues/gantts',
-                                                                  :action => 'index',
-                                                                  :project_id => 'project-name')
 
     should route(:get, "/issues/auto_complete").to( :controller => 'issues/auto_completes',
                                                     :action => 'issues')
@@ -263,28 +255,6 @@ class RoutingTest < ActionDispatch::IntegrationTest
     end
   end
 
-  context "watches" do
-    ['issues', 'messages', 'boards', 'wikis', 'wiki_pages', 'news'].each do |type|
-      should route(:post, "/#{type}/1/watch").to( :controller => 'watchers',
-                                                 :action => 'watch',
-                                                 :object_type => type,
-                                                 :object_id => '1' )
-
-      should route(:delete, "/#{type}/1/unwatch").to( :controller => 'watchers',
-                                                     :action => 'unwatch',
-                                                     :object_type => type,
-                                                     :object_id => '1' )
-
-      should route(:get, "/#{type}/1/watchers/new").to( :controller => 'watchers',
-                                                       :action => 'new',
-                                                       :object_type => type,
-                                                       :object_id => '1' )
-    end
-
-    should route(:delete, "/watchers/1").to( :controller => 'watchers',
-                                             :action => 'destroy',
-                                             :id => '1' )
-  end
 
   context "enumerations" do
     context "within admin" do
@@ -349,7 +319,7 @@ class RoutingTest < ActionDispatch::IntegrationTest
                                                              :id => '100',
                                                              :field => 'description' )
   end
-  
+
   context "issue categories" do
     context "project scoped" do
       should route(:get, "/projects/test/issue_categories/new").to( :controller => 'issue_categories',
@@ -480,15 +450,15 @@ class RoutingTest < ActionDispatch::IntegrationTest
                                                         :format => 'atom',
                                                         :project_id => '567' )
 
-      should route(:get, "/projects/567/news.xml").to( :controller => 'news',
-                                                       :action => 'index',
-                                                       :format => 'xml',
-                                                       :project_id => '567' )
+      should route(:get, "/api/v1/projects/567/news.xml").to( :controller => 'api/v1/news',
+                                                              :action => 'index',
+                                                              :format => 'xml',
+                                                              :project_id => '567' )
 
-      should route(:get, "/projects/567/news.json").to( :controller => 'news',
-                                                        :action => 'index',
-                                                        :format => 'json',
-                                                        :project_id => '567' )
+      should route(:get, "/api/v1/projects/567/news.json").to( :controller => 'api/v1/news',
+                                                               :action => 'index',
+                                                               :format => 'json',
+                                                               :project_id => '567' )
 
       should route(:get, "/projects/567/news/new").to( :controller => 'news',
                                                        :action => 'new',
@@ -511,13 +481,13 @@ class RoutingTest < ActionDispatch::IntegrationTest
                                          :action => 'index',
                                          :format => 'atom' )
 
-    should route(:get, "/news.xml").to( :controller => 'news',
-                                        :action => 'index',
-                                        :format => 'xml' )
+    should route(:get, "/api/v1/news.xml").to( :controller => 'api/v1/news',
+                                               :action => 'index',
+                                               :format => 'xml' )
 
-    should route(:get, "/news.json").to( :controller => 'news',
-                                         :action => 'index',
-                                         :format => 'json' )
+    should route(:get, "/api/v1/news.json").to( :controller => 'api/v1/news',
+                                                :action => 'index',
+                                                :format => 'json' )
 
     should route(:get, "/news/2").to( :controller => 'news',
                                       :action => 'show',
@@ -1002,7 +972,7 @@ class RoutingTest < ActionDispatch::IntegrationTest
                                                                                    :action => 'preview',
                                                                                    :project_id => '567',
                                                                                    :id => 'CookBook_documentation' )
-      should route(:post, "/projects/22/wiki/ladida/rename").to( :controller => 'wiki',
+      should route(:put, "/projects/22/wiki/ladida/rename").to( :controller => 'wiki',
                                                                  :action => 'rename',
                                                                  :project_id => '22',
                                                                 :id => 'ladida' )

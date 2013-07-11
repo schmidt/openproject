@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -16,11 +14,11 @@ require File.expand_path('../../../../../test_helper', __FILE__)
 class CalendarTest < ActiveSupport::TestCase
 
   def test_monthly
-    Setting.available_languages = [:fr, :en]
-    c = Redmine::Helpers::Calendar.new(Date.today, :fr, :month)
+    Setting.available_languages = [:de, :en]
+    c = Redmine::Helpers::Calendar.new(Date.today, :de, :month)
     assert_equal [1, 7], [c.startdt.cwday, c.enddt.cwday]
 
-    c = Redmine::Helpers::Calendar.new('2007-07-14'.to_date, :fr, :month)
+    c = Redmine::Helpers::Calendar.new('2007-07-14'.to_date, :de, :month)
     assert_equal ['2007-06-25'.to_date, '2007-08-05'.to_date], [c.startdt, c.enddt]
 
     c = Redmine::Helpers::Calendar.new(Date.today, :en, :month)
@@ -28,11 +26,11 @@ class CalendarTest < ActiveSupport::TestCase
   end
 
   def test_weekly
-    Setting.available_languages = [:fr, :en]
-    c = Redmine::Helpers::Calendar.new(Date.today, :fr, :week)
+    Setting.available_languages = [:de, :en]
+    c = Redmine::Helpers::Calendar.new(Date.today, :de, :week)
     assert_equal [1, 7], [c.startdt.cwday, c.enddt.cwday]
 
-    c = Redmine::Helpers::Calendar.new('2007-07-14'.to_date, :fr, :week)
+    c = Redmine::Helpers::Calendar.new('2007-07-14'.to_date, :de, :week)
     assert_equal ['2007-07-09'.to_date, '2007-07-15'.to_date], [c.startdt, c.enddt]
 
     c = Redmine::Helpers::Calendar.new(Date.today, :en, :week)

@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 Feature: Localized boolean custom fields can be created
 
   Background:
@@ -5,8 +16,13 @@ Feature: Localized boolean custom fields can be created
     And the following languages are active:
       | en |
       | de |
+    And there are the following trackers:
+      | name    | position |  is_in_chlog |
+      | Bug     |    1     |  true        |
+      | Feature |    2     |  true        |
+      | Support |    3     |  false       |
     When I go to the custom fields page
-    When I follow "New custom field"
+    When I follow "New custom field" within "#tab-content-WorkPackageCustomField"
 
   @javascript
   Scenario: Available fields

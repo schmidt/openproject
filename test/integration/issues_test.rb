@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -123,8 +121,8 @@ class IssuesTest < ActionDispatch::IntegrationTest
   end
 
   def test_issue_with_user_custom_field
-    @field = IssueCustomField.create!(:name => 'Tester', :field_format => 'user', :is_for_all => true, :trackers => Tracker.all)
-    Role.anonymous.add_permission! :add_issues, :edit_issues
+    @field = WorkPackageCustomField.create!(:name => 'Tester', :field_format => 'user', :is_for_all => true, :trackers => Tracker.all)
+    Role.anonymous.add_permission! :add_issues, :edit_work_packages
     users = Project.find(1).users
     tester = users.first
 
@@ -161,6 +159,9 @@ class IssuesTest < ActionDispatch::IntegrationTest
         :tag => 'td',
         :content => tester.name
       }
+
+    get "/issues/#{issue.id}/edit"
+    assert_response 200
     assert_tag :select,
       :attributes => {:name => "issue[custom_field_values][#{@field.id}]"},
       :children => {:count => (users.size + 1)}, # +1 for blank value

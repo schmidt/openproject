@@ -1,3 +1,15 @@
+<%#-- copyright
+OpenProject is a project management system.
+
+Copyright (C) 2012-2013 the OpenProject Team
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License version 3.
+
+See doc/COPYRIGHT.rdoc for more details.
+
+++#%>
+
 <form id="status_by_form">
 <fieldset>
 <legend>
@@ -18,7 +30,7 @@
     <% counts.each do |count| %>
     <tr>
         <td width="130px" align="right" >
-            <%= link_to h(count[:group]), {:controller => 'issues',
+            <%= link_to h(count[:group]), {:controller => '/issues',
                                         :action => 'index',
                                         :project_id => version.project,
                                         :set_filter => 1,

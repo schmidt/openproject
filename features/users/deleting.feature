@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 Feature: User deletion
 
   @javascript
@@ -28,7 +39,7 @@ Feature: User deletion
       | login     | bob |
     And I am already logged in as "admin"
     When I go to the edit page of the user "bob"
-    And I follow "Delete" within ".contextual"
+    And I select "Delete" from the action menu
     And I press "Delete"
     And I accept the alert dialog
     Then I should see "Account successfully deleted"
@@ -40,7 +51,7 @@ Feature: User deletion
       | login     | bob |
     And I am already logged in as "admin"
     And I go to the edit page of the user "bob"
-    Then I should not see "Delete" within ".contextual"
+    Then there should not be a "Delete" entry in the action menu
 
   Scenario: Deletablilty settings can be set in the users tab of the settings
     Given I am already logged in as "admin"
@@ -49,6 +60,6 @@ Feature: User deletion
     And I go to the users tab of the settings page
     And I check "settings_users_deletable_by_admins"
     And I check "settings_users_deletable_by_self"
-    And I press "Save"
+    And I press "Save" within "#tab-content-users"
     Then the "users_deletable_by_admins" setting should be true
     Then the "users_deletable_by_self" setting should be true

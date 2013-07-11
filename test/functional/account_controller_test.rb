@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -96,7 +94,7 @@ class AccountControllerTest < ActionController::TestCase
                              :lastname => 'User',
                              :mail => 'user@somedomain.com',
                              :identity_url => 'http://openid.example.com/good_user',
-                             :status => User::STATUS_REGISTERED)
+                             :status => User::STATUSES[:registered])
     existing_user.login = 'cool_user'
     assert existing_user.save!
 
@@ -143,7 +141,7 @@ class AccountControllerTest < ActionController::TestCase
     assert_redirected_to '/login'
     user = User.find_by_login('cool_user')
     assert user
-    assert_equal User::STATUS_REGISTERED, user.status
+    assert_equal User::STATUSES[:registered], user.status
   end
 
   def test_login_with_openid_with_new_user_with_conflict_should_register
@@ -193,7 +191,7 @@ class AccountControllerTest < ActionController::TestCase
 
       should respond_with :success
       should render_template :register
-      should assign_to :user
+      should_assign_to :user
     end
 
     context "with self registration off" do
@@ -213,8 +211,8 @@ class AccountControllerTest < ActionController::TestCase
         Setting.self_registration = '3'
         post :register, :user => {
           :login => 'register',
-          :password => 'test',
-          :password_confirmation => 'test',
+          :password => 'adminADMIN!',
+          :password_confirmation => 'adminADMIN!',
           :firstname => 'John',
           :lastname => 'Doe',
           :mail => 'register@example.com'
@@ -222,7 +220,7 @@ class AccountControllerTest < ActionController::TestCase
       end
 
       should respond_with :redirect
-      should assign_to :user
+      should_assign_to :user
       should redirect_to('my page') { {:controller => 'my', :action => 'account'} }
 
       should_create_a_new_user { User.last(:conditions => {:login => 'register'}) }
@@ -230,7 +228,7 @@ class AccountControllerTest < ActionController::TestCase
       should 'set the user status to active' do
         user = User.last(:conditions => {:login => 'register'})
         assert user
-        assert_equal User::STATUS_ACTIVE, user.status
+        assert_equal User::STATUSES[:active], user.status
       end
     end
 

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -19,15 +17,15 @@ class MenuManagerTest < ActionDispatch::IntegrationTest
   fixtures :all
 
   def test_project_menu_with_specific_locale
-    Setting.available_languages = [:fr, :en]
-    get 'projects/ecookbook/issues', { }, 'HTTP_ACCEPT_LANGUAGE' => 'fr,fr-fr;q=0.8,en-us;q=0.5,en;q=0.3'
+    Setting.available_languages = [:de, :en]
+    get 'projects/ecookbook/issues', { }, 'HTTP_ACCEPT_LANGUAGE' => 'de,de-de;q=0.8,en-us;q=0.5,en;q=0.3'
 
     assert_tag :div, :attributes => { :id => 'main-menu' },
-                     :descendant => { :tag => 'li', :child => { :tag => 'a', :content => ll('fr', :label_activity),
+                     :descendant => { :tag => 'li', :child => { :tag => 'a', :content => ll('de', :label_activity),
                                                                              :attributes => { :href => '/projects/ecookbook/activity',
                                                                                               :class => 'activity ellipsis' } } }
     assert_tag :div, :attributes => { :id => 'main-menu' },
-                     :descendant => { :tag => 'li', :child => { :tag => 'a', :content => ll('fr', :label_issue_plural),
+                     :descendant => { :tag => 'li', :child => { :tag => 'a', :content => ll('de', :label_issue_plural),
                                                                              :attributes => { :href => '/projects/ecookbook/issues',
                                                                                               :class => 'issues ellipsis selected' } } }
   end

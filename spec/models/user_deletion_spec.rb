@@ -1,13 +1,22 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe User, 'deletion' do
-  let(:user) { FactoryGirl.build(:user) }
-  let(:user2) { FactoryGirl.build(:user) }
   let(:project) { FactoryGirl.create(:project_with_trackers) }
-  let(:role) { FactoryGirl.create(:role) }
-  let(:member) { FactoryGirl.create(:member, :project => project,
-                                         :roles => [role],
-                                         :principal => user) }
+  let(:user) { FactoryGirl.build(:user, :member_in_project => project) }
+  let(:user2) { FactoryGirl.build(:user) }
+  let(:member) { project.members.first }
+  let(:role) { member.roles.first }
   let(:issue_status) { FactoryGirl.create(:issue_status) }
   let(:issue) { FactoryGirl.create(:issue, :tracker => project.trackers.first,
                                        :author => user,
@@ -253,7 +262,7 @@ describe User, 'deletion' do
 
   describe "WHEN the user has created a time entry" do
     let(:associated_instance) { FactoryGirl.build(:time_entry, :project => project,
-                                                           :issue => issue,
+                                                           :work_package => issue,
                                                            :hours => 2,
                                                            :activity => FactoryGirl.create(:time_entry_activity)) }
     let(:associated_class) { TimeEntry }
@@ -264,7 +273,7 @@ describe User, 'deletion' do
 
   describe "WHEN the user has worked on time_entry" do
     let(:associated_instance) { FactoryGirl.build(:time_entry, :project => project,
-                                                           :issue => issue,
+                                                           :work_package => issue,
                                                            :hours => 2,
                                                            :activity => FactoryGirl.create(:time_entry_activity)) }
     let(:associated_class) { TimeEntry }
@@ -288,7 +297,6 @@ describe User, 'deletion' do
   describe "WHEN the user is a member of a project" do
     before do
       member #saving
-
       user.destroy
     end
 
@@ -298,12 +306,12 @@ describe User, 'deletion' do
   end
 
   describe "WHEN the user is watching something" do
-    let(:watched) { FactoryGirl.create(:wiki_content) }
+    let(:watched) { FactoryGirl.create(:issue, :project => project) }
     let(:watch) { Watcher.new(:user => user,
                               :watchable => watched) }
 
     before do
-      watch.save
+      watch.save!
 
       user.destroy
     end
@@ -403,11 +411,7 @@ describe User, 'deletion' do
                                                           :project => project) }
 
     before do
-      FactoryGirl.create(:member, :principal => user,
-                              :project => project,
-                              :roles => [role])
       issue_category.save!
-
       user.destroy
       issue_category.reload
     end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -20,6 +18,7 @@ class MessagesController < ApplicationController
   before_filter :authorize, :except => [:preview, :edit, :update, :destroy]
 
   include AttachmentsHelper
+  include PaginationHelper
 
   REPLIES_PER_PAGE = 25 unless const_defined?(:REPLIES_PER_PAGE)
 
@@ -34,15 +33,13 @@ class MessagesController < ApplicationController
       page = 1 + offset / REPLIES_PER_PAGE
     end
 
-    @reply_count = @topic.children.count
-    @reply_pages = Paginator.new self, @reply_count, REPLIES_PER_PAGE, page
-    @replies =  @topic.children.find(:all, :include => [:author, :attachments, {:board => :project}],
-                                           :order => "#{Message.table_name}.created_on ASC",
-                                           :limit => @reply_pages.items_per_page,
-                                           :offset => @reply_pages.current.offset)
+    @replies =  @topic.children.includes(:author, :attachments, {:board => :project})
+                               .order("#{Message.table_name}.created_on ASC")
+                               .page(page)
+                               .per_page(per_page_param)
 
     @reply = Message.new(:subject => "RE: #{@message.subject}")
-    render :action => "show", :layout => false if request.xhr?
+    render :action => "show", :layout => !request.xhr?
   end
 
   # new topic
@@ -114,7 +111,7 @@ class MessagesController < ApplicationController
     (render_403; return false) unless @message.destroyable_by?(User.current)
     @message.destroy
     redirect_to @message.parent.nil? ?
-      { :controller => 'boards', :action => 'show', :project_id => @project, :id => @board } :
+      { :controller => '/boards', :action => 'show', :project_id => @project, :id => @board } :
       { :action => 'show', :id => @message.parent, :r => @message }
   end
 

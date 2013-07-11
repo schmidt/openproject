@@ -1,9 +1,20 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe WikiMenuItemsController do
   before do
-    User.destroy_all
-    Role.destroy_all
+    User.delete_all
+    Role.delete_all
 
     @project = FactoryGirl.create(:project)
     @project.reload # project contains wiki by default
@@ -36,7 +47,7 @@ describe WikiMenuItemsController do
 
       get 'edit', @params
 
-      response.status.should == "403 Forbidden"
+      response.status.should == 403 # forbidden
     end
   end
 end

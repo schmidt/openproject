@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -64,23 +62,29 @@ class MyController < ApplicationController
 
   # Manage user's password
   def password
-    @user = User.current
-    unless @user.change_password_allowed?
-      flash[:error] = l(:notice_can_t_change_password)
-      redirect_to :action => 'account'
-      return
-    end
-    if request.post?
-      if @user.check_password?(params[:password])
-        @user.password, @user.password_confirmation = params[:new_password], params[:new_password_confirmation]
-        if @user.save
-          flash[:notice] = l(:notice_account_password_updated)
-          redirect_to :action => 'account'
-        end
-      else
-        flash[:error] = l(:notice_account_wrong_password)
+    @user = User.current  # required by "my" layout
+    @username = @user.login
+    redirect_if_password_change_not_allowed_for(@user)
+  end
+
+  # When making changes here, also check AccountController.change_password
+  def change_password
+    @user = User.current  # required by "my" layout
+    @username = @user.login
+    return if redirect_if_password_change_not_allowed_for(@user)
+    if @user.check_password?(params[:password])
+      @user.password = params[:new_password]
+      @user.password_confirmation = params[:new_password_confirmation]
+      @user.force_password_change = false
+      if @user.save
+        flash[:notice] = l(:notice_account_password_updated)
+        redirect_to :action => 'account'
+        return
       end
+    else
+      flash.now[:error] = l(:notice_account_wrong_password)
     end
+    render 'my/password'
   end
 
   def first_login
@@ -93,7 +97,7 @@ class MyController < ApplicationController
       User.current.pref.save
 
       flash[:notice] = l(:notice_account_updated)
-      redirect_back_or_default(:controller => 'my', :action => 'page')
+      redirect_back_or_default(:controller => '/my', :action => 'page')
     end
   end
 
@@ -185,5 +189,15 @@ class MyController < ApplicationController
 
   def default_breadcrumb
     l(:label_my_account)
+  end
+
+  private
+  def redirect_if_password_change_not_allowed_for(user)
+    unless user.change_password_allowed?
+      flash[:error] = l(:notice_can_t_change_password)
+      redirect_to :action => 'account'
+      return true
+    end
+    false
   end
 end

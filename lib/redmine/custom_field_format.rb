@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -73,7 +71,7 @@ module Redmine
 
       def label_for(name)
         format = @@available[name.to_s]
-        format.label if format
+        format.label.is_a?(Proc) ? format.label.call : l(format.label) if format
       end
 
       # Return an array of custom field formats which can be used in select_tag
@@ -83,7 +81,7 @@ module Redmine
         fields.sort {|a,b|
           a.order <=> b.order
         }.collect {|custom_field_format|
-          [ l(custom_field_format.label), custom_field_format.name ]
+          [ label_for(custom_field_format.name), custom_field_format.name ]
         }
       end
 

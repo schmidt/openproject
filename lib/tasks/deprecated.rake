@@ -1,16 +1,15 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
+
 
 def deprecated_task(name, new_name)
   task name=>new_name do
@@ -18,8 +17,18 @@ def deprecated_task(name, new_name)
   end
 end
 
+def removed_task(name, message)
+  task name do
+    $stderr.puts "\nError: The rake task #{name} has been removed. #{message}"
+    raise
+  end
+end
+
 deprecated_task :load_default_data, "redmine:load_default_data"
-deprecated_task :migrate_from_mantis, "redmine:migrate_from_mantis"
-deprecated_task :migrate_from_trac, "redmine:migrate_from_trac"
-deprecated_task "db:migrate_plugins", "redmine:plugins:migrate"
-deprecated_task "db:migrate:plugin", "redmine:plugins:migrate"
+
+plugin_migrate_message = "<plugin>:install:migrations is used now to copy" +
+                         " migrations to the rails application directory." +
+                         " After installation, use db:migrate."
+removed_task "db:migrate_plugins", plugin_migrate_message
+removed_task "db:migrate:plugin", plugin_migrate_message
+removed_task "redmine:plugins:migrate", plugin_migrate_message

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,7 +19,7 @@ class Changeset < ActiveRecord::Base
   acts_as_journalized :event_title => Proc.new {|o| "#{l(:label_revision)} #{o.format_identifier}" + (o.short_comments.blank? ? '' : (': ' + o.short_comments))},
                 :event_description => :long_comments,
                 :event_datetime => :committed_on,
-                :event_url => Proc.new {|o| {:controller => 'repositories', :action => 'revision', :id => o.repository.project, :rev => o.identifier}},
+                :event_url => Proc.new {|o| {:controller => '/repositories', :action => 'revision', :id => o.repository.project, :rev => o.identifier}},
                 :event_author => Proc.new {|o| o.author},
                 :activity_timestamp => "#{table_name}.committed_on",
                 :activity_find_options => {:include => [:user, {:repository => :project}]}
@@ -216,7 +214,7 @@ class Changeset < ActiveRecord::Base
     time_entry = TimeEntry.new(
       :user => user,
       :hours => hours,
-      :issue => issue,
+      :work_package => issue,
       :spent_on => commit_date,
       :comments => l(:text_time_logged_by_changeset, :value => text_tag, :locale => Setting.default_language)
       )

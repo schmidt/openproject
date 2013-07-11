@@ -1,20 +1,24 @@
 # encoding: utf-8
+
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'active_record/fixtures'
+require "rack_session_access/capybara"
 
 Before do |scenario|
   unless ScenarioDisabler.empty_if_disabled(scenario)
-    # Reset the DB and load the minimal fixtures for a functional system before each scenario
-    system "RAILS_ENV=test db:test:load >/dev/null 2>/dev/null"
-    ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations['test'])
-    ActiveRecord::Schema.verbose = false
-
-    fixtures_path = File.expand_path(Rails.root.join('test/fixtures'))
     FactoryGirl.create(:admin) unless User.find_by_login("admin")
     FactoryGirl.create(:anonymous) unless AnonymousUser.count > 0
     Setting.notified_events = [] #can not test mailer
-    Dir.glob(File.join(fixtures_path, "*.yml")) do |table_name|
-      ActiveRecord::Fixtures.create_fixtures(fixtures_path, File.basename(table_name).gsub(".yml", ""))
-    end
 
     if Capybara.current_driver.to_s.include?("selenium")
       Capybara.current_session.driver.browser.manage.window.resize_to(3000, 3000)
@@ -22,58 +26,46 @@ Before do |scenario|
   end
 end
 
+Given /^I am logged in$/ do
+  @user = FactoryGirl.create :user
+  page.set_rack_session(:user_id => @user.id)
+end
+
+When(/^I log out in the background$/) do
+  page.execute_script("jQuery.ajax('/logout', {
+    success: function () {
+      jQuery(document.body).addClass('logout-ajax')
+    }
+  })")
+
+  page.should have_selector("body.logout-ajax")
+end
+
 Given /^(?:|I )am not logged in$/ do
   User.current = AnonymousUser.first
 end
 
 Given /^(?:|I )am [aA]dmin$/ do
-  steps %Q{
-    Given I am logged in as \"admin\"
-  }
+  FactoryGirl.create :admin unless User.where(:login => 'admin').any?
+  FactoryGirl.create :anonymous unless AnonymousUser.count > 0
+  login('admin', 'adminADMIN!')
 end
 
 Given /^I am already logged in as "(.+?)"$/ do |login|
-  # consider using: http://collectiveidea.com/blog/archives/2012/01/05/capybara-cucumber-and-how-the-cookie-crumbles/
-  # or: https://github.com/railsware/rack_session_access
-  # once the application is rails3
   user = User.find_by_login(login)
-
-  ApplicationController.class_eval do
-    define_method :set_user_session do
-      session[:user_id] = user.id
-
-      ApplicationController.skip_before_filter :set_user_session
-      ApplicationController.subclasses.each do |subclass_name|
-        unless subclass_name.to_s.include?("Spec::Rails")
-          subclass_name.prepend_before_filter :set_user_session
-        end
-      end
-    end
-  end
-
-  ApplicationController.prepend_before_filter :set_user_session
-  ApplicationController.subclasses.each do |subclass_name|
-    unless subclass_name.to_s.include?("Spec::Rails")
-      subclass_name.prepend_before_filter :set_user_session
-    end
-  end
-end
-
-def login_user(username, password = "admin")
-  steps %Q{
-    Given I am on the logout page
-     When I go to the login page
-      And I fill in "#{username}" for "username"
-      And I fill in "#{password}" for "password"
-      And I press "Login"
-     Then I should be logged in as "#{username}"
-  }
+  # see https://github.com/railsware/rack_session_access
+  page.set_rack_session(:user_id => user.id)
 end
 
 Given /^(?:|I )am logged in as "([^\"]*)"$/ do |username|
-  FactoryGirl.create(:admin) unless User.find_by_login("admin")
-  FactoryGirl.create(:anonymous) unless AnonymousUser.count > 0
-  login_user(username)
+  FactoryGirl.create :admin unless User.where(:login => 'admin').any?
+  FactoryGirl.create :anonymous unless AnonymousUser.count > 0
+  login(username, 'adminADMIN!')
+end
+
+Given /^(?:|I )am (not )?impaired$/ do |bool|
+  (user = User.current).impaired = !bool
+  user.save
 end
 
 Given /^there is 1 [pP]roject with(?: the following)?:$/ do |table|
@@ -95,32 +87,6 @@ Given /^the [Pp]roject "([^\"]*)" has 1 [wW]iki(?: )?[pP]age with the following:
   content = FactoryGirl.create(:wiki_content, :page => page)
 
   send_table_to_object(page, table)
-end
-
-Given /^there is 1 [Uu]ser with(?: the following)?:$/ do |table|
-  login = table.rows_hash[:Login].to_s + table.rows_hash[:login].to_s
-  user = User.find_by_login(login) unless login.blank?
-
-  if user
-    table = table.reject_key(/(L|l)ogin/)
-  else
-    user = FactoryGirl.create(:user)
-    user.password = user.password_confirmation = nil
-  end
-
-  modify_user(user, table)
-end
-
-Given /^the [Uu]ser "([^\"]*)" has:$/ do |user, table|
-  u = User.find_by_login(user)
-  raise "No such user: #{user}" unless u
-  modify_user(u, table)
-end
-
-Given /^there are the following users:$/ do |table|
-  table.raw.flatten.each do |login|
-    FactoryGirl.create(:user, :login => login)
-  end
 end
 
 Given /^the plugin (.+) is loaded$/ do |plugin_name|
@@ -148,6 +114,13 @@ Given /^the [Uu]ser "([^\"]*)" is a "([^\"]*)" (?:in|of) the [Pp]roject "([^\"]*
     end.save!
   end
 end
+
+Given /^the [Uu]ser "([^\"]*)" has the following preferences$/ do |user, table|
+  u = User.find_by_login(user)
+
+  send_table_to_object(u.pref, table)
+end
+
 
 Given /^there is a(?:n)? (default )?(?:issue)?status with:$/ do |default, table|
   name = table.raw.select { |ary| ary.include? "name" }.first[table.raw.first.index("name") + 1].to_s
@@ -253,7 +226,7 @@ Given /^the [Pp]roject "([^\"]*)" has (\d+) [tT]ime(?: )?[eE]ntr(?:ies|y) with t
     t = TimeEntry.generate
     i = Issue.generate_for_project!(p)
     t.project = p
-    t.issue = i
+    t.work_package = i
     t.activity.project = p
     t.activity.save!
     send_table_to_object(t, table,
@@ -275,7 +248,8 @@ end
 Given /^the [Pp]roject "([^\"]*)" has (\d+) [iI]ssue(?:s)? with(?: the following)?:$/ do |project, count, table|
   p = Project.find_by_name(project) || Project.find_by_identifier(project)
   as_admin count do
-    i = Issue.generate_for_project!(p)
+    i = FactoryGirl.build(:issue, :project => p,
+                                  :tracker => p.trackers.first)
     send_table_to_object(i, table, {}, method(:add_custom_value_to_issue))
   end
 end
@@ -364,7 +338,7 @@ Given /^the [iI]ssue "([^\"]*)" has (\d+) [tT]ime(?: )?[eE]ntr(?:ies|y) with the
     t = TimeEntry.generate
     t.project = i.project
     t.spent_on = DateTime.now
-    t.issue = i
+    t.work_package = i
     send_table_to_object(t, table,
       {:user => Proc.new do |o,v|
         o.user = User.find_by_login(v)
@@ -376,12 +350,11 @@ end
 Given /^I select to see [cC]olumn "([^\"]*)"$/ do |column_name|
   steps %Q{
     When I select \"#{column_name}\" from \"available_columns\"
-    When I click on \"→\"
-    When I click on \"Apply\"
+    When I press \"→\"
   }
 end
 
-Given /I select to see [cC]olumn(?:s)?$/ do |table|
+Given /^I select to see [cC]olumn(?:s)?$/ do |table|
   params = "?set_filter=1&" + table.raw.collect(&:first).collect do |name|
     page.source =~ /<option value="(.*?)">#{name}<\/option>/
     column_name = $1 || name.gsub(" ", "_").downcase
@@ -392,6 +365,7 @@ end
 
 Given /^I start debugging$/ do
   save_and_open_page
+  require 'pry'
   binding.pry
   true
 end
@@ -407,10 +381,10 @@ Given /^I (?:stop|pause) (?:step )?execution$/ do
   end
 end
 
-When /^(?:|I )login as (.+)? with password (.+)?$/ do |username, password|
+When /^(?:|I )login as (.+)(?: with password (.+))?$/ do |username, password|
   username = username.gsub("\"", "")
-  password = password.gsub("\"", "")
-  login_user(username, password)
+  password = password.nil? ? "adminADMIN!" : password.gsub("\"", "")
+  login(username, password)
 end
 
 Then /^I should be logged in as "([^\"]*)"?$/ do |username|
@@ -418,12 +392,6 @@ Then /^I should be logged in as "([^\"]*)"?$/ do |username|
   page.should have_xpath("//div[contains(., 'Logged in as #{username}')] | //a[contains(.,'#{user.name}')]")
 
   User.current = user
-end
-
-When /^(?:|I )login as (.+)?$/ do |username|
-  steps %Q{
-    When I login as #{username} with password admin
-  }
 end
 
 When /^I satisfy the "(.+)" plugin to (.+)$/ do |plugin_name, action|
@@ -443,7 +411,7 @@ Given /^the [pP]roject uses the following modules:$/ do |table|
 end
 
 
-Given /the user "(.*?)" is a "(.*?)"/ do |user, role|
+Given /^the user "(.*?)" is a "([^\"]*?)"$/ do |user, role|
   step %Q{the user "#{user}" is a "#{role}" in the project "#{get_project.name}"}
 end
 
@@ -455,8 +423,10 @@ Given /^the [pP]roject(?: "([^\"]*)")? has the following trackers:$/ do |project
     tracker.position = t['position'] ? t['position'] : i
     tracker.is_in_roadmap = t['is_in_roadmap'] ? t['is_in_roadmap'] : true
     tracker.save!
-    p.trackers << tracker
-    p.save!
+    if !p.trackers.include?(tracker)
+      p.trackers << tracker
+      p.save!
+    end
   end
 end
 
@@ -508,12 +478,12 @@ end
 
 # Encapsule the logic to set a custom field on an issue
 def add_custom_value_to_issue(object, key, value)
-  if IssueCustomField.all.collect(&:name).include? key.to_s
+  if WorkPackageCustomField.all.collect(&:name).include? key.to_s
     cv = CustomValue.find(:first, :conditions => ["customized_id = '#{object.id}'"])
     cv ||= CustomValue.new
-    cv.customized_type = "Issue"
+    cv.customized_type = "WorkPackage"
     cv.customized_id = object.id
-    cv.custom_field_id = IssueCustomField.first(:joins => :translations, :conditions => ["custom_field_translations.name = ?", key]).id
+    cv.custom_field_id = WorkPackageCustomField.first(:joins => :translations, :conditions => ["custom_field_translations.name = ?", key]).id
     cv.value = value
     cv.save!
   end

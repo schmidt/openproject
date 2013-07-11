@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 describe Issue do
@@ -77,6 +88,16 @@ describe Issue do
         recreated_journal = @issue.recreate_initial_journal!
 
         initial_journal.should be_identical(recreated_journal)
+      end
+
+      it "should not validate with oddly set estimated_hours" do
+        @issue.estimated_hours = "this should not work"
+        @issue.should_not be_valid
+      end
+
+      it "should validate with sane estimated_hours" do
+        @issue.estimated_hours = "13h"
+        @issue.should be_valid
       end
     end
   end

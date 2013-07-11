@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -36,20 +34,20 @@ module IssuesHelper
   #    </div>
   #
   def render_issue_tooltip(issue)
-    @cached_label_status ||= l(:field_status)
-    @cached_label_start_date ||= l(:field_start_date)
-    @cached_label_due_date ||= l(:field_due_date)
-    @cached_label_assigned_to ||= l(:field_assigned_to)
-    @cached_label_priority ||= l(:field_priority)
-    @cached_label_project ||= l(:field_project)
+    @cached_label_status ||= Issue.human_attribute_name(:status)
+    @cached_label_start_date ||= Issue.human_attribute_name(:start_date)
+    @cached_label_due_date ||= Issue.human_attribute_name(:due_date)
+    @cached_label_assigned_to ||= Issue.human_attribute_name(:assigned_to)
+    @cached_label_priority ||= Issue.human_attribute_name(:priority)
+    @cached_label_project ||= Issue.human_attribute_name(:project)
 
-    (link_to_issue(issue).html_safe + "<br /><br />".html_safe +
-      "<strong>#{@cached_label_project}</strong>: #{link_to_project(issue.project)}<br />".html_safe +
-      "<strong>#{@cached_label_status}</strong>: #{h(issue.status.name)}<br />".html_safe +
-      "<strong>#{@cached_label_start_date}</strong>: #{format_date(issue.start_date)}<br />".html_safe +
-      "<strong>#{@cached_label_due_date}</strong>: #{format_date(issue.due_date)}<br />".html_safe +
-      "<strong>#{@cached_label_assigned_to}</strong>: #{h(issue.assigned_to)}<br />".html_safe +
-      "<strong>#{@cached_label_priority}</strong>: #{h(issue.priority.name)}".html_safe).html_safe
+    (link_to_issue(issue) + "<br /><br />
+      <strong>#{@cached_label_project}</strong>: #{link_to_project(issue.project)}<br />
+      <strong>#{@cached_label_status}</strong>: #{h(issue.status.name)}<br />
+      <strong>#{@cached_label_start_date}</strong>: #{format_date(issue.start_date)}<br />
+      <strong>#{@cached_label_due_date}</strong>: #{format_date(issue.due_date)}<br />
+      <strong>#{@cached_label_assigned_to}</strong>: #{h(issue.assigned_to)}<br />
+      <strong>#{@cached_label_priority}</strong>: #{h(issue.priority.name)}".html_safe)
   end
 
   # TODO: deprecate and/or remove
@@ -117,7 +115,7 @@ module IssuesHelper
 
   def query_links(title, queries)
     # links to #index on issues/show
-    url_params = controller_name == 'issues' ? {:controller => 'issues', :action => 'index', :project_id => @project} : params
+    url_params = controller_name == 'issues' ? {:controller => '/issues', :action => 'index', :project_id => @project} : params
 
     content_tag('h3', title) +
       queries.collect {|query|
@@ -157,34 +155,69 @@ module IssuesHelper
     end
   end
 
+  def render_issue_tree_row(issue, level, relation)
+    css_classes = ["issue"]
+    css_classes << "issue-#{issue.id}"
+    css_classes << "idnt" << "idnt-#{level}" if level > 0
+
+    if relation == "root"
+      issue_text = link_to("#{h(issue.tracker.name)} ##{issue.id}",
+                             'javascript:void(0)',
+                             :style => "color:inherit; font-weight: bold; text-decoration:none; cursor:default;",
+                             :class => issue.css_classes)
+    else
+      title = []
+
+      if relation == "parent"
+        title << content_tag(:span, l(:description_parent_issue), :class => "hidden-for-sighted")
+      elsif relation == "child"
+        title << content_tag(:span, l(:description_sub_issue), :class => "hidden-for-sighted")
+      end
+      title << h(issue.tracker.name)
+      title << "##{issue.id}"
+
+      issue_text = link_to(title.join(' ').html_safe, issue_path(issue), :class => issue.css_classes)
+    end
+    issue_text << ": "
+    issue_text << truncate(issue.subject, :length => 60)
+
+    content_tag :tr, :class => css_classes.join(' ') do
+      concat content_tag :td, check_box_tag("ids[]", issue.id, false, :id => nil), :class => 'checkbox'
+      concat content_tag :td, issue_text, :class => 'subject'
+      concat content_tag :td, h(issue.status)
+      concat content_tag :td, link_to_user(issue.assigned_to)
+      concat content_tag :td, link_to_version(issue.fixed_version)
+    end
+  end
+
   def issues_to_csv(issues, project = nil)
     decimal_separator = l(:general_csv_decimal_separator)
     export = FCSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
       # csv header fields
       headers = [ "#",
-                  l(:field_status),
-                  l(:field_project),
-                  l(:field_tracker),
-                  l(:field_priority),
-                  l(:field_subject),
-                  l(:field_assigned_to),
-                  l(:field_category),
-                  l(:field_fixed_version),
-                  l(:field_author),
-                  l(:field_start_date),
-                  l(:field_due_date),
-                  l(:field_done_ratio),
-                  l(:field_estimated_hours),
-                  l(:field_parent_issue),
-                  l(:field_created_on),
-                  l(:field_updated_on)
+                  Issue.human_attribute_name(:status),
+                  Issue.human_attribute_name(:project),
+                  Issue.human_attribute_name(:tracker),
+                  Issue.human_attribute_name(:priority),
+                  Issue.human_attribute_name(:subject),
+                  Issue.human_attribute_name(:assigned_to),
+                  Issue.human_attribute_name(:category),
+                  Issue.human_attribute_name(:fixed_version),
+                  Issue.human_attribute_name(:author),
+                  Issue.human_attribute_name(:start_date),
+                  Issue.human_attribute_name(:due_date),
+                  Issue.human_attribute_name(:done_ratio),
+                  Issue.human_attribute_name(:estimated_hours),
+                  Issue.human_attribute_name(:parent_issue),
+                  Issue.human_attribute_name(:created_at),
+                  Issue.human_attribute_name(:updated_at)
                   ]
       # Export project custom fields if project is given
       # otherwise export custom fields marked as "For all projects"
-      custom_fields = project.nil? ? IssueCustomField.for_all : project.all_issue_custom_fields
+      custom_fields = project.nil? ? WorkPackageCustomField.for_all : project.all_work_package_custom_fields
       custom_fields.each {|f| headers << f.name}
       # Description in the last column
-      headers << l(:field_description)
+      headers << CustomField.human_attribute_name(:description)
       csv << headers.collect {|c| begin; c.to_s.encode(l(:general_csv_encoding), 'UTF-8'); rescue; c.to_s; end }
       # csv lines
       issues.each do |issue|
@@ -203,8 +236,8 @@ module IssuesHelper
                   issue.done_ratio,
                   issue.estimated_hours.to_s.gsub('.', decimal_separator),
                   issue.parent_id,
-                  format_time(issue.created_on),
-                  format_time(issue.updated_on)
+                  format_time(issue.created_at),
+                  format_time(issue.updated_at)
                   ]
         custom_fields.each {|f| fields << show_value(issue.custom_value_for(f)) }
         fields << issue.description
@@ -226,7 +259,7 @@ module IssuesHelper
 
   def issue_quick_info(issue)
     ret = link_to(h("#{issue.tracker.name} ##{issue.id} #{issue.status}: #{issue.subject} "),
-                  { :controller => 'issues', :action => 'show', :id => issue.id },
+                  { :controller => '/issues', :action => 'show', :id => issue.id },
                     :class => issue.css_classes,
                     :title => "#{ truncate(issue.subject, :length => 100) } (#{ issue.status.name })")
     ret += "#{ issue.start_date.nil? ? "[?]" : issue.start_date.to_s }"
@@ -251,9 +284,16 @@ module IssuesHelper
   end
 
   def entries_for_filter_select_sorted(query)
-    # with rails 3.2 ActiveSupport::Inflector.transliterate should be used instead of I18n.transliterate
-    [["",""]] + query.available_filters.collect{|field| [ field[1][:name] || l(("field_"+field[0].to_s.gsub(/_id$/, "")).to_sym), field[0]] unless query.has_filter?(field[0])}.compact.sort_by do |el| 
-      I18n.transliterate(el[0]).downcase
+    [["",""]] + query.available_filters.collect{|field| [ field[1][:name] || Issue.human_attribute_name(field[0]), field[0]] unless query.has_filter?(field[0])}.compact.sort_by do |el|
+      ActiveSupport::Inflector.transliterate(el[0]).downcase
     end
+  end
+
+  def value_overridden_by_children?(attrib)
+    Issue::ATTRIBS_WITH_VALUES_FROM_CHILDREN.include? attrib
+  end
+
+  def attrib_disabled?(issue, attrib)
+    value_overridden_by_children?(attrib) && !(issue.new_record? || issue.leaf?)
   end
 end

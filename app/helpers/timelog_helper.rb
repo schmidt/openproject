@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -17,8 +15,8 @@ module TimelogHelper
 
   def render_timelog_breadcrumb
     links = []
-    links << link_to(l(:label_project_all), {:project_id => nil, :issue_id => nil})
-    links << link_to(h(@project), {:project_id => @project, :issue_id => nil}) if @project
+    links << link_to(l(:label_project_all), {:project_id => nil, :work_package_id => nil})
+    links << link_to(h(@project), {:project_id => @project, :work_package_id => nil}) if @project
     if @issue
       if @issue.visible?
         links << link_to_issue(@issue, :subject => false)
@@ -85,15 +83,15 @@ module TimelogHelper
     custom_fields = TimeEntryCustomField.find(:all)
     export = FCSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
       # csv header fields
-      headers = [l(:field_spent_on),
-                 l(:field_user),
-                 l(:field_activity),
-                 l(:field_project),
-                 l(:field_issue),
-                 l(:field_tracker),
-                 l(:field_subject),
-                 l(:field_hours),
-                 l(:field_comments)
+      headers = [TimeEntry.human_attribute_name(:spent_on),
+                 TimeEntry.human_attribute_name(:user),
+                 TimeEntry.human_attribute_name(:activity),
+                 TimeEntry.human_attribute_name(:project),
+                 TimeEntry.human_attribute_name(:issue),
+                 TimeEntry.human_attribute_name(:tracker),
+                 TimeEntry.human_attribute_name(:subject),
+                 TimeEntry.human_attribute_name(:hours),
+                 TimeEntry.human_attribute_name(:comments)
                  ]
       # Export custom fields
       headers += custom_fields.collect(&:name)
@@ -105,9 +103,9 @@ module TimelogHelper
                   entry.user,
                   entry.activity,
                   entry.project,
-                  (entry.issue ? entry.issue.id : nil),
-                  (entry.issue ? entry.issue.tracker : nil),
-                  (entry.issue ? entry.issue.subject : nil),
+                  (entry.work_package ? entry.work_package.id : nil),
+                  (entry.work_package ? entry.work_package.tracker : nil),
+                  (entry.work_package ? entry.work_package.subject : nil),
                   entry.hours.to_s.gsub('.', decimal_separator),
                   entry.comments
                   ]
@@ -137,7 +135,10 @@ module TimelogHelper
   def report_to_csv(criterias, periods, hours)
     export = FCSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
       # Column headers
-      headers = criterias.collect {|criteria| l(@available_criterias[criteria][:label]) }
+      headers = criterias.collect do |criteria|
+        label = @available_criterias[criteria][:label]
+        label.is_a?(Symbol) ? l(label) : label
+      end
       headers += periods
       headers << l(:label_total)
       csv << headers.collect {|c| to_utf8_for_timelogs(c) }

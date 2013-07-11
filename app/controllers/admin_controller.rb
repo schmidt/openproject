@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -73,7 +71,7 @@ class AdminController < ApplicationController
       flash[:error] = l(:notice_email_error, e.message)
     end
     ActionMailer::Base.raise_delivery_errors = raise_delivery_errors
-    redirect_to :controller => 'settings', :action => 'edit', :tab => 'notifications'
+    redirect_to :controller => '/settings', :action => 'edit', :tab => 'notifications'
   end
 
   def force_user_language
@@ -89,7 +87,8 @@ class AdminController < ApplicationController
   def info
     @db_adapter_name = ActiveRecord::Base.connection.adapter_name
     @checklist = [
-      [:text_default_administrator_account_changed, User.find(:first, :conditions => ["login=? and hashed_password=?", 'admin', User.hash_password('admin')]).nil?],
+      [:text_default_administrator_account_changed,
+        !User.find_by_login('admin').current_password.same_as_plain_password?('admin')],
       [:text_file_repository_writable, File.writable?(Attachment.storage_path)],
       [:text_rmagick_available, Object.const_defined?(:Magick)]
     ]

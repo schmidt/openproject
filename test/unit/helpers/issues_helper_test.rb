@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -44,37 +42,37 @@ class IssuesHelperTest < HelperTestCase
   context "IssuesHelper#show_detail" do
     context "with no_html" do
       should 'show a changing attribute' do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"done_ratio" => [40, 100]}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_equal "% Done changed from 40 to 100", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_equal "% Done changed from 40 to 100", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
 
       should 'show a new attribute' do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"done_ratio" => [nil, 100]}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_equal "% Done set to 100", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_equal "% Done changed from 0 to 100", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
 
       should 'show a deleted attribute' do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"done_ratio" => [50, nil]}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_equal "% Done deleted (50)", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_equal "% Done changed from 50 to 0", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
     end
 
     context "with html" do
       should 'show a changing attribute with HTML highlights' do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"done_ratio" => [40, 100]}
           j.journaled = FactoryGirl.create :issue
         end
-        @response.body = @journal.render_detail(@journal.details.to_a.first, false)
+        @response.body = @journal.render_detail(@journal.details.to_a.first, :no_html => false)
 
         html_node = HTML::Document.new(@response.body)
         assert_select html_node.root, 'strong', :text => '% Done'
@@ -83,11 +81,11 @@ class IssuesHelperTest < HelperTestCase
       end
 
       should 'show a new attribute with HTML highlights' do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"done_ratio" => [nil, 100]}
           j.journaled = FactoryGirl.create :issue
         end
-        @response.body = @journal.render_detail(@journal.details.to_a.first, false)
+        @response.body = @journal.render_detail(@journal.details.to_a.first, :no_html => false)
 
         html_node = HTML::Document.new(@response.body)
         assert_select html_node.root, 'strong', :text => '% Done'
@@ -95,53 +93,51 @@ class IssuesHelperTest < HelperTestCase
       end
 
       should 'show a deleted attribute with HTML highlights' do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"done_ratio" => [50, nil]}
           j.journaled = FactoryGirl.create :issue
         end
-        @response.body = @journal.render_detail(@journal.details.to_a.first, false)
+        @response.body = @journal.render_detail(@journal.details.to_a.first, :no_html => false)
 
         html_node = HTML::Document.new(@response.body)
         assert_select html_node.root, 'strong', :text => '% Done'
-        assert_select html_node.root, 'strike' do
-          assert_select 'i', :text => '50'
-        end
+        assert_select html_node.root, 'i', :text => '50'
       end
     end
 
     context "with a start_date attribute" do
       should "format the current date" do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"start_date" => ['2010-01-01', '2010-01-31']}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_match "01/31/2010", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_match "01/31/2010", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
 
       should "format the old date" do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"start_date" => ['2010-01-01', '2010-01-31']}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_match "01/01/2010", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_match "01/01/2010", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
     end
 
     context "with a due_date attribute" do
       should "format the current date" do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"due_date" => ['2010-01-01', '2010-01-31']}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_match "01/31/2010", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_match "01/31/2010", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
 
       should "format the old date" do
-        @journal = IssueJournal.create! do |j|
+        @journal = WorkPackageJournal.create! do |j|
           j.changed_data = {"due_date" => ['2010-01-01', '2010-01-31']}
           j.journaled = FactoryGirl.create :issue
         end
-        assert_match "01/01/2010", @journal.render_detail(@journal.details.to_a.first, true)
+        assert_match "01/01/2010", @journal.render_detail(@journal.details.to_a.first, :no_html => true)
       end
     end
 
@@ -183,7 +179,5 @@ class IssuesHelperTest < HelperTestCase
 
     should "test custom fields"
     should "test attachments"
-
   end
-
 end

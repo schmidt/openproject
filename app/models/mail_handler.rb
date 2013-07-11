@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -169,7 +167,7 @@ class MailHandler < ActionMailer::Base
     return unless issue
     # check permission
     unless @@handler_options[:no_permission_check]
-      raise UnauthorizedAction unless user.allowed_to?(:add_issue_notes, issue.project) || user.allowed_to?(:edit_issues, issue.project)
+      raise UnauthorizedAction unless user.allowed_to?(:add_issue_notes, issue.project) || user.allowed_to?(:edit_work_packages, issue.project)
     end
     # ignore CLI-supplied defaults for new issues
     @@handler_options[:issue].clear
@@ -252,7 +250,7 @@ class MailHandler < ActionMailer::Base
     else
       @keywords[attr] = begin
         if (options[:override] || @@handler_options[:allow_override].include?(attr)) &&
-           (v = extract_keyword!(plain_text_body, attr.to_sym, options[:format]))
+           (v = extract_keyword!(plain_text_body, attr, options[:format]))
           v
         elsif !@@handler_options[:issue][attr.to_sym].blank?
           @@handler_options[:issue][attr.to_sym]
@@ -265,10 +263,9 @@ class MailHandler < ActionMailer::Base
   # Returns nil if no matching keyword found
   def extract_keyword!(text, attr, format=nil)
     keys = [attr.to_s.humanize]
-    if attr.is_a?(Symbol)
-      keys << l("field_#{attr}", :default => '', :locale =>  user.language) if user && user.language.present?
-      keys << l("field_#{attr}", :default => '', :locale =>  Setting.default_language) if Setting.default_language.present?
-    end
+    keys << all_attribute_translations(user.language)[attr.to_sym] if user && user.language.present?
+    keys << all_attribute_translations(Setting.default_language)[attr.to_sym] if Setting.default_language.present?
+
     keys.reject! {|k| k.blank?}
     keys.collect! {|k| Regexp.escape(k)}
     format ||= '.+'
@@ -300,7 +297,7 @@ class MailHandler < ActionMailer::Base
       'due_date' => get_keyword(:due_date, :override => true, :format => '\d{4}-\d{2}-\d{2}'),
       'estimated_hours' => get_keyword(:estimated_hours, :override => true),
       'done_ratio' => get_keyword(:done_ratio, :override => true, :format => '(\d|10)?0')
-    }.delete_if {|k, v| v.blank? }
+    }.delete_if {|_, v| v.blank? }
 
     if issue.new_record? && attrs['tracker_id'].nil?
       attrs['tracker_id'] = issue.project.trackers.find(:first).try(:id)
@@ -345,7 +342,7 @@ class MailHandler < ActionMailer::Base
     user = User.new
     user.mail = email_address
     user.login = user.mail
-    user.password = SecureRandom.hex [Setting.password_min_length.to_i, 10].max
+    user.random_password!
     user.language = Setting.default_language
 
     names = fullname.blank? ? email_address.gsub(/@.*$/, '').split('.') : fullname.split

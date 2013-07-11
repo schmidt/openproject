@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -82,7 +80,7 @@ module RepositoriesHelper
       if s = tree[file][:s]
         style << ' folder'
         path_param = to_path_param(@repository.relative_path(file))
-        text = link_to(h(text), :controller => 'repositories',
+        text = link_to(h(text), :controller => '/repositories',
                              :action => 'show',
                              :id => @project,
                              :path => path_param,
@@ -92,13 +90,13 @@ module RepositoriesHelper
       elsif c = tree[file][:c]
         style << " change-#{c.action}"
         path_param = to_path_param(@repository.relative_path(c.path))
-        text = link_to(h(text), :controller => 'repositories',
+        text = link_to(h(text), :controller => '/repositories',
                              :action => 'entry',
                              :id => @project,
                              :path => path_param,
                              :rev => @changeset.identifier) unless c.action == 'D'
         text << raw(" - #{h(c.revision)}") unless c.revision.blank?
-        text << raw(' (' + link_to(l(:label_diff), :controller => 'repositories',
+        text << raw(' (' + link_to(l(:label_diff), :controller => '/repositories',
                                        :action => 'diff',
                                        :id => @project,
                                        :path => path_param,
@@ -181,7 +179,7 @@ module RepositoriesHelper
                :disabled => (repository && !repository.new_record?),
                :onchange => remote_function(
                   :url => {
-                      :controller => 'repositories',
+                      :controller => '/repositories',
                       :action => 'edit',
                       :id => @project
                         },

@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 require 'spec_helper'
 
 module Redmine
@@ -13,16 +24,15 @@ module Redmine
     end
 
     describe '.themes' do
-      it "returns the instances of subclasses of Theme" do
+      it "returns the known themes" do
         theme = Themes.new_theme
         expect(Themes.themes).to include theme
       end
     end
 
     describe '.clear_themes' do
-      it "clears the themes" do
+      it "clears the known themes" do
         theme = Themes.new_theme
-        expect(Themes.themes).to_not be_empty
         Themes.clear_themes
         expect(Themes.themes).to be_empty
       end

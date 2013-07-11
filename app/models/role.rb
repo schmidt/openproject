@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -21,6 +19,11 @@ class Role < ActiveRecord::Base
   scope :builtin, lambda { |*args|
     compare = 'not' if args.first == true
     { :conditions => "#{compare} builtin = 0" }
+  }
+  scope :like, lambda { |q|
+    s = "%#{q.to_s.strip.downcase}%"
+    {:conditions => ["LOWER(name) LIKE :s", {:s => s}]
+    }
   }
 
   before_destroy :check_deletable
@@ -93,7 +96,7 @@ class Role < ActiveRecord::Base
 
   # Return true if role is allowed to do the specified action
   # action can be:
-  # * a parameter-like Hash (eg. :controller => 'projects', :action => 'edit')
+  # * a parameter-like Hash (eg. :controller => '/projects', :action => 'edit')
   # * a permission Symbol (eg. :edit_project)
   def allowed_to?(action)
     if action.is_a? Hash
@@ -146,6 +149,12 @@ class Role < ActiveRecord::Base
     all.select do |role|
       role.allowed_to? permission
     end
+  end
+
+  def self.paginated_search(search, options = {})
+    limit = options.fetch(:page_limit) || 10
+    page = options.fetch(:page) || 1
+    givable.like(search).paginate({ :per_page => limit, :page => page })
   end
 
 private

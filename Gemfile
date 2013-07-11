@@ -1,9 +1,6 @@
 source 'https://rubygems.org'
 
-# until we have 3.2.10 use rails-3-2-stable to avoid mocha bugs
-# see: https://github.com/freerange/mocha/issues/117
-gem "rails", :git => "git://github.com/rails/rails.git", :branch => "3-2-stable"
-#gem 'rails', '3.2.10'
+gem "rails", :git => "https://github.com/rails/rails.git", :branch => "3-2-stable"
 
 gem "coderay", "~> 1.0.5"
 gem "rubytree", "~> 0.8.3"
@@ -11,13 +8,17 @@ gem "rdoc", ">= 2.4.2"
 # Needed only on RUBY_VERSION = 1.8, ruby 1.9+ compatible interpreters should bring their csv
 gem "fastercsv", "~> 1.5.0", :platforms => [:ruby_18, :jruby, :mingw_18]
 # master includes the uniqueness validator, formerly patched in config/initializers/globalize3_patch.rb
-gem 'globalize3', :github => 'svenfuchs/globalize3'
+gem 'globalize3', :git => 'https://github.com/svenfuchs/globalize3.git'
 gem "delayed_job_active_record" # that's how delayed job's readme recommends it
 
 # TODO: adds #auto_link which was deprecated in rails 3.1
 gem 'rails_autolink'
+gem "will_paginate", '~> 3.0'
+gem "acts_as_list", "~> 0.2.0"
 
 gem 'awesome_nested_set'
+
+gem 'color-tools', '~> 1.3.0', :require => 'color'
 
 gem 'tinymce-rails'
 gem 'tinymce-rails-langs'
@@ -30,60 +31,79 @@ gem 'htmldiff'
 gem 'execjs'
 gem 'therubyracer'
 
+# will need to be removed once we are on rails4 as it will be part of the rails4 core
+gem 'strong_parameters'
+
+group :production do
+  # we use dalli as standard memcache client remove this if you don't
+  # requires memcached 1.4+
+  # see https://github.com/mperham/dalli
+  gem 'dalli'
+end
+
 group :assets do
   gem 'sass-rails',   '~> 3.2.3'
   gem 'coffee-rails', '~> 3.2.1'
   gem 'uglifier', '>= 1.0.3'
   gem 'jquery-ui-rails'
-  gem "i18n-js"
+  gem 'select2-rails', '~> 3.3.2'
 end
 
 gem "prototype-rails"
-gem 'jquery-rails'
+# remove once we no longer use the deprecated "link_to_remote", "remote_form_for" and alike methods
+# replace those with :remote => true
+gem 'prototype_legacy_helper', '0.0.0', :git => 'git://github.com/rails/prototype_legacy_helper.git'
+
+gem 'jquery-rails', '~> 2.0.3'
+# branch rewrite has commit 6bfdcd7e14df1efffc00b2bbdf4e14e614d00418 which adds
+# a "magic comment" in the translations.js.erb and somehow breaks i18n-js
+# using the commit before this comment
+gem "i18n-js", :git => "https://github.com/fnando/i18n-js.git", :ref => '8801f8d17ef96c48a7a0269e251fcf1648c8f441'
 
 group :test do
-  gem 'shoulda', '~> 3.1.1'
-  gem 'object-daddy', :github => 'awebneck/object_daddy'
+  gem 'shoulda'
+  gem 'object-daddy', :git => 'https://github.com/awebneck/object_daddy.git'
   gem 'mocha', '~> 0.13.1', :require => false
-  gem "launchy", "~> 2.1.0"
+  gem "launchy", "~> 2.3.0"
   gem "factory_girl_rails", "~> 4.0"
   gem 'cucumber-rails', :require => false
+  gem 'rack_session_access'
   gem 'database_cleaner'
+  gem "cucumber-rails-training-wheels" # http://aslakhellesoy.com/post/11055981222/the-training-wheels-came-off
+  gem 'rspec', '~> 2.0'
+  # also add to development group, so "spec" rake task gets loaded
   gem "rspec-rails", "~> 2.0", :group => :development
+  gem 'rspec-example_disabler', :git => 'https://github.com/finnlabs/rspec-example_disabler.git'
   gem 'capybara'
-  gem 'spork-rails'
-  gem 'spork-testunit' # needed for test-unit only
+  gem 'capybara-screenshot'
+  gem 'selenium-webdriver'
 
   gem 'rb-readline' # ruby on CI needs this
-  gem 'ruby-debug', :platforms => [:mri_18, :mingw_18]
-  # TODO: remove dependency to v 1.1.3 when pry-debugger is updated to > 0.2
-  gem 'debugger', '~> 1.1.3', :platforms => [:mri_19, :mingw_19]
   # why in Gemfile? see: https://github.com/guard/guard-test
   gem 'ruby-prof'
+  gem 'simplecov', ">= 0.8.pre"
+  gem 'coveralls', :require => false
 end
 
 group :openid do
-  gem "ruby-openid", '~> 2.1.4', :require => 'openid'
+  gem "ruby-openid", '~> 2.2.3', :require => 'openid'
 end
 
 group :development do
   gem 'rails-footnotes', '>= 3.7.5.rc4'
   gem 'bullet'
   gem 'letter_opener', '~> 1.0.0'
-  gem 'rails-dev-tweaks', '~> 0.6.1'
-  gem 'guard-rspec'
-  gem 'guard-cucumber'
-  gem 'guard-spork'
-  gem 'rb-fsevent', :group => :test, :require => false if RUBY_PLATFORM =~ /darwin/i
-  gem 'rack-mini-profiler'
-end
-
-group :development, :test do
   gem 'pry-rails'
   gem 'pry-stack_explorer'
   gem 'pry-rescue'
   gem 'pry-debugger'
   gem 'pry-doc'
+  gem 'rails-dev-tweaks', '~> 0.6.1'
+  gem 'guard-rspec'
+  gem 'guard-cucumber'
+  gem 'rb-fsevent', :group => :test
+  gem 'rack-mini-profiler'
+  gem 'thin'
 end
 
 group :tools do
@@ -123,6 +143,10 @@ platforms :mri, :mingw do
   group :postgres do
     gem 'pg'
   end
+
+  group :sqlite do
+    gem "sqlite3"
+  end
 end
 
 platforms :mri_18, :mingw_18 do
@@ -130,17 +154,9 @@ platforms :mri_18, :mingw_18 do
     gem "mysql"
     #   gem "ruby-mysql"
   end
-
-  group :sqlite do
-    gem "sqlite3-ruby", "< 1.3", :require => "sqlite3"
-  end
 end
 
 platforms :mri_19, :mingw_19 do
-  group :sqlite do
-    gem "sqlite3"
-  end
-
   group :mysql2 do
     gem "mysql2", "~> 0.3.11"
   end
@@ -162,15 +178,8 @@ platforms :jruby do
   end
 end
 
-# Load a "local" Gemfile
-gemfile_local = File.join(File.dirname(__FILE__), "Gemfile.local")
-if File.readable?(gemfile_local)
-  puts "Loading #{gemfile_local} ..." if $DEBUG
-  instance_eval(File.read(gemfile_local))
-end
-
-# Load plugins' Gemfiles
-Dir.glob File.expand_path("../lib/plugins/*/Gemfile", __FILE__) do |file|
-  puts "Loading #{file} ..." if $DEBUG # `ruby -d` or `bundle -v`
+# Load Gemfile.local, Gemfile.plugins and plugins' Gemfiles
+Dir.glob File.expand_path("../{Gemfile.local,Gemfile.plugins,lib/plugins/*/Gemfile}", __FILE__) do |file|
+  next unless File.readable?(file)
   instance_eval File.read(file)
 end

@@ -1,13 +1,11 @@
 #-- encoding: UTF-8
 #-- copyright
-# ChiliProject is a project management system.
+# OpenProject is a project management system.
 #
-# Copyright (C) 2010-2011 the ChiliProject Team
+# Copyright (C) 2012-2013 the OpenProject Team
 #
 # This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# modify it under the terms of the GNU General Public License version 3.
 #
 # See doc/COPYRIGHT.rdoc for more details.
 #++
@@ -20,6 +18,7 @@ class BoardsController < ApplicationController
   include MessagesHelper
   include SortHelper
   include WatchersHelper
+  include PaginationHelper
 
   def index
     @boards = @project.boards
@@ -39,19 +38,19 @@ class BoardsController < ApplicationController
                     'replies' => "#{Message.table_name}.replies_count",
                     'updated_on' => "#{Message.table_name}.updated_on"
 
-        @topic_count = @board.topics.count
-        @topic_pages = Paginator.new self, @topic_count, per_page_option, params['page']
-        @topics =  @board.topics.find :all, :order => ["#{Message.table_name}.sticky DESC", sort_clause].compact.join(', '),
-                                      :include => [:author, {:last_reply => :author}],
-                                      :limit  =>  @topic_pages.items_per_page,
-                                      :offset =>  @topic_pages.current.offset
+        @topics =  @board.topics.order(["#{Message.table_name}.sticky DESC", sort_clause].compact.join(', '))
+                                .includes(:author, { :last_reply => :author })
+                                .page(params[:page])
+                                .per_page(per_page_param)
+
         @message = Message.new
         render :action => 'show', :layout => !request.xhr?
       }
       format.atom {
-        @messages = @board.messages.find :all, :order => 'created_on DESC',
-                                               :include => [:author, :board],
-                                               :limit => Setting.feeds_limit.to_i
+        @messages = @board.messages.order('created_on DESC')
+                                   .includes(:author, :board)
+                                   .limit(Setting.feeds_limit.to_i)
+
         render_feed(@messages, :title => "#{@project}: #{@board}")
       }
     end
@@ -85,7 +84,7 @@ class BoardsController < ApplicationController
 
 private
   def redirect_to_settings_in_projects
-    redirect_to :controller => 'projects', :action => 'settings', :id => @project, :tab => 'boards'
+    redirect_to :controller => '/projects', :action => 'settings', :id => @project, :tab => 'boards'
   end
 
   def find_project

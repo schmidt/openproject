@@ -1,11 +1,21 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 Feature: Name localizations of bool custom fields can be deleted
 
   Background:
-    Given I am already logged in as "admin"
+    Given I am admin
     And the following languages are active:
       | en |
       | de |
-      | fr |
     And the following issue custom fields are defined:
       | name             | type      |
       | My Custom Field  | bool      |
@@ -51,14 +61,16 @@ Feature: Name localizations of bool custom fields can be deleted
   @javascript
   Scenario: Deleting a newly added localization
     When I follow "My Custom Field"
-    And I add the french localization of the "name" attribute as "To delete"
-    And I delete the french localization of the "name" attribute
+    And I delete the german localization of the "name" attribute
+    And I press "Save"
+    And I follow "My Custom Field"
+    And I add the german localization of the "name" attribute as "To delete"
+    And I delete the german localization of the "name" attribute
     And I press "Save"
     And I follow "My Custom Field"
     Then there should be the following localizations:
       | locale | name                          | default_value |
       | en     | My Custom Field               | 0             |
-      | de     | Mein Benutzerdefiniertes Feld | nil           |
 
   @javascript
   Scenario: Deletion link is hidden when only one localization exists

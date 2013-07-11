@@ -1,3 +1,14 @@
+#-- copyright
+# OpenProject is a project management system.
+#
+# Copyright (C) 2012-2013 the OpenProject Team
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version 3.
+#
+# See doc/COPYRIGHT.rdoc for more details.
+#++
+
 #-- encoding: UTF-8
 # This file is part of the acts_as_journalized plugin for the redMine
 # project management software
@@ -20,6 +31,7 @@
 
 
 Dir[File.expand_path("../redmine/acts/journalized/*.rb", __FILE__)].each{|f| require f }
+Dir[File.expand_path("../acts/journalized/*.rb", __FILE__)].each{|f| require f }
 require "ar_condition"
 
 module Redmine
@@ -115,6 +127,9 @@ module Redmine
               c.class_eval("belongs_to :journaled, :class_name => '#{name}' #{include_option}")
               c.class_eval("belongs_to :#{name.gsub("::", "_").underscore},
                   :foreign_key => 'journaled_id' #{include_option}")
+              c.class_eval("def self.journaled_class
+                              #{self}
+                            end")
             end
           end
         end
