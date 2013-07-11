@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,6 +18,7 @@
 class Issue < ActiveRecord::Base
   include Redmine::SafeAttributes
   include Redmine::Utils::DateCalculation
+  include Redmine::I18n
 
   belongs_to :project
   belongs_to :tracker
@@ -67,24 +68,31 @@ class Issue < ActiveRecord::Base
 
   validates_length_of :subject, :maximum => 255
   validates_inclusion_of :done_ratio, :in => 0..100
-  validates_numericality_of :estimated_hours, :allow_nil => true
+  validates :estimated_hours, :numericality => {:greater_than_or_equal_to => 0, :allow_nil => true, :message => :invalid}
+  validates :start_date, :date => true
+  validates :due_date, :date => true
   validate :validate_issue, :validate_required_fields
 
-  scope :visible,
-        lambda {|*args| { :include => :project,
-                          :conditions => Issue.visible_condition(args.shift || User.current, *args) } }
+  scope :visible, lambda {|*args|
+    includes(:project).where(Issue.visible_condition(args.shift || User.current, *args))
+  }
 
   scope :open, lambda {|*args|
     is_closed = args.size > 0 ? !args.first : false
-    {:conditions => ["#{IssueStatus.table_name}.is_closed = ?", is_closed], :include => :status}
+    includes(:status).where("#{IssueStatus.table_name}.is_closed = ?", is_closed)
   }
 
-  scope :recently_updated, :order => "#{Issue.table_name}.updated_on DESC"
-  scope :on_active_project, :include => [:status, :project, :tracker],
-                            :conditions => ["#{Project.table_name}.status=#{Project::STATUS_ACTIVE}"]
+  scope :recently_updated, lambda { order("#{Issue.table_name}.updated_on DESC") }
+  scope :on_active_project, lambda {
+    includes(:status, :project, :tracker).where("#{Project.table_name}.status = ?", Project::STATUS_ACTIVE)
+  }
+  scope :fixed_version, lambda {|versions|
+    ids = [versions].flatten.compact.map {|v| v.is_a?(Version) ? v.id : v}
+    ids.any? ? where(:fixed_version_id => ids) : where('1=0')
+  }
 
   before_create :default_assign
-  before_save :close_duplicates, :update_done_ratio_from_issue_status, :force_updated_on_change
+  before_save :close_duplicates, :update_done_ratio_from_issue_status, :force_updated_on_change, :update_closed_on
   after_save {|issue| issue.send :after_project_change if !issue.id_changed? && issue.project_id_changed?} 
   after_save :reschedule_following_issues, :update_nested_set_attributes, :update_parent_attributes, :create_journal
   # Should be after_create but would be called before previous after_save callbacks
@@ -133,6 +141,11 @@ class Issue < ActiveRecord::Base
     end
   end
 
+  # Returns true if user or current user is allowed to edit or add a note to the issue
+  def editable?(user=User.current)
+    user.allowed_to?(:edit_issues, project) || user.allowed_to?(:add_issue_notes, project)
+  end
+
   def initialize(attributes=nil, *args)
     super
     if new_record?
@@ -142,6 +155,13 @@ class Issue < ActiveRecord::Base
       self.watcher_user_ids = []
     end
   end
+
+  def create_or_update
+    super
+  ensure
+    @status_was = nil
+  end
+  private :create_or_update
 
   # AR#Persistence#destroy would raise and RecordNotFound exception
   # if the issue was already deleted or updated (non matching lock_version).
@@ -165,10 +185,12 @@ class Issue < ActiveRecord::Base
     super
   end
 
+  alias :base_reload :reload
   def reload(*args)
     @workflow_rule_by_attribute = nil
     @assignable_versions = nil
-    super
+    @relations = nil
+    base_reload(*args)
   end
 
   # Overrides Redmine::Acts::Customizable::InstanceMethods#available_custom_fields
@@ -326,8 +348,7 @@ class Issue < ActiveRecord::Base
       if issue.new_record?
         issue.copy?
       elsif user.allowed_to?(:move_issues, issue.project)
-        projects = Issue.allowed_target_projects_on_move(user)
-        projects.include?(issue.project) && projects.size > 1
+        Issue.allowed_target_projects_on_move.count > 1
       end
     }
 
@@ -394,7 +415,7 @@ class Issue < ActiveRecord::Base
 
     # Project and Tracker must be set before since new_statuses_allowed_to depends on it.
     if (p = attrs.delete('project_id')) && safe_attribute?('project_id')
-      if allowed_target_projects(user).collect(&:id).include?(p.to_i)
+      if allowed_target_projects(user).where(:id => p.to_i).exists?
         self.project_id = p
       end
     end
@@ -418,7 +439,7 @@ class Issue < ActiveRecord::Base
 
     if attrs['parent_issue_id'].present?
       s = attrs['parent_issue_id'].to_s
-      unless (m = s.match(%r{\A#?(\d+)\z})) && Issue.visible(user).exists?(m[1])
+      unless (m = s.match(%r{\A#?(\d+)\z})) && (m[1] == parent_id.to_s || Issue.visible(user).exists?(m[1]))
         @invalid_parent_issue_id = attrs.delete('parent_issue_id')
       end
     end
@@ -526,20 +547,12 @@ class Issue < ActiveRecord::Base
   end
 
   def validate_issue
-    if due_date.nil? && @attributes['due_date'].present?
-      errors.add :due_date, :not_a_date
-    end
-
-    if start_date.nil? && @attributes['start_date'].present?
-      errors.add :start_date, :not_a_date
-    end
-
-    if due_date && start_date && due_date < start_date
+    if due_date && start_date && (start_date_changed? || due_date_changed?) && due_date < start_date
       errors.add :due_date, :greater_than_start_date
     end
 
-    if start_date && soonest_start && start_date < soonest_start
-      errors.add :start_date, :invalid
+    if start_date && start_date_changed? && soonest_start && start_date < soonest_start
+      errors.add :start_date, :earlier_than_minimum_start_date, :date => format_date(soonest_start)
     end
 
     if fixed_version
@@ -562,6 +575,8 @@ class Issue < ActiveRecord::Base
       errors.add :parent_issue_id, :invalid
     elsif @parent_issue
       if !valid_parent_project?(@parent_issue)
+        errors.add :parent_issue_id, :invalid
+      elsif (@parent_issue != parent) && (all_dependent_issues.include?(@parent_issue) || @parent_issue.all_dependent_issues.include?(self))
         errors.add :parent_issue_id, :invalid
       elsif !new_record?
         # moving an existing issue
@@ -633,6 +648,14 @@ class Issue < ActiveRecord::Base
     scope
   end
 
+  # Returns the initial status of the issue
+  # Returns nil for a new issue
+  def status_was
+    if status_id_was && status_id_was.to_i > 0
+      @status_was ||= IssueStatus.find_by_id(status_id_was)
+    end
+  end
+
   # Return true if the issue is closed, otherwise false
   def closed?
     self.status.is_closed?
@@ -653,9 +676,7 @@ class Issue < ActiveRecord::Base
   # Return true if the issue is being closed
   def closing?
     if !new_record? && status_id_changed?
-      status_was = IssueStatus.find_by_id(status_id_was)
-      status_new = IssueStatus.find_by_id(status_id)
-      if status_was && status_new && !status_was.is_closed? && status_new.is_closed?
+      if status_was && status && !status_was.is_closed? && status.is_closed?
         return true
       end
     end
@@ -785,13 +806,13 @@ class Issue < ActiveRecord::Base
   end
 
   def relations
-    @relations ||= IssueRelations.new(self, (relations_from + relations_to).sort)
+    @relations ||= IssueRelation::Relations.new(self, (relations_from + relations_to).sort)
   end
 
   # Preloads relations for a collection of issues
   def self.load_relations(issues)
     if issues.any?
-      relations = IssueRelation.all(:conditions => ["issue_from_id IN (:ids) OR issue_to_id IN (:ids)", {:ids => issues.map(&:id)}])
+      relations = IssueRelation.where("issue_from_id IN (:ids) OR issue_to_id IN (:ids)", :ids => issues.map(&:id)).all
       issues.each do |issue|
         issue.instance_variable_set "@relations", relations.select {|r| r.issue_from_id == issue.id || r.issue_to_id == issue.id}
       end
@@ -801,7 +822,7 @@ class Issue < ActiveRecord::Base
   # Preloads visible spent time for a collection of issues
   def self.load_visible_spent_hours(issues, user=User.current)
     if issues.any?
-      hours_by_issue_id = TimeEntry.visible(user).sum(:hours, :group => :issue_id)
+      hours_by_issue_id = TimeEntry.visible(user).group(:issue_id).sum(:hours)
       issues.each do |issue|
         issue.instance_variable_set "@spent_hours", (hours_by_issue_id[issue.id] || 0)
       end
@@ -822,25 +843,110 @@ class Issue < ActiveRecord::Base
           relations_from.select {|relation| relation.issue_from_id == issue.id} +
           relations_to.select {|relation| relation.issue_to_id == issue.id}
 
-        issue.instance_variable_set "@relations", IssueRelations.new(issue, relations.sort)
+        issue.instance_variable_set "@relations", IssueRelation::Relations.new(issue, relations.sort)
       end
     end
   end
 
   # Finds an issue relation given its id.
   def find_relation(relation_id)
-    IssueRelation.find(relation_id, :conditions => ["issue_to_id = ? OR issue_from_id = ?", id, id])
+    IssueRelation.where("issue_to_id = ? OR issue_from_id = ?", id, id).find(relation_id)
   end
 
+  # Returns all the other issues that depend on the issue
+  # The algorithm is a modified breadth first search (bfs)
   def all_dependent_issues(except=[])
-    except << self
+    # The found dependencies
     dependencies = []
-    relations_from.each do |relation|
-      if relation.issue_to && !except.include?(relation.issue_to)
-        dependencies << relation.issue_to
-        dependencies += relation.issue_to.all_dependent_issues(except)
+
+    # The visited flag for every node (issue) used by the breadth first search
+    eNOT_DISCOVERED         = 0       # The issue is "new" to the algorithm, it has not seen it before.
+
+    ePROCESS_ALL            = 1       # The issue is added to the queue. Process both children and relations of
+                                      # the issue when it is processed.
+
+    ePROCESS_RELATIONS_ONLY = 2       # The issue was added to the queue and will be output as dependent issue,
+                                      # but its children will not be added to the queue when it is processed.
+
+    eRELATIONS_PROCESSED    = 3       # The related issues, the parent issue and the issue itself have been added to
+                                      # the queue, but its children have not been added.
+
+    ePROCESS_CHILDREN_ONLY  = 4       # The relations and the parent of the issue have been added to the queue, but
+                                      # the children still need to be processed.
+
+    eALL_PROCESSED          = 5       # The issue and all its children, its parent and its related issues have been
+                                      # added as dependent issues. It needs no further processing.
+
+    issue_status = Hash.new(eNOT_DISCOVERED)
+
+    # The queue
+    queue = []
+
+    # Initialize the bfs, add start node (self) to the queue
+    queue << self
+    issue_status[self] = ePROCESS_ALL
+
+    while (!queue.empty?) do
+      current_issue = queue.shift
+      current_issue_status = issue_status[current_issue]
+      dependencies << current_issue
+
+      # Add parent to queue, if not already in it.
+      parent = current_issue.parent
+      parent_status = issue_status[parent]
+
+      if parent && (parent_status == eNOT_DISCOVERED) && !except.include?(parent)
+        queue << parent
+        issue_status[parent] = ePROCESS_RELATIONS_ONLY
       end
-    end
+
+      # Add children to queue, but only if they are not already in it and
+      # the children of the current node need to be processed.
+      if (current_issue_status == ePROCESS_CHILDREN_ONLY || current_issue_status == ePROCESS_ALL)
+        current_issue.children.each do |child|
+          next if except.include?(child)
+
+          if (issue_status[child] == eNOT_DISCOVERED)
+            queue << child
+            issue_status[child] = ePROCESS_ALL
+          elsif (issue_status[child] == eRELATIONS_PROCESSED)
+            queue << child
+            issue_status[child] = ePROCESS_CHILDREN_ONLY
+          elsif (issue_status[child] == ePROCESS_RELATIONS_ONLY)
+            queue << child
+            issue_status[child] = ePROCESS_ALL
+          end
+        end
+      end
+
+      # Add related issues to the queue, if they are not already in it.
+      current_issue.relations_from.map(&:issue_to).each do |related_issue|
+        next if except.include?(related_issue)
+
+        if (issue_status[related_issue] == eNOT_DISCOVERED)
+          queue << related_issue
+          issue_status[related_issue] = ePROCESS_ALL
+        elsif (issue_status[related_issue] == eRELATIONS_PROCESSED)
+          queue << related_issue
+          issue_status[related_issue] = ePROCESS_CHILDREN_ONLY
+        elsif (issue_status[related_issue] == ePROCESS_RELATIONS_ONLY)
+          queue << related_issue
+          issue_status[related_issue] = ePROCESS_ALL
+        end
+      end
+
+      # Set new status for current issue
+      if (current_issue_status == ePROCESS_ALL) || (current_issue_status == ePROCESS_CHILDREN_ONLY)
+        issue_status[current_issue] = eALL_PROCESSED
+      elsif (current_issue_status == ePROCESS_RELATIONS_ONLY)
+        issue_status[current_issue] = eRELATIONS_PROCESSED
+      end
+    end # while
+
+    # Remove the issues from the "except" parameter from the result array
+    dependencies -= except
+    dependencies.delete(self)
+
     dependencies
   end
 
@@ -869,10 +975,11 @@ class Issue < ActiveRecord::Base
     (start_date && due_date) ? working_days(start_date, due_date) : 0
   end
 
-  def soonest_start
+  def soonest_start(reload=false)
+    @soonest_start = nil if reload
     @soonest_start ||= (
-        relations_to.collect{|relation| relation.successor_soonest_start} +
-        ancestors.collect(&:soonest_start)
+        relations_to(reload).collect{|relation| relation.successor_soonest_start} +
+        [(@parent_issue || parent).try(:soonest_start)]
       ).compact.max
   end
 
@@ -890,7 +997,11 @@ class Issue < ActiveRecord::Base
   def reschedule_on!(date)
     return if date.nil?
     if leaf?
-      if start_date.nil? || start_date < date
+      if start_date.nil? || start_date != date
+        if start_date && start_date > date
+          # Issue can not be moved earlier than its soonest start date
+          date = [soonest_start(true), date].compact.max
+        end
         reschedule_on(date)
         begin
           save
@@ -902,7 +1013,15 @@ class Issue < ActiveRecord::Base
       end
     else
       leaves.each do |leaf|
-        leaf.reschedule_on!(date)
+        if leaf.start_date
+          # Only move subtask if it starts at the same date as the parent
+          # or if it starts before the given date
+          if start_date == leaf.start_date || date > leaf.start_date 
+            leaf.reschedule_on!(date)
+          end
+        else
+          leaf.reschedule_on!(date)
+        end
       end
     end
   end
@@ -922,15 +1041,18 @@ class Issue < ActiveRecord::Base
   end
 
   # Returns a string of css classes that apply to the issue
-  def css_classes
-    s = "issue status-#{status_id} #{priority.try(:css_classes)}"
+  def css_classes(user=User.current)
+    s = "issue tracker-#{tracker_id} status-#{status_id} #{priority.try(:css_classes)}"
     s << ' closed' if closed?
     s << ' overdue' if overdue?
     s << ' child' if child?
     s << ' parent' unless leaf?
     s << ' private' if is_private?
-    s << ' created-by-me' if User.current.logged? && author_id == User.current.id
-    s << ' assigned-to-me' if User.current.logged? && assigned_to_id == User.current.id
+    if user.logged?
+      s << ' created-by-me' if author_id == user.id
+      s << ' assigned-to-me' if assigned_to_id == user.id
+      s << ' assigned-to-my-group' if user.groups.any? {|g| g.id = assigned_to_id}
+    end
     s
   end
 
@@ -992,8 +1114,8 @@ class Issue < ActiveRecord::Base
     end
   end
 
-	# Returns true if issue's project is a valid
-	# parent issue project
+  # Returns true if issue's project is a valid
+  # parent issue project
   def valid_parent_project?(issue=parent)
     return true if issue.nil? || issue.project_id == project_id
 
@@ -1064,18 +1186,18 @@ class Issue < ActiveRecord::Base
   end
   # End ReportsController extraction
 
-  # Returns an array of projects that user can assign the issue to
+  # Returns a scope of projects that user can assign the issue to
   def allowed_target_projects(user=User.current)
     if new_record?
-      Project.all(:conditions => Project.allowed_to_condition(user, :add_issues))
+      Project.where(Project.allowed_to_condition(user, :add_issues))
     else
       self.class.allowed_target_projects_on_move(user)
     end
   end
 
-  # Returns an array of projects that user can move issues to
+  # Returns a scope of projects that user can move issues to
   def self.allowed_target_projects_on_move(user=User.current)
-    Project.all(:conditions => Project.allowed_to_condition(user, :move_issues))
+    Project.where(Project.allowed_to_condition(user, :move_issues))
   end
 
   private
@@ -1115,20 +1237,27 @@ class Issue < ActiveRecord::Base
     end
 
     unless @copied_from.leaf? || @copy_options[:subtasks] == false
-      @copied_from.children.each do |child|
+      copy_options = (@copy_options || {}).merge(:subtasks => false)
+      copied_issue_ids = {@copied_from.id => self.id}
+      @copied_from.reload.descendants.reorder("#{Issue.table_name}.lft").each do |child|
+        # Do not copy self when copying an issue as a descendant of the copied issue
+        next if child == self
+        # Do not copy subtasks of issues that were not copied
+        next unless copied_issue_ids[child.parent_id]
+        # Do not copy subtasks that are not visible to avoid potential disclosure of private data
         unless child.visible?
-          # Do not copy subtasks that are not visible to avoid potential disclosure of private data
           logger.error "Subtask ##{child.id} was not copied during ##{@copied_from.id} copy because it is not visible to the current user" if logger
           next
         end
-        copy = Issue.new.copy_from(child, @copy_options)
+        copy = Issue.new.copy_from(child, copy_options)
         copy.author = author
         copy.project = project
-        copy.parent_issue_id = id
-        # Children subtasks are copied recursively
+        copy.parent_issue_id = copied_issue_ids[child.parent_id]
         unless copy.save
           logger.error "Could not copy subtask ##{child.id} while copying ##{@copied_from.id} to ##{id} due to validation errors: #{copy.errors.full_messages.join(', ')}" if logger
+          next
         end
+        copied_issue_ids[child.id] = copy.id
       end
     end
     @after_create_from_copy_handled = true
@@ -1139,11 +1268,10 @@ class Issue < ActiveRecord::Base
       # issue was just created
       self.root_id = (@parent_issue.nil? ? id : @parent_issue.root_id)
       set_default_left_and_right
-      Issue.update_all("root_id = #{root_id}, lft = #{lft}, rgt = #{rgt}", ["id = ?", id])
+      Issue.update_all(["root_id = ?, lft = ?, rgt = ?", root_id, lft, rgt], ["id = ?", id])
       if @parent_issue
         move_to_child_of(@parent_issue)
       end
-      reload
     elsif parent_issue_id != parent_id
       former_parent_id = parent_id
       # moving an existing issue
@@ -1154,13 +1282,12 @@ class Issue < ActiveRecord::Base
         # to another tree
         unless root?
           move_to_right_of(root)
-          reload
         end
         old_root_id = root_id
         self.root_id = (@parent_issue.nil? ? id : @parent_issue.root_id )
         target_maxright = nested_set_scope.maximum(right_column_name) || 0
         offset = target_maxright + 1 - lft
-        Issue.update_all("root_id = #{root_id}, lft = lft + #{offset}, rgt = rgt + #{offset}",
+        Issue.update_all(["root_id = ?, lft = lft + ?, rgt = rgt + ?", root_id, offset, offset],
                           ["root_id = ? AND lft >= ? AND rgt <= ? ", old_root_id, lft, rgt])
         self[left_column_name] = lft + offset
         self[right_column_name] = rgt + offset
@@ -1168,7 +1295,6 @@ class Issue < ActiveRecord::Base
           move_to_child_of(@parent_issue)
         end
       end
-      reload
       # delete invalid relations of all descendants
       self_and_descendants.each do |issue|
         issue.relations.each do |relation|
@@ -1227,12 +1353,11 @@ class Issue < ActiveRecord::Base
   def self.update_versions(conditions=nil)
     # Only need to update issues with a fixed_version from
     # a different project and that is not systemwide shared
-    Issue.scoped(:conditions => conditions).all(
-      :conditions => "#{Issue.table_name}.fixed_version_id IS NOT NULL" +
+    Issue.includes(:project, :fixed_version).
+      where("#{Issue.table_name}.fixed_version_id IS NOT NULL" +
         " AND #{Issue.table_name}.project_id <> #{Version.table_name}.project_id" +
-        " AND #{Version.table_name}.sharing <> 'system'",
-      :include => [:project, :fixed_version]
-    ).each do |issue|
+        " AND #{Version.table_name}.sharing <> 'system'").
+      where(conditions).each do |issue|
       next if issue.project.nil? || issue.fixed_version.nil?
       unless issue.project.shared_versions.include?(issue.fixed_version)
         issue.init_journal(User.current)
@@ -1290,10 +1415,23 @@ class Issue < ActiveRecord::Base
     end
   end
 
-  # Make sure updated_on is updated when adding a note
+  # Make sure updated_on is updated when adding a note and set updated_on now
+  # so we can set closed_on with the same value on closing
   def force_updated_on_change
-    if @current_journal
+    if @current_journal || changed?
       self.updated_on = current_time_from_proper_timezone
+      if new_record?
+        self.created_on = updated_on
+      end
+    end
+  end
+
+  # Callback for setting closed_on when the issue is closed.
+  # The closed_on attribute stores the time of the last closing
+  # and is preserved when the issue is reopened.
+  def update_closed_on
+    if closing? || (new_record? && closed?)
+      self.closed_on = updated_on
     end
   end
 
@@ -1303,7 +1441,7 @@ class Issue < ActiveRecord::Base
     if @current_journal
       # attributes changes
       if @attributes_before_change
-        (Issue.column_names - %w(id root_id lft rgt lock_version created_on updated_on)).each {|c|
+        (Issue.column_names - %w(id root_id lft rgt lock_version created_on updated_on closed_on)).each {|c|
           before = @attributes_before_change[c]
           after = send(c)
           next if before == after || (before.blank? && after.blank?)
