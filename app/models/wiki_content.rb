@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -59,6 +59,7 @@ class WikiContent < ActiveRecord::Base
                   :description => :comments,
                   :datetime => :updated_on,
                   :type => 'wiki-page',
+                  :group => :page,
                   :url => Proc.new {|o| {:controller => 'wiki', :action => 'show', :project_id => o.page.wiki.project, :id => o.page.title, :version => o.version}}
 
     acts_as_activity_provider :type => 'wiki_edits',

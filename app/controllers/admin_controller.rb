@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,19 +23,18 @@ class AdminController < ApplicationController
 
   before_filter :require_admin
   helper :sort
-  include SortHelper	
+  include SortHelper
 
   def index
     @no_configuration_data = Redmine::DefaultData::Loader::no_data?
   end
-	
+
   def projects
     @status = params[:status] || 1
 
-    scope = Project.status(@status)
+    scope = Project.status(@status).order('lft')
     scope = scope.like(params[:name]) if params[:name].present?
-
-    @projects = scope.all(:order => 'lft')
+    @projects = scope.all
 
     render :action => "projects", :layout => false if request.xhr?
   end
@@ -55,7 +54,7 @@ class AdminController < ApplicationController
         flash[:error] = l(:error_can_t_load_default_data, e.message)
       end
     end
-    redirect_to :action => 'index'
+    redirect_to admin_path
   end
 
   def test_email
@@ -69,7 +68,7 @@ class AdminController < ApplicationController
       flash[:error] = l(:notice_email_error, e.message)
     end
     ActionMailer::Base.raise_delivery_errors = raise_delivery_errors
-    redirect_to :controller => 'settings', :action => 'edit', :tab => 'notifications'
+    redirect_to settings_path(:tab => 'notifications')
   end
 
   def info

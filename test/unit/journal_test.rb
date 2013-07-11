@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -41,8 +41,8 @@ class JournalTest < ActiveSupport::TestCase
 
   def test_create_should_send_email_notification
     ActionMailer::Base.deliveries.clear
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     journal = issue.init_journal(user, issue)
 
     assert journal.save
@@ -137,7 +137,7 @@ class JournalTest < ActiveSupport::TestCase
     user.reload
     journals = Journal.visible(user).all
     assert journals.empty?
-    # User should see issues of projects for which he has view_issues permissions only
+    # User should see issues of projects for which user has view_issues permissions only
     Member.create!(:principal => user, :project_id => 1, :role_ids => [1])
     user.reload
     journals = Journal.visible(user).all
@@ -151,7 +151,28 @@ class JournalTest < ActiveSupport::TestCase
     assert user.projects.empty?
     journals = Journal.visible(user).all
     assert journals.any?
-    # Admin should see issues on private projects that he does not belong to
+    # Admin should see issues on private projects that admin does not belong to
     assert journals.detect {|journal| !journal.issue.project.is_public?}
+  end
+
+  def test_details_should_normalize_dates
+    j = JournalDetail.create!(:old_value => Date.parse('2012-11-03'), :value => Date.parse('2013-01-02'))
+    j.reload
+    assert_equal '2012-11-03', j.old_value
+    assert_equal '2013-01-02', j.value
+  end
+
+  def test_details_should_normalize_true_values
+    j = JournalDetail.create!(:old_value => true, :value => true)
+    j.reload
+    assert_equal '1', j.old_value
+    assert_equal '1', j.value
+  end
+
+  def test_details_should_normalize_false_values
+    j = JournalDetail.create!(:old_value => false, :value => false)
+    j.reload
+    assert_equal '0', j.old_value
+    assert_equal '0', j.value
   end
 end

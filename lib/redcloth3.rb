@@ -525,7 +525,7 @@ class RedCloth3 < String
             tatts = pba( tatts, 'table' )
             tatts = shelve( tatts ) if tatts
             rows = []
-
+            fullrow.gsub!(/([^|])\n/, "\\1<br />")
             fullrow.each_line do |row|
                 ratts, row = pba( $1, 'tr' ), $2 if row =~ /^(#{A}#{C}\. )(.*)/m
                 cells = []
@@ -816,10 +816,10 @@ class RedCloth3 < String
             ":
             (                          # $url
             (\/|[a-zA-Z]+:\/\/|www\.|mailto:)  # $proto
-            [\w\/]\S+?
+            [[:alnum:]_\/]\S+?
             )               
             (\/)?                      # $slash
-            ([^\w\=\/;\(\)]*?)         # $post
+            ([^[:alnum:]_\=\/;\(\)]*?)         # $post
             )
             (?=<|\s|$)
         /x 
