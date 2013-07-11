@@ -22,7 +22,7 @@ class Unauthorized < Exception; end
 
 class ApplicationController < ActionController::Base
   include Redmine::I18n
-  
+
   class_attribute :accept_api_auth_actions
   class_attribute :accept_rss_auth_actions
   class_attribute :model_object
@@ -90,7 +90,7 @@ class ApplicationController < ActionController::Base
   def find_current_user
     user = nil
     unless api_request?
-      if session[:user_id] 
+      if session[:user_id]
         # existing session
         user = (User.active.find(session[:user_id]) rescue nil)
       elsif autologin_user = try_to_autologin
@@ -108,6 +108,16 @@ class ApplicationController < ActionController::Base
         # HTTP Basic, either username/password or API key/random
         authenticate_with_http_basic do |username, password|
           user = User.try_to_login(username, password) || User.find_by_api_key(username)
+        end
+      end
+      # Switch user if requested by an admin user
+      if user && user.admin? && (username = api_switch_user_from_request)
+        su = User.find_by_login(username)
+        if su && su.active?
+          logger.info("  User switched by: #{user.login} (id=#{user.id})") if logger
+          user = su
+        else
+          render_error :message => 'Invalid X-Redmine-Switch-User header', :status => 412
         end
       end
     end
@@ -402,7 +412,7 @@ class ApplicationController < ActionController::Base
     @items.sort! {|x,y| y.event_datetime <=> x.event_datetime }
     @items = @items.slice(0, Setting.feeds_limit.to_i)
     @title = options[:title] || Setting.app_title
-    render :template => "common/feed.atom", :layout => false,
+    render :template => "common/feed", :formats => [:atom], :layout => false,
            :content_type => 'application/atom+xml'
   end
 
@@ -502,10 +512,15 @@ class ApplicationController < ActionController::Base
   # Returns the API key present in the request
   def api_key_from_request
     if params[:key].present?
-      params[:key].to_s
+      params[:key]
     elsif request.headers["X-Redmine-API-Key"].present?
-      request.headers["X-Redmine-API-Key"].to_s
+      request.headers["X-Redmine-API-Key"]
     end
+  end
+
+  # Returns the API 'switch user' value if present
+  def api_switch_user_from_request
+    request.headers["X-Redmine-Switch-User"].to_s.presence
   end
 
   # Renders a warning flash if obj has unsaved attachments
@@ -538,8 +553,13 @@ class ApplicationController < ActionController::Base
 
   # Renders a 200 response for successfull updates or deletions via the API
   def render_api_ok
-    # head :ok would return a response body with one space
-    render :text => '', :status => :ok, :layout => nil
+    render_api_head :ok
+  end
+
+  # Renders a head API response
+  def render_api_head(status)
+    # #head would return a response body with one space
+    render :text => '', :status => status, :layout => nil
   end
 
   # Renders API response on validation failure

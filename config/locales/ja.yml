@@ -99,7 +99,7 @@ ja:
     human:
       format:
         delimiter: ""
-        precision: 3
+        precision: 1
       storage_units:
         format: "%n %u"
         units:
@@ -196,7 +196,7 @@ ja:
   notice_failed_to_save_issues: "全%{total}件中%{count}件のチケットが保存できませんでした: %{ids}."
   notice_failed_to_save_members: "メンバーの保存に失敗しました: %{errors}."
   notice_no_issue_selected: "チケットが選択されていません! 更新対象のチケットを選択してください。"
-  notice_account_pending: アカウントは作成済みで、管理者の承認待ちです。
+  notice_account_pending: アカウントは作成済みで、システム管理者の承認待ちです。
   notice_default_data_loaded: デフォルト設定をロードしました。
   notice_unable_delete_version: バージョンを削除できません
   notice_unable_delete_time_entry: 作業時間を削除できません
@@ -284,7 +284,7 @@ ja:
   field_is_in_roadmap: チケットをロードマップに表示する
   field_login: ログイン
   field_mail_notification: メール通知
-  field_admin: 管理者
+  field_admin: システム管理者
   field_last_login_on: 最終接続日
   field_language: 言語
   field_effective_date: 期日
@@ -370,7 +370,7 @@ ja:
   setting_autologin: 自動ログイン
   setting_date_format: 日付の形式
   setting_time_format: 時刻の形式
-  setting_cross_project_issue_relations: 異なるプロジェクトのチケット間で関係の設定を許可
+  setting_cross_project_issue_relations: 異なるプロジェクトのチケット間で関連の設定を許可
   setting_issue_list_default_columns: チケットの一覧で表示する項目
   setting_repositories_encodings: 添付ファイルとリポジトリのエンコーディング
   setting_emails_header: メールのヘッダ
@@ -392,7 +392,7 @@ ja:
   setting_repository_log_display_limit: ファイルのリビジョン表示数の上限
   setting_openid: OpenIDによるログインと登録
   setting_password_min_length: パスワードの最低必要文字数
-  setting_new_project_user_role_id: 管理者以外のユーザーが作成したプロジェクトに設定するロール
+  setting_new_project_user_role_id: システム管理者以外のユーザーが作成したプロジェクトに設定するロール
   setting_default_projects_modules: 新規プロジェクトにおいてデフォルトで有効になるモジュール
   setting_issue_done_ratio: 進捗の算出方法
   setting_issue_done_ratio_issue_field: 各チケットにフィールドを用意する
@@ -414,7 +414,7 @@ ja:
   permission_view_issues: チケットの閲覧
   permission_add_issues: チケットの追加
   permission_edit_issues: チケットの編集
-  permission_manage_issue_relations: チケットの管理
+  permission_manage_issue_relations: 関連するチケットの管理
   permission_add_issue_notes: 注記の追加
   permission_edit_issue_notes: 注記の編集
   permission_edit_own_issue_notes: 自身が記入した注記の編集
@@ -427,10 +427,10 @@ ja:
   permission_view_issue_watchers: ウォッチャー一覧の閲覧
   permission_add_issue_watchers: ウォッチャーの追加
   permission_delete_issue_watchers: ウォッチャーの削除
-  permission_log_time: 変更履歴の記入
-  permission_view_time_entries: 変更履歴の閲覧
-  permission_edit_time_entries: 変更履歴の編集
-  permission_edit_own_time_entries: 自身が記入した変更履歴の編集
+  permission_log_time: 作業時間の記入
+  permission_view_time_entries: 作業時間の閲覧
+  permission_edit_time_entries: 作業時間の編集
+  permission_edit_own_time_entries: 自身が記入した作業時間の編集
   permission_manage_project_activities: 作業分類 (時間トラッキング) の管理
   permission_manage_news: ニュースの管理
   permission_comment_news: ニュースへのコメント
@@ -642,11 +642,11 @@ ja:
   label_filter_plural: フィルタ
   label_equals: 等しい
   label_not_equals: 等しくない
-  label_in_less_than: が今日から○日後以前
-  label_in_more_than: が今日から○日後以降
+  label_in_less_than: 今日から○日後以前
+  label_in_more_than: 今日から○日後以降
   label_greater_or_equal: 以上
   label_less_or_equal: 以下
-  label_in: が今日から○日後
+  label_in: 今日から○日後
   label_today: 今日
   label_all_time: 全期間
   label_yesterday: 昨日
@@ -657,9 +657,9 @@ ja:
   label_last_month: 先月
   label_this_year: 今年
   label_date_range: 期間
-  label_less_than_ago: が今日より○日前以降
-  label_more_than_ago: が今日より○日前以前
-  label_ago: 日前
+  label_less_than_ago: 今日より○日前以降
+  label_more_than_ago: 今日より○日前以前
+  label_ago: ○日前
   label_contains: 含む
   label_not_contains: 含まない
   label_day_plural: 日
@@ -729,13 +729,13 @@ ja:
   label_loading: ロード中...
   label_relation_new: 新しい関連
   label_relation_delete: 関連の削除
-  label_relates_to: 関係している
-  label_duplicates: 重複している
-  label_duplicated_by: 重複されている
+  label_relates_to: 関連している
+  label_duplicates: 次のチケットと重複
+  label_duplicated_by: 次のチケットが重複
   label_blocks: ブロックしている
   label_blocked_by: ブロックされている
-  label_precedes: 先行する
-  label_follows: 後続する
+  label_precedes: 次のチケットに先行
+  label_follows: 次のチケットに後続
   label_end_to_start: 最後-最初
   label_end_to_end: 最後-最後
   label_start_to_start: 最初-最初
@@ -1087,9 +1087,28 @@ ja:
   label_readonly: 読み取り専用
   label_required: 必須
   text_repository_identifier_info: アルファベット小文字(a-z)・数字・ハイフン・アンダースコアが使えます。<br />識別子は後で変更することはできません。
-  field_board_parent: Parent forum
-  label_attribute_of_project: Project's %{name}
-  label_attribute_of_author: Author's %{name}
-  label_attribute_of_assigned_to: Assignee's %{name}
-  label_attribute_of_fixed_version: Target version's %{name}
-  label_copy_subtasks: Copy subtasks
+  field_board_parent: 親フォーラム
+  label_attribute_of_project: プロジェクトの %{name}
+  label_attribute_of_author: 作成者の %{name}
+  label_attribute_of_assigned_to: 担当者の %{name}
+  label_attribute_of_fixed_version: 対象バージョンの %{name}
+  label_copy_subtasks: 子チケットをコピー
+  label_copied_to: コピー先
+  label_copied_from: コピー元
+  label_any_issues_in_project: 次のプロジェクト内のチケット
+  label_any_issues_not_in_project: 次のプロジェクト外のチケット
+  field_private_notes: プライベート注記
+  permission_view_private_notes: プライベート注記の閲覧
+  permission_set_notes_private: 注記をプライベートに設定
+  label_no_issues_in_project: no issues in project
+  label_any: すべて
+  label_last_n_weeks: 直近%{count}週間
+  setting_cross_project_subtasks: 異なるプロジェクトのチケット間の親子関係を許可
+  label_cross_project_descendants: サブプロジェクト単位
+  label_cross_project_tree: プロジェクトツリー単位
+  label_cross_project_hierarchy: プロジェクト階層単位
+  label_cross_project_system: すべてのプロジェクト
+  button_hide: 隠す
+  setting_non_working_week_days: 休業日
+  label_in_the_next_days: 今後○日
+  label_in_the_past_days: 過去○日

@@ -18,7 +18,32 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class RoleTest < ActiveSupport::TestCase
-  fixtures :roles, :workflows
+  fixtures :roles, :workflows, :trackers
+
+  def test_sorted_scope
+    assert_equal Role.all.sort, Role.sorted.all
+  end
+
+  def test_givable_scope
+    assert_equal Role.all.reject(&:builtin?).sort, Role.givable.all
+  end
+
+  def test_builtin_scope
+    assert_equal Role.all.select(&:builtin?).sort, Role.builtin(true).all.sort
+    assert_equal Role.all.reject(&:builtin?).sort, Role.builtin(false).all.sort
+  end
+
+  def test_copy_from
+    role = Role.find(1)
+    copy = Role.new.copy_from(role)
+
+    assert_nil copy.id
+    assert_equal '', copy.name
+    assert_equal role.permissions, copy.permissions
+
+    copy.name = 'Copy'
+    assert copy.save
+  end
 
   def test_sorted_scope
     assert_equal Role.all.sort, Role.sorted.all

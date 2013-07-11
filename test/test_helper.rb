@@ -114,6 +114,15 @@ class ActiveSupport::TestCase
     saved_settings.each {|k, v| Setting[k] = v} if saved_settings
   end
 
+  # Yields the block with user as the current user
+  def with_current_user(user, &block)
+    saved_user = User.current
+    User.current = user
+    yield
+  ensure
+    User.current = saved_user
+  end
+
   def change_user_password(login, new_password)
     user = User.first(:conditions => {:login => login})
     user.password, user.password_confirmation = new_password, new_password
@@ -156,6 +165,14 @@ class ActiveSupport::TestCase
     hs
   end
 
+  def assert_save(object)
+    saved = object.save
+    message = "#{object.class} could not be saved"
+    errors = object.errors.full_messages.map {|m| "- #{m}"}
+    message << ":\n#{errors.join("\n")}" if errors.any?
+    assert_equal true, saved, message
+  end
+
   def assert_error_tag(options={})
     assert_tag({:attributes => { :id => 'errorExplanation' }}.merge(options))
   end
@@ -166,6 +183,11 @@ class ActiveSupport::TestCase
 
   def assert_not_include(expected, s)
     assert !s.include?(expected), "\"#{expected}\" found in \"#{s}\""
+  end
+
+  def assert_select_in(text, *args, &block)
+    d = HTML::Document.new(CGI::unescapeHTML(String.new(text))).root
+    assert_select(d, *args, &block)
   end
 
   def assert_mail_body_match(expected, mail)

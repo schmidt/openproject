@@ -47,8 +47,8 @@ module ApplicationHelper
   def link_to_user(user, options={})
     if user.is_a?(User)
       name = h(user.name(options[:format]))
-      if user.active?
-        link_to name, :controller => 'users', :action => 'show', :id => user
+      if user.active? || (User.current.admin? && user.logged?)
+        link_to name, user_path(user), :class => user.css_classes
       else
         name
       end
@@ -64,10 +64,12 @@ module ApplicationHelper
   #   link_to_issue(issue, :truncate => 6)        # => Defect #6: This i...
   #   link_to_issue(issue, :subject => false)     # => Defect #6
   #   link_to_issue(issue, :project => true)      # => Foo - Defect #6
+  #   link_to_issue(issue, :subject => false, :tracker => false)     # => #6
   #
   def link_to_issue(issue, options={})
     title = nil
     subject = nil
+    text = options[:tracker] == false ? "##{issue.id}" : "#{issue.tracker} ##{issue.id}"
     if options[:subject] == false
       title = truncate(issue.subject, :length => 60)
     else
@@ -76,9 +78,7 @@ module ApplicationHelper
         subject = truncate(subject, :length => options[:truncate])
       end
     end
-    s = link_to "#{h(issue.tracker)} ##{issue.id}", {:controller => "issues", :action => "show", :id => issue},
-                                                 :class => issue.css_classes,
-                                                 :title => title
+    s = link_to text, issue_path(issue), :class => issue.css_classes, :title => title
     s << h(": #{subject}") if subject
     s = h("#{issue.project} - ") + s if options[:project]
     s
@@ -147,6 +147,10 @@ module ApplicationHelper
     end
   end
 
+  def wiki_page_path(page, options={})
+    url_for({:controller => 'wiki', :action => 'show', :project_id => page.project, :id => page.title}.merge(options))
+  end
+
   def thumbnail_tag(attachment)
     link_to image_tag(url_for(:controller => 'attachments', :action => 'thumbnail', :id => attachment)),
       {:controller => 'attachments', :action => 'show', :id => attachment, :filename => attachment.filename},
@@ -173,7 +177,7 @@ module ApplicationHelper
   end
 
   def format_activity_day(date)
-    date == User.current.today ? l(:label_today).titleize : format_date(date)
+    date == Date.today ? l(:label_today).titleize : format_date(date)
   end
 
   def format_activity_description(text)
@@ -234,7 +238,7 @@ module ApplicationHelper
       content << "<ul class=\"pages-hierarchy\">\n"
       pages[node].each do |page|
         content << "<li>"
-        content << link_to(h(page.pretty_title), {:controller => 'wiki', :action => 'show', :project_id => page.project, :id => page.title},
+        content << link_to(h(page.pretty_title), {:controller => 'wiki', :action => 'show', :project_id => page.project, :id => page.title, :version => nil},
                            :title => (options[:timestamp] && page.updated_on ? l(:label_updated_time, distance_of_time_in_words(Time.now, page.updated_on)) : nil))
         content << "\n" + render_page_hierarchy(pages, page.id, options) if pages[page.id]
         content << "</li>\n"
@@ -357,7 +361,7 @@ module ApplicationHelper
   def time_tag(time)
     text = distance_of_time_in_words(Time.now, time)
     if @project
-      link_to(text, {:controller => 'activities', :action => 'index', :id => @project, :from => User.current.time_to_date(time)}, :title => format_time(time))
+      link_to(text, {:controller => 'activities', :action => 'index', :id => @project, :from => time.to_date}, :title => format_time(time))
     else
       content_tag('acronym', text, :title => format_time(time))
     end
@@ -644,7 +648,7 @@ module ApplicationHelper
               wiki_page_id = page.present? ? Wiki.titleize(page) : nil
               parent = wiki_page.nil? && obj.is_a?(WikiContent) && obj.page && project == link_project ? obj.page.title : nil
               url_for(:only_path => only_path, :controller => 'wiki', :action => 'show', :project_id => link_project, 
-               :id => wiki_page_id, :anchor => anchor, :parent => parent)
+               :id => wiki_page_id, :version => nil, :anchor => anchor, :parent => parent)
             end
           end
           link_to(title.present? ? title.html_safe : h(page), url, :class => ('wiki-page' + (wiki_page ? '' : ' new')))
@@ -795,11 +799,10 @@ module ApplicationHelper
                 if repository && User.current.allowed_to?(:browse_repository, project)
                   name =~ %r{^[/\\]*(.*?)(@([0-9a-f]+))?(#(L\d+))?$}
                   path, rev, anchor = $1, $3, $5
-                  link = link_to h("#{project_prefix}#{prefix}:#{repo_prefix}#{name}"), {:controller => 'repositories', :action => 'entry', :id => project, :repository_id => repository.identifier_param,
+                  link = link_to h("#{project_prefix}#{prefix}:#{repo_prefix}#{name}"), {:controller => 'repositories', :action => (prefix == 'export' ? 'raw' : 'entry'), :id => project, :repository_id => repository.identifier_param,
                                                           :path => to_path_param(path),
                                                           :rev => rev,
-                                                          :anchor => anchor,
-                                                          :format => (prefix == 'export' ? 'raw' : nil)},
+                                                          :anchor => anchor},
                                                          :class => (prefix == 'export' ? 'source download' : 'source')
                 end
               end
@@ -1029,6 +1032,11 @@ module ApplicationHelper
     content_tag(:a, name, {:href => '#', :onclick => "#{function}; return false;"}.merge(html_options))
   end
 
+  # Helper to render JSON in views
+  def raw_json(arg)
+    arg.to_json.to_s.gsub('/', '\/').html_safe
+  end
+
   def back_url
     url = params[:back_url]
     if url.nil? && referer = request.env['HTTP_REFERER']
@@ -1095,8 +1103,14 @@ module ApplicationHelper
     unless @calendar_headers_tags_included
       @calendar_headers_tags_included = true
       content_for :header_tags do
+        start_of_week = Setting.start_of_week
+        start_of_week = l(:general_first_day_of_week, :default => '1') if start_of_week.blank?
+        # Redmine uses 1..7 (monday..sunday) in settings and locales
+        # JQuery uses 0..6 (sunday..saturday), 7 needs to be changed to 0
+        start_of_week = start_of_week.to_i % 7
+
         tags = javascript_tag(
-                   "var datepickerOptions={dateFormat: 'yy-mm-dd', " +
+                   "var datepickerOptions={dateFormat: 'yy-mm-dd', firstDay: #{start_of_week}, " +
                      "showOn: 'button', buttonImageOnly: true, buttonImage: '" + 
                      path_to_image('/images/calendar.png') +
                      "', showButtonPanel: true};")

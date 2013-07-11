@@ -56,6 +56,7 @@ class IssuesController < ApplicationController
     retrieve_query
     sort_init(@query.sort_criteria.empty? ? [['id', 'desc']] : @query.sort_criteria)
     sort_update(@query.sortable_columns)
+    @query.sort_criteria = sort_criteria.to_a
 
     if @query.valid?
       case params[:format]
@@ -81,7 +82,7 @@ class IssuesController < ApplicationController
       respond_to do |format|
         format.html { render :template => 'issues/index', :layout => !request.xhr? }
         format.api  {
-          Issue.load_relations(@issues) if include_in_api_response?('relations')
+          Issue.load_visible_relations(@issues) if include_in_api_response?('relations')
         }
         format.atom { render_feed(@issues, :title => "#{@project || Setting.app_title}: #{l(:label_issue_plural)}") }
         format.csv  { send_data(issues_to_csv(@issues, @project, @query, params), :type => 'text/csv; header=present', :filename => 'export.csv') }
@@ -99,8 +100,9 @@ class IssuesController < ApplicationController
   end
 
   def show
-    @journals = @issue.journals.find(:all, :include => [:user, :details], :order => "#{Journal.table_name}.created_on ASC")
+    @journals = @issue.journals.includes(:user, :details).reorder("#{Journal.table_name}.id ASC").all
     @journals.each_with_index {|j,i| j.indice = i+1}
+    @journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, @issue.project)
     @journals.reverse! if User.current.wants_comments_in_reverse_order?
 
     @changesets = @issue.changesets.visible.all
@@ -118,7 +120,10 @@ class IssuesController < ApplicationController
       }
       format.api
       format.atom { render :template => 'journals/index', :layout => false, :content_type => 'application/atom+xml' }
-      format.pdf  { send_data(issue_to_pdf(@issue), :type => 'application/pdf', :filename => "#{@project.identifier}-#{@issue.id}.pdf") }
+      format.pdf  {
+        pdf = issue_to_pdf(@issue, :journals => @journals)
+        send_data(pdf, :type => 'application/pdf', :filename => "#{@project.identifier}-#{@issue.id}.pdf")
+      }
     end
   end
 
@@ -173,6 +178,7 @@ class IssuesController < ApplicationController
       @conflict = true
       if params[:last_journal_id]
         @conflict_journals = @issue.journals_after(params[:last_journal_id]).all
+        @conflict_journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, @issue.project)
       end
     end
 
@@ -354,8 +360,7 @@ private
     @time_entry = TimeEntry.new(:issue => @issue, :project => @issue.project)
     @time_entry.attributes = params[:time_entry]
 
-    @notes = params[:notes] || (params[:issue].present? ? params[:issue][:notes] : nil)
-    @issue.init_journal(User.current, @notes)
+    @issue.init_journal(User.current)
 
     issue_attributes = params[:issue]
     if issue_attributes && params[:conflict_resolution]
@@ -364,7 +369,7 @@ private
         issue_attributes = issue_attributes.dup
         issue_attributes.delete(:lock_version)
       when 'add_notes'
-        issue_attributes = {}
+        issue_attributes = issue_attributes.slice(:notes)
       when 'cancel'
         redirect_to issue_path(@issue)
         return false
@@ -398,7 +403,7 @@ private
     end
 
     @issue.project = @project
-    @issue.author = User.current
+    @issue.author ||= User.current
     # Tracker must be set before custom field values
     @issue.tracker ||= @project.trackers.find((params[:issue] && params[:issue][:tracker_id]) || params[:tracker_id] || :first)
     if @issue.tracker.nil?

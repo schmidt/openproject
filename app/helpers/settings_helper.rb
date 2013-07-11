@@ -56,7 +56,7 @@ module SettingsHelper
              Setting.send(setting).include?(value),
              :id => nil
            ) + text.to_s,
-          :class => 'block'
+          :class => (options[:inline] ? 'inline' : 'block')
          )
       end.join.html_safe
   end
@@ -90,5 +90,17 @@ module SettingsHelper
                                      Setting.notified_events.include?(notifiable.name), :id => nil).html_safe +
                          l_or_humanize(notifiable.name, :prefix => 'label_').html_safe,
                        :class => notifiable.parent.present? ? "parent" : '').html_safe
+  end
+
+  def cross_project_subtasks_options
+    options = [
+      [:label_disabled, ''],
+      [:label_cross_project_system, 'system'],
+      [:label_cross_project_tree, 'tree'],
+      [:label_cross_project_hierarchy, 'hierarchy'],
+      [:label_cross_project_descendants, 'descendants']
+    ]
+
+    options.map {|label, value| [l(label), value.to_s]}
   end
 end
