@@ -518,15 +518,15 @@ class TimelogControllerTest < ActionController::TestCase
 
   def test_index_last_week
     Date.stubs(:today).returns('2011-12-15'.to_date)
-    get :index, :period => 'current_week'
+    get :index, :period => 'last_week'
     assert_equal '2011-12-05'.to_date, assigns(:from)
     assert_equal '2011-12-11'.to_date, assigns(:to)
   end
 
-  def test_index_last_week
+  def test_index_last_2_week
     Date.stubs(:today).returns('2011-12-15'.to_date)
-    get :index, :period => 'last_week'
-    assert_equal '2011-12-05'.to_date, assigns(:from)
+    get :index, :period => 'last_2_weeks'
+    assert_equal '2011-11-28'.to_date, assigns(:from)
     assert_equal '2011-12-11'.to_date, assigns(:to)
   end
 

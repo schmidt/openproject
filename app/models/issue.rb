@@ -17,6 +17,7 @@
 
 class Issue < ActiveRecord::Base
   include Redmine::SafeAttributes
+  include Redmine::Utils::DateCalculation
 
   belongs_to :project
   belongs_to :tracker
@@ -28,6 +29,14 @@ class Issue < ActiveRecord::Base
   belongs_to :category, :class_name => 'IssueCategory', :foreign_key => 'category_id'
 
   has_many :journals, :as => :journalized, :dependent => :destroy
+  has_many :visible_journals,
+    :class_name => 'Journal',
+    :as => :journalized,
+    :conditions => Proc.new { 
+      ["(#{Journal.table_name}.private_notes = ? OR (#{Project.allowed_to_condition(User.current, :view_private_notes)}))", false]
+    },
+    :readonly => true
+
   has_many :time_entries, :dependent => :delete_all
   has_and_belongs_to_many :changesets, :order => "#{Changeset.table_name}.committed_on ASC, #{Changeset.table_name}.id ASC"
 
@@ -39,7 +48,7 @@ class Issue < ActiveRecord::Base
   acts_as_customizable
   acts_as_watchable
   acts_as_searchable :columns => ['subject', "#{table_name}.description", "#{Journal.table_name}.notes"],
-                     :include => [:project, :journals],
+                     :include => [:project, :visible_journals],
                      # sort by id so that limited eager loading doesn't break with postgresql
                      :order_column => "#{table_name}.id"
   acts_as_event :title => Proc.new {|o| "#{o.tracker.name} ##{o.id} (#{o.status}): #{o.subject}"},
@@ -52,6 +61,7 @@ class Issue < ActiveRecord::Base
   DONE_RATIO_OPTIONS = %w(issue_field issue_status)
 
   attr_reader :current_journal
+  delegate :notes, :notes=, :private_notes, :private_notes=, :to => :current_journal, :allow_nil => true
 
   validates_presence_of :subject, :priority, :project, :tracker, :author, :status
 
@@ -84,17 +94,21 @@ class Issue < ActiveRecord::Base
   # Returns a SQL conditions string used to find all issues visible by the specified user
   def self.visible_condition(user, options={})
     Project.allowed_to_condition(user, :view_issues, options) do |role, user|
-      case role.issues_visibility
-      when 'all'
-        nil
-      when 'default'
-        user_ids = [user.id] + user.groups.map(&:id)
-        "(#{table_name}.is_private = #{connection.quoted_false} OR #{table_name}.author_id = #{user.id} OR #{table_name}.assigned_to_id IN (#{user_ids.join(',')}))"
-      when 'own'
-        user_ids = [user.id] + user.groups.map(&:id)
-        "(#{table_name}.author_id = #{user.id} OR #{table_name}.assigned_to_id IN (#{user_ids.join(',')}))"
+      if user.logged?
+        case role.issues_visibility
+        when 'all'
+          nil
+        when 'default'
+          user_ids = [user.id] + user.groups.map(&:id)
+          "(#{table_name}.is_private = #{connection.quoted_false} OR #{table_name}.author_id = #{user.id} OR #{table_name}.assigned_to_id IN (#{user_ids.join(',')}))"
+        when 'own'
+          user_ids = [user.id] + user.groups.map(&:id)
+          "(#{table_name}.author_id = #{user.id} OR #{table_name}.assigned_to_id IN (#{user_ids.join(',')}))"
+        else
+          '1=0'
+        end
       else
-        '1=0'
+        "(#{table_name}.is_private = #{connection.quoted_false})"
       end
     end
   end
@@ -102,15 +116,19 @@ class Issue < ActiveRecord::Base
   # Returns true if usr or current user is allowed to view the issue
   def visible?(usr=nil)
     (usr || User.current).allowed_to?(:view_issues, self.project) do |role, user|
-      case role.issues_visibility
-      when 'all'
-        true
-      when 'default'
-        !self.is_private? || self.author == user || user.is_or_belongs_to?(assigned_to)
-      when 'own'
-        self.author == user || user.is_or_belongs_to?(assigned_to)
+      if user.logged?
+        case role.issues_visibility
+        when 'all'
+          true
+        when 'default'
+          !self.is_private? || (self.author == user || user.is_or_belongs_to?(assigned_to))
+        when 'own'
+          self.author == user || user.is_or_belongs_to?(assigned_to)
+        else
+          false
+        end
       else
-        false
+        !self.is_private?
       end
     end
   end
@@ -268,7 +286,8 @@ class Issue < ActiveRecord::Base
       if fixed_version && fixed_version.project != project && !project.shared_versions.include?(fixed_version)
         self.fixed_version = nil
       end
-      if parent && parent.project_id != project_id
+      # Clear the parent task if it's no longer valid
+      unless valid_parent_project?
         self.parent_issue_id = nil
       end
       @custom_field_values = nil
@@ -327,6 +346,7 @@ class Issue < ActiveRecord::Base
     'custom_field_values',
     'custom_fields',
     'lock_version',
+    'notes',
     :if => lambda {|issue, user| issue.new_record? || user.allowed_to?(:edit_issues, issue.project) }
 
   safe_attributes 'status_id',
@@ -334,7 +354,14 @@ class Issue < ActiveRecord::Base
     'fixed_version_id',
     'done_ratio',
     'lock_version',
+    'notes',
     :if => lambda {|issue, user| issue.new_statuses_allowed_to(user).any? }
+
+  safe_attributes 'notes',
+    :if => lambda {|issue, user| user.allowed_to?(:add_issue_notes, issue.project)}
+
+  safe_attributes 'private_notes',
+    :if => lambda {|issue, user| !issue.new_record? && user.allowed_to?(:set_notes_private, issue.project)} 
 
   safe_attributes 'watcher_user_ids',
     :if => lambda {|issue, user| issue.new_record? && user.allowed_to?(:add_issue_watchers, issue.project)} 
@@ -390,7 +417,10 @@ class Issue < ActiveRecord::Base
     end
 
     if attrs['parent_issue_id'].present?
-      attrs.delete('parent_issue_id') unless Issue.visible(user).exists?(attrs['parent_issue_id'].to_i)
+      s = attrs['parent_issue_id'].to_s
+      unless (m = s.match(%r{\A#?(\d+)\z})) && Issue.visible(user).exists?(m[1])
+        @invalid_parent_issue_id = attrs.delete('parent_issue_id')
+      end
     end
 
     if attrs['custom_field_values'].present?
@@ -496,11 +526,15 @@ class Issue < ActiveRecord::Base
   end
 
   def validate_issue
-    if self.due_date.nil? && @attributes['due_date'] && !@attributes['due_date'].empty?
+    if due_date.nil? && @attributes['due_date'].present?
       errors.add :due_date, :not_a_date
     end
 
-    if self.due_date and self.start_date and self.due_date < self.start_date
+    if start_date.nil? && @attributes['start_date'].present?
+      errors.add :start_date, :not_a_date
+    end
+
+    if due_date && start_date && due_date < start_date
       errors.add :due_date, :greater_than_start_date
     end
 
@@ -524,9 +558,11 @@ class Issue < ActiveRecord::Base
     end
 
     # Checks parent issue assignment
-    if @parent_issue
-      if @parent_issue.project_id != project_id
-        errors.add :parent_issue_id, :not_same_project
+    if @invalid_parent_issue_id.present?
+      errors.add :parent_issue_id, :invalid
+    elsif @parent_issue
+      if !valid_parent_project?(@parent_issue)
+        errors.add :parent_issue_id, :invalid
       elsif !new_record?
         # moving an existing issue
         if @parent_issue.root_id != root_id
@@ -534,7 +570,7 @@ class Issue < ActiveRecord::Base
         elsif move_possible?(@parent_issue)
           # move accepted inside tree
         else
-          errors.add :parent_issue_id, :not_a_valid_parent
+          errors.add :parent_issue_id, :invalid
         end
       end
     end
@@ -707,8 +743,8 @@ class Issue < ActiveRecord::Base
     end
   end
 
-  # Returns the mail adresses of users that should be notified
-  def recipients
+  # Returns the users that should be notified
+  def notified_users
     notified = []
     # Author and assignee are always notified unless they have been
     # locked or don't want to be notified
@@ -725,7 +761,12 @@ class Issue < ActiveRecord::Base
     notified.uniq!
     # Remove users that can not view the issue
     notified.reject! {|user| !visible?(user)}
-    notified.collect(&:mail)
+    notified
+  end
+
+  # Returns the email addresses that should be notified
+  def recipients
+    notified_users.collect(&:mail)
   end
 
   # Returns the number of hours spent on this issue
@@ -744,7 +785,7 @@ class Issue < ActiveRecord::Base
   end
 
   def relations
-    @relations ||= (relations_from + relations_to).sort
+    @relations ||= IssueRelations.new(self, (relations_from + relations_to).sort)
   end
 
   # Preloads relations for a collection of issues
@@ -763,6 +804,25 @@ class Issue < ActiveRecord::Base
       hours_by_issue_id = TimeEntry.visible(user).sum(:hours, :group => :issue_id)
       issues.each do |issue|
         issue.instance_variable_set "@spent_hours", (hours_by_issue_id[issue.id] || 0)
+      end
+    end
+  end
+
+  # Preloads visible relations for a collection of issues
+  def self.load_visible_relations(issues, user=User.current)
+    if issues.any?
+      issue_ids = issues.map(&:id)
+      # Relations with issue_from in given issues and visible issue_to
+      relations_from = IssueRelation.includes(:issue_to => [:status, :project]).where(visible_condition(user)).where(:issue_from_id => issue_ids).all
+      # Relations with issue_to in given issues and visible issue_from
+      relations_to = IssueRelation.includes(:issue_from => [:status, :project]).where(visible_condition(user)).where(:issue_to_id => issue_ids).all
+
+      issues.each do |issue|
+        relations =
+          relations_from.select {|relation| relation.issue_from_id == issue.id} +
+          relations_to.select {|relation| relation.issue_to_id == issue.id}
+
+        issue.instance_variable_set "@relations", IssueRelations.new(issue, relations.sort)
       end
     end
   end
@@ -804,6 +864,11 @@ class Issue < ActiveRecord::Base
     (start_date && due_date) ? due_date - start_date : 0
   end
 
+  # Returns the duration in working days
+  def working_duration
+    (start_date && due_date) ? working_days(start_date, due_date) : 0
+  end
+
   def soonest_start
     @soonest_start ||= (
         relations_to.collect{|relation| relation.successor_soonest_start} +
@@ -811,22 +876,33 @@ class Issue < ActiveRecord::Base
       ).compact.max
   end
 
-  def reschedule_after(date)
+  # Sets start_date on the given date or the next working day
+  # and changes due_date to keep the same working duration.
+  def reschedule_on(date)
+    wd = working_duration
+    date = next_working_date(date)
+    self.start_date = date
+    self.due_date = add_working_days(date, wd)
+  end
+
+  # Reschedules the issue on the given date or the next working day and saves the record.
+  # If the issue is a parent task, this is done by rescheduling its subtasks.
+  def reschedule_on!(date)
     return if date.nil?
     if leaf?
       if start_date.nil? || start_date < date
-        self.start_date, self.due_date = date, date + duration
+        reschedule_on(date)
         begin
           save
         rescue ActiveRecord::StaleObjectError
           reload
-          self.start_date, self.due_date = date, date + duration
+          reschedule_on(date)
           save
         end
       end
     else
       leaves.each do |leaf|
-        leaf.reschedule_after(date)
+        leaf.reschedule_on!(date)
       end
     end
   end
@@ -847,7 +923,7 @@ class Issue < ActiveRecord::Base
 
   # Returns a string of css classes that apply to the issue
   def css_classes
-    s = "issue status-#{status_id} priority-#{priority_id}"
+    s = "issue status-#{status_id} #{priority.try(:css_classes)}"
     s << ' closed' if closed?
     s << ' overdue' if overdue?
     s << ' child' if child?
@@ -897,20 +973,41 @@ class Issue < ActiveRecord::Base
   end
 
   def parent_issue_id=(arg)
-    parent_issue_id = arg.blank? ? nil : arg.to_i
-    if parent_issue_id && @parent_issue = Issue.find_by_id(parent_issue_id)
+    s = arg.to_s.strip.presence
+    if s && (m = s.match(%r{\A#?(\d+)\z})) && (@parent_issue = Issue.find_by_id(m[1]))
       @parent_issue.id
     else
       @parent_issue = nil
-      nil
+      @invalid_parent_issue_id = arg
     end
   end
 
   def parent_issue_id
-    if instance_variable_defined? :@parent_issue
+    if @invalid_parent_issue_id
+      @invalid_parent_issue_id
+    elsif instance_variable_defined? :@parent_issue
       @parent_issue.nil? ? nil : @parent_issue.id
     else
       parent_id
+    end
+  end
+
+	# Returns true if issue's project is a valid
+	# parent issue project
+  def valid_parent_project?(issue=parent)
+    return true if issue.nil? || issue.project_id == project_id
+
+    case Setting.cross_project_subtasks
+    when 'system'
+      true
+    when 'tree'
+      issue.project.root == project.root
+    when 'hierarchy'
+      issue.project.is_or_is_ancestor_of?(project) || issue.project.is_descendant_of?(project)
+    when 'descendants'
+      issue.project.is_or_is_ancestor_of?(project)
+    else
+      false
     end
   end
 
@@ -993,8 +1090,9 @@ class Issue < ActiveRecord::Base
       relations_to.clear
     end
 
-    # Move subtasks
+    # Move subtasks that were in the same project
     children.each do |child|
+      next unless child.project_id == project_id_was
       # Change project and keep project
       child.send :project=, project, true
       unless child.save
@@ -1003,11 +1101,20 @@ class Issue < ActiveRecord::Base
     end
   end
 
-  # Copies subtasks from the copied issue
+  # Callback for after the creation of an issue by copy
+  # * adds a "copied to" relation with the copied issue
+  # * copies subtasks from the copied issue
   def after_create_from_copy
-    return unless copy?
+    return unless copy? && !@after_create_from_copy_handled
 
-    unless @copied_from.leaf? || @copy_options[:subtasks] == false || @subtasks_copied
+    if (@copied_from.project_id == project_id || Setting.cross_project_issue_relations?) && @copy_options[:link] != false
+      relation = IssueRelation.new(:issue_from => @copied_from, :issue_to => self, :relation_type => IssueRelation::TYPE_COPIED_TO)
+      unless relation.save
+        logger.error "Could not create relation while copying ##{@copied_from.id} to ##{id} due to validation errors: #{relation.errors.full_messages.join(', ')}" if logger
+      end
+    end
+
+    unless @copied_from.leaf? || @copy_options[:subtasks] == false
       @copied_from.children.each do |child|
         unless child.visible?
           # Do not copy subtasks that are not visible to avoid potential disclosure of private data
@@ -1023,8 +1130,8 @@ class Issue < ActiveRecord::Base
           logger.error "Could not copy subtask ##{child.id} while copying ##{@copied_from.id} to ##{id} due to validation errors: #{copy.errors.full_messages.join(', ')}" if logger
         end
       end
-      @subtasks_copied = true
     end
+    @after_create_from_copy_handled = true
   end
 
   def update_nested_set_attributes
@@ -1135,7 +1242,7 @@ class Issue < ActiveRecord::Base
     end
   end
 
-  # Callback on attachment deletion
+  # Callback on file attachment
   def attachment_added(obj)
     if @current_journal && !obj.new_record?
       @current_journal.details << JournalDetail.new(:property => 'attachment', :prop_key => obj.id, :value => obj.filename)

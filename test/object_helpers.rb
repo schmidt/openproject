@@ -61,6 +61,8 @@ module ObjectHelpers
 
   def Issue.generate!(attributes={})
     issue = Issue.new(attributes)
+    issue.project ||= Project.find(1)
+    issue.tracker ||= issue.project.trackers.first
     issue.subject = 'Generated' if issue.subject.blank?
     issue.author ||= User.find(2)
     yield issue if block_given?
@@ -68,17 +70,22 @@ module ObjectHelpers
     issue
   end
 
-  # Generate an issue for a project, using its trackers
-  def Issue.generate_for_project!(project, attributes={})
-    issue = Issue.new(attributes) do |issue|
-      issue.project = project
-      issue.tracker = project.trackers.first unless project.trackers.empty?
-      issue.subject = 'Generated' if issue.subject.blank?
-      issue.author ||= User.find(2)
-      yield issue if block_given?
-    end
-    issue.save!
-    issue
+  # Generates an issue with 2 children and a grandchild
+  def Issue.generate_with_descendants!(attributes={})
+    issue = Issue.generate!(attributes)
+    child = Issue.generate!(:project => issue.project, :subject => 'Child1', :parent_issue_id => issue.id)
+    Issue.generate!(:project => issue.project, :subject => 'Child2', :parent_issue_id => issue.id)
+    Issue.generate!(:project => issue.project, :subject => 'Child11', :parent_issue_id => child.id)
+    issue.reload
+  end
+
+  def Journal.generate!(attributes={})
+    journal = Journal.new(attributes)
+    journal.user ||= User.first
+    journal.journalized ||= Issue.first
+    yield journal if block_given?
+    journal.save!
+    journal
   end
 
   # Generates an issue with some children and a grandchild
