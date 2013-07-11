@@ -152,10 +152,10 @@ function buildFilterRow(field, operator, values) {
       var option = $('<option>');
       if ($.isArray(filterValue)) {
         option.val(filterValue[1]).text(filterValue[0]);
-        if (values.indexOf(filterValue[1]) > -1) {option.attr('selected', true)};
+        if ($.inArray(filterValue[1], values) > -1) {option.attr('selected', true);}
       } else {
         option.val(filterValue).text(filterValue);
-        if (values.indexOf(filterValue) > -1) {option.attr('selected', true)};
+        if ($.inArray(filterValue, values) > -1) {option.attr('selected', true);}
       }
       select.append(option);
     }
@@ -163,9 +163,9 @@ function buildFilterRow(field, operator, values) {
   case "date":
   case "date_past":
     tr.find('td.values').append(
-      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_1" size="10" class="value date_value" value="'+values[0]+'" /></span>' +
-      ' <span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_2" size="10" class="value date_value" value="'+values[1]+'" /></span>' +
-      ' <span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'" size="3" class="value" value="'+values[0]+'" /> '+labelDayPlural+'</span>'
+      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_1" size="10" class="value date_value" /></span>' +
+      ' <span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_2" size="10" class="value date_value" /></span>' +
+      ' <span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'" size="3" class="value" /> '+labelDayPlural+'</span>'
     );
     $('#values_'+fieldId+'_1').val(values[0]).datepicker(datepickerOptions);
     $('#values_'+fieldId+'_2').val(values[1]).datepicker(datepickerOptions);
@@ -174,15 +174,29 @@ function buildFilterRow(field, operator, values) {
   case "string":
   case "text":
     tr.find('td.values').append(
-      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'" size="30" class="value" value="'+values[0]+'" /></span>'
+      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'" size="30" class="value" /></span>'
     );
     $('#values_'+fieldId).val(values[0]);
     break;
+  case "relation":
+    tr.find('td.values').append(
+      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'" size="6" class="value" /></span>' +
+      '<span style="display:none;"><select class="value" name="v['+field+'][]" id="values_'+fieldId+'_1"></select></span>'
+    );
+    $('#values_'+fieldId).val(values[0]);
+    select = tr.find('td.values select');
+    for (i=0;i<allProjects.length;i++){
+      var filterValue = allProjects[i];
+      var option = $('<option>');
+      option.val(filterValue[1]).text(filterValue[0]);
+      if (values[0] == filterValue[1]) {option.attr('selected', true)};
+      select.append(option);
+    }
   case "integer":
   case "float":
     tr.find('td.values').append(
-      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_1" size="6" class="value" value="'+values[0]+'" /></span>' +
-      ' <span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_2" size="6" class="value" value="'+values[1]+'" /></span>'
+      '<span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_1" size="6" class="value" /></span>' +
+      ' <span style="display:none;"><input type="text" name="v['+field+'][]" id="values_'+fieldId+'_2" size="6" class="value" /></span>'
     );
     $('#values_'+fieldId+'_1').val(values[0]);
     $('#values_'+fieldId+'_2').val(values[1]);
@@ -204,7 +218,7 @@ function toggleFilter(field) {
 function enableValues(field, indexes) {
   var fieldId = field.replace('.', '_');
   $('#tr_'+fieldId+' td.values .value').each(function(index) {
-    if (indexes.indexOf(index) >= 0) {
+    if ($.inArray(index, indexes) >= 0) {
       $(this).removeAttr('disabled');
       $(this).parents('span').first().show();
     } else {
@@ -238,11 +252,18 @@ function toggleOperator(field) {
       break;
     case "<t+":
     case ">t+":
+    case "><t+":
     case "t+":
     case ">t-":
     case "<t-":
+    case "><t-":
     case "t-":
       enableValues(field, [2]);
+      break;
+    case "=p":
+    case "=!p":
+    case "!p":
+      enableValues(field, [1]);
       break;
     default:
       enableValues(field, [0]);
@@ -466,7 +487,7 @@ function updateBulkEditFrom(url) {
 function observeAutocompleteField(fieldId, url) {
   $('#'+fieldId).autocomplete({
     source: url,
-    minLength: 2,
+    minLength: 2
   });
 }
 
@@ -478,16 +499,14 @@ function observeSearchfield(fieldId, targetId, url) {
       var val = $this.val();
       if ($this.attr('data-value-was') != val){
         $this.attr('data-value-was', val);
-        if (val != '') {
-          $.ajax({
-            url: url,
-            type: 'get',
-            data: {q: $this.val()},
-            success: function(data){ $('#'+targetId).html(data); },
-            beforeSend: function(){ $this.addClass('ajax-loading'); },
-            complete: function(){ $this.removeClass('ajax-loading'); }
-          });
-        }
+        $.ajax({
+          url: url,
+          type: 'get',
+          data: {q: $this.val()},
+          success: function(data){ $('#'+targetId).html(data); },
+          beforeSend: function(){ $this.addClass('ajax-loading'); },
+          complete: function(){ $this.removeClass('ajax-loading'); }
+        });
       }
     };
     var reset = function() {

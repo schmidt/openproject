@@ -96,8 +96,13 @@ class AttachmentsControllerTest < ActionController::TestCase
   end
 
   def test_save_diff_type
-    @request.session[:user_id] = 1 # admin
+    user1 = User.find(1)
+    user1.pref[:diff_type] = nil
+    user1.preference.save
     user = User.find(1)
+    assert_nil user.pref[:diff_type]
+
+    @request.session[:user_id] = 1 # admin
     get :show, :id => 5
     assert_response :success
     assert_template 'diff'
@@ -108,6 +113,21 @@ class AttachmentsControllerTest < ActionController::TestCase
     assert_template 'diff'
     user.reload
     assert_equal "sbs", user.pref[:diff_type]
+  end
+
+  def test_diff_show_filename_in_mercurial_export
+    set_tmp_attachments_directory
+    a = Attachment.new(:container => Issue.find(1),
+                       :file => uploaded_test_file("hg-export.diff", "text/plain"),
+                       :author => User.find(1))
+    assert a.save
+    assert_equal 'hg-export.diff', a.filename
+
+    get :show, :id => a.id, :type => 'inline'
+    assert_response :success
+    assert_template 'diff'
+    assert_equal 'text/html', @response.content_type
+    assert_select 'th.filename', :text => 'test1.txt'
   end
 
   def test_show_text_file

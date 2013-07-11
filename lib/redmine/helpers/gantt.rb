@@ -21,6 +21,7 @@ module Redmine
     class Gantt
       include ERB::Util
       include Redmine::I18n
+      include Redmine::Utils::DateCalculation
 
       # :nodoc:
       # Some utility methods for the PDF export
@@ -456,7 +457,7 @@ module Redmine
           wday = @date_from.cwday
           (date_to - @date_from + 1).to_i.times do
             width =  zoom
-            gc.fill(wday == 6 || wday == 7 ? '#eee' : 'white')
+            gc.fill(non_working_week_days.include?(wday) ? '#eee' : 'white')
             gc.stroke('#ddd')
             gc.stroke_width(1)
             gc.rectangle(left, 2 * header_height, left + width, 2 * header_height + g_height - 1)
@@ -638,11 +639,11 @@ module Redmine
 
       # Sorts a collection of issues by start_date, due_date, id for gantt rendering
       def sort_issues!(issues)
-        issues.sort! { |a, b| gantt_issue_compare(a, b, issues) }
+        issues.sort! { |a, b| gantt_issue_compare(a, b) }
       end
 
       # TODO: top level issues should be sorted by start date
-      def gantt_issue_compare(x, y, issues)
+      def gantt_issue_compare(x, y)
         if x.root_id == y.root_id
           x.lft <=> y.lft
         else

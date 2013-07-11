@@ -336,7 +336,11 @@ module Redmine #:nodoc:
 
       unless source_files.empty?
         base_target_dir = File.join(destination, File.dirname(source_files.first).gsub(source, ''))
-        FileUtils.mkdir_p(base_target_dir)
+        begin
+          FileUtils.mkdir_p(base_target_dir)
+        rescue Exception => e
+          raise "Could not create directory #{base_target_dir}: " + e.message
+        end
       end
 
       source_dirs.each do |dir|
@@ -346,7 +350,7 @@ module Redmine #:nodoc:
         begin
           FileUtils.mkdir_p(target_dir)
         rescue Exception => e
-          raise "Could not create directory #{target_dir}: \n" + e
+          raise "Could not create directory #{target_dir}: " + e.message
         end
       end
 
@@ -357,7 +361,7 @@ module Redmine #:nodoc:
             FileUtils.cp(file, target)
           end
         rescue Exception => e
-          raise "Could not copy #{file} to #{target}: \n" + e
+          raise "Could not copy #{file} to #{target}: " + e.message
         end
       end
     end

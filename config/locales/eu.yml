@@ -244,7 +244,6 @@ eu:
   field_homepage: Orri nagusia
   field_is_public: Publikoa
   field_parent: "Honen azpiproiektua:"
-  field_is_in_chlog: Zereginak aldaketa egunkarian ikusten dira
   field_is_in_roadmap: Arazoak ibilbide-mapan erakutsi
   field_login: Erabiltzaile izena
   field_mail_notification: Eposta jakinarazpenak
@@ -515,7 +514,6 @@ eu:
   label_news_latest: Azken berriak
   label_news_view_all: Berri guztiak ikusi
   label_news_added: Berria gehituta
-  label_change_log: Aldaketa egunkaria
   label_settings: Ezarpenak
   label_overview: Gainbegirada
   label_version: Bertsioa
@@ -1066,3 +1064,22 @@ eu:
   label_attribute_of_assigned_to: Assignee's %{name}
   label_attribute_of_fixed_version: Target version's %{name}
   label_copy_subtasks: Copy subtasks
+  label_copied_to: copied to
+  label_copied_from: copied from
+  label_any_issues_in_project: any issues in project
+  label_any_issues_not_in_project: any issues not in project
+  field_private_notes: Private notes
+  permission_view_private_notes: View private notes
+  permission_set_notes_private: Set notes as private
+  label_no_issues_in_project: no issues in project
+  label_any: guztiak
+  label_last_n_weeks: last %{count} weeks
+  setting_cross_project_subtasks: Allow cross-project subtasks
+  label_cross_project_descendants: Azpiproiektuekin
+  label_cross_project_tree: Proiektu zuhaitzarekin
+  label_cross_project_hierarchy: Proiektu Hierarkiarekin
+  label_cross_project_system: Proiektu guztiekin
+  button_hide: Hide
+  setting_non_working_week_days: Non-working days
+  label_in_the_next_days: in the next
+  label_in_the_past_days: in the past

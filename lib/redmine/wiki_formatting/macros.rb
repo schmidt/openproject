@@ -180,10 +180,13 @@ module Redmine
 
       desc "Displays a list of child pages. With no argument, it displays the child pages of the current wiki page. Examples:\n\n" +
              "  !{{child_pages}} -- can be used from a wiki page only\n" +
+             "  !{{child_pages(depth=2)}} -- display 2 levels nesting only\n"
              "  !{{child_pages(Foo)}} -- lists all children of page Foo\n" +
              "  !{{child_pages(Foo, parent=1)}} -- same as above with a link to page Foo"
       macro :child_pages do |obj, args|
-        args, options = extract_macro_options(args, :parent)
+        args, options = extract_macro_options(args, :parent, :depth)
+        options[:depth] = options[:depth].to_i if options[:depth].present?
+
         page = nil
         if args.size > 0
           page = Wiki.find_page(args.first.to_s, :project => @project)
@@ -193,7 +196,7 @@ module Redmine
           raise 'With no argument, this macro can be called from wiki pages only.'
         end
         raise 'Page not found' if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
-        pages = ([page] + page.descendants).group_by(&:parent_id)
+        pages = page.self_and_descendants(options[:depth]).group_by(&:parent_id)
         render_page_hierarchy(pages, options[:parent] ? page.parent_id : page.id)
       end
 
@@ -206,6 +209,19 @@ module Redmine
         @included_wiki_pages << page.title
         out = textilizable(page.content, :text, :attachments => page.attachments, :headings => false)
         @included_wiki_pages.pop
+        out
+      end
+
+      desc "Inserts of collapsed block of text. Example:\n\n  {{collapse(View details...)\nThis is a block of text that is collapsed by default.\nIt can be expanded by clicking a link.\n}}"
+      macro :collapse do |obj, args, text|
+        html_id = "collapse-#{Redmine::Utils.random_hex(4)}"
+        show_label = args[0] || l(:button_show)
+        hide_label = args[1] || args[0] || l(:button_hide)
+        js = "$('##{html_id}-show, ##{html_id}-hide').toggle(); $('##{html_id}').fadeToggle(150);"
+        out = ''.html_safe
+        out << link_to_function(show_label, js, :id => "#{html_id}-show", :class => 'collapsible collapsed')
+        out << link_to_function(hide_label, js, :id => "#{html_id}-hide", :class => 'collapsible', :style => 'display:none;')
+        out << content_tag('div', textilizable(text, :object => obj), :id => html_id, :class => 'collapsed-text', :style => 'display:none;')
         out
       end
 

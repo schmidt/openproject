@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class VersionTest < ActiveSupport::TestCase
-  fixtures :projects, :users, :issues, :issue_statuses, :trackers, :enumerations, :versions
+  fixtures :projects, :users, :issues, :issue_statuses, :trackers, :enumerations, :versions, :projects_trackers
 
   def setup
   end
@@ -117,6 +117,11 @@ class VersionTest < ActiveSupport::TestCase
 
     assert_equal [v5, v3, v1, v2, v4], [v1, v2, v3, v4, v5].sort
     assert_equal [v5, v3, v1, v2, v4], Version.sorted.all
+  end
+
+  def test_completed_should_be_false_when_due_today
+    version = Version.create!(:project_id => 1, :effective_date => Date.today, :name => 'Due today')
+    assert_equal false, version.completed?
   end
 
   context "#behind_schedule?" do

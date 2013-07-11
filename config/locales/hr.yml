@@ -237,7 +237,6 @@ hr:
   field_homepage: Naslovnica
   field_is_public: Javni projekt
   field_parent: Potprojekt od
-  field_is_in_chlog: Predmeti se prikazuju u dnevniku promjena
   field_is_in_roadmap: Predmeti se prikazuju u Putokazu
   field_login: Korisničko ime
   field_mail_notification: Obavijest putem e-pošte
@@ -507,7 +506,6 @@ hr:
   label_news_latest: Novosti
   label_news_view_all: Pregled svih novosti
   label_news_added: Novosti dodane
-  label_change_log: Dnevnik promjena
   label_settings: Postavke
   label_overview: Pregled
   label_version: Verzija
@@ -1066,3 +1064,22 @@ hr:
   label_attribute_of_assigned_to: Assignee's %{name}
   label_attribute_of_fixed_version: Target version's %{name}
   label_copy_subtasks: Copy subtasks
+  label_copied_to: copied to
+  label_copied_from: copied from
+  label_any_issues_in_project: any issues in project
+  label_any_issues_not_in_project: any issues not in project
+  field_private_notes: Private notes
+  permission_view_private_notes: View private notes
+  permission_set_notes_private: Set notes as private
+  label_no_issues_in_project: no issues in project
+  label_any: Svi
+  label_last_n_weeks: last %{count} weeks
+  setting_cross_project_subtasks: Allow cross-project subtasks
+  label_cross_project_descendants: With subprojects
+  label_cross_project_tree: With project tree
+  label_cross_project_hierarchy: With project hierarchy
+  label_cross_project_system: With all projects
+  button_hide: Hide
+  setting_non_working_week_days: Non-working days
+  label_in_the_next_days: in the next
+  label_in_the_past_days: in the past
