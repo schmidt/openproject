@@ -270,20 +270,28 @@ module ApplicationHelper
     end
   end
 
-  def project_tree_options_for_select(projects, options = {})
-    s = ''
-    project_tree(projects) do |project, level|
-      name_prefix = (level > 0 ? ('&nbsp;' * 3 * level + '&#187; ') : '')
-      tag_options = {:value => project.id, :title => h(project)}
-      if project == options[:selected] || (options[:selected].respond_to?(:include?) && options[:selected].include?(project))
+  def project_tree_options_for_select(projects, options = {}, &block)
+    Project.project_level_list(projects).map do |element|
+
+      tag_options = {
+        :value => h(element[:project].id),
+        :title => h(element[:project].name),
+      }
+
+      if options[:selected] == element[:project] ||
+         (options[:selected].respond_to?(:include?) &&
+          options[:selected].include?(element[:project]))
+
         tag_options[:selected] = 'selected'
-      else
-        tag_options[:selected] = nil
       end
-      tag_options.merge!(yield(project)) if block_given?
-      s << content_tag('option', name_prefix + h(project), tag_options)
-    end
-    s
+
+      level_prefix = ''
+      level_prefix = '&nbsp;' * 3 * element[:level] + '&#187; ' if element[:level] > 0
+
+      tag_options.merge!(yield(element[:project])) if block_given?
+
+      content_tag('option', level_prefix + h(element[:project].name), tag_options)
+    end.join('')
   end
 
   # Yields the given block for each project with its level in the tree
@@ -368,14 +376,16 @@ module ApplicationHelper
   def pagination_links_full(paginator, count=nil, options={})
     page_param = options.delete(:page_param) || :page
     per_page_links = options.delete(:per_page_links)
-    url_param = {}
 
-    action, controller, id, tab = options.delete(:action), options.delete(:controller), options.delete(:id), options.delete(:tab)
+    # options for the underlying classic pagination
+    ignored_options = [:window_size,
+                       :always_show_anchors,
+                       :link_to_current_page,
+                       :name,
+                       :prefix,
+                       :suffix]
 
-    url_param.merge!(:action => action) if action
-    url_param.merge!(:controller => controller) if controller
-    url_param.merge!(:id => id) if id
-    url_param.merge!(:tab => tab) if tab
+    url_param = options.reject{ |key, value| ignored_options.include?(key) }
 
     # don't reuse query params if filters are present
     url_param.merge!(:fields => nil, :values => nil, :operators => nil) if params.delete(:set_filter)
@@ -939,7 +949,7 @@ module ApplicationHelper
 
   def checked_image(checked=true)
     if checked
-      image_tag('toggle_check.png', :alt => l(:label_checked), :title => l(:label_checked))
+      image_tag('check.png', :alt => l(:label_checked), :title => l(:label_checked))
     end
   end
 
@@ -1042,10 +1052,21 @@ module ApplicationHelper
   # Returns the javascript tags that are included in the html layout head
   def javascript_heads
     tags = javascript_include_tag(:defaults)
+    tags << javascript_include_tag("openproject")
+    tags << javascript_tag(%Q{
+      window.openProject = new OpenProject({
+        urlRoot : '#{Redmine::Utils.relative_url_root}'
+      });
+    })
+
     unless User.current.pref.warn_on_leaving_unsaved == '0'
       tags << "\n" + javascript_tag("Event.observe(window, 'load', function(){ new WarnLeavingUnsaved('#{escape_javascript( l(:text_warn_on_leaving_unsaved) )}'); });")
     end
-    tags << "\n" + javascript_include_tag("accessibility.js") if User.current.impaired? and accessibility_js_enabled?
+
+    if User.current.impaired? and accessibility_js_enabled?
+      tags << "\n" + javascript_include_tag("accessibility.js")
+    end
+
     tags
   end
 
@@ -1085,31 +1106,12 @@ module ApplicationHelper
 
   # Expands the current menu item using JavaScript based on the params
   def expand_current_menu
-    current_menu_class =
-      case
-      when params[:controller] == "timelog"
-        "reports"
-      when params[:controller] == 'reports'
-        'issues'
-      when params[:controller] == 'projects' && params[:action] == 'changelog'
-        "reports"
-      when params[:controller] == 'issues' && ['calendar','gantt'].include?(params[:action])
-        "reports"
-      when params[:controller] == 'projects' && params[:action] == 'roadmap'
-        'roadmap'
-      when params[:controller] == 'versions' && params[:action] == 'show'
-        'roadmap'
-      when params[:controller] == 'projects' && params[:action] == 'settings'
-        'settings'
-      when params[:controller] == 'contracts' || params[:controller] == 'deliverables'
-        'contracts'
-      when params[:controller] == 'my' && params[:action] == 'account'
-        'account'
-      else
-        params[:controller].dasherize
-      end
-
-    javascript_tag("jQuery.menu_expand({ menuItem: '.#{current_menu_class}' });")
+    javascript_tag do
+      "jQuery.menu_expand({ item: jQuery('#main-menu .selected').parents('#main-menu li')
+                                                                .last()
+                                                                .find('a')
+                                                                .first() });"
+    end
   end
 
 
@@ -1128,7 +1130,7 @@ module ApplicationHelper
   def accessibility_js_enabled?
     !@accessibility_js_disabled
   end
-  
+
   #
   # Returns the footer text displayed in the layout file.
   #

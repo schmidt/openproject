@@ -526,6 +526,7 @@ de:
   label_login: Anmelden
   label_logout: Abmelden
   label_help: Hilfe
+  label_hide: Verbergen
   label_reported_issues: Gemeldete Tickets
   label_assigned_to_me_issues: Mir zugewiesen
   label_last_login: Letzte Anmeldung
@@ -700,6 +701,21 @@ de:
   label_wiki_edit_plural: Wiki-Bearbeitungen
   label_wiki_page: Wiki-Seite
   label_wiki_page_plural: Wiki-Seiten
+
+  wiki_menu_item: "Menüpunkt"
+  wiki_menu_item_for: "Menüpunkt für die Wikiseite \"%{title}\""
+  label_wiki_dont_show_menu_item: Wikiseite nicht in der Projektnavigation anzeigen
+  label_wiki_show_menu_item: als Menüpunkt in der Projektnavigation anzeigen
+  label_wiki_show_submenu_item: "als Untermenüpunkt anzeigen von "
+  label_menu_item_name: Name des Menüpunktes
+  wiki_menu_item_setting: Sichtbarkeit
+  label_wiki_show_new_page_link: "'Neue Unterseite anlegen' Link als Untermenüpunkt anzeigen"
+  label_wiki_show_index_page_link: "'Inhaltsverzeichnis' Link als Untermenüpunkt anzeigen"
+
+  create_child_page: Neue Unterseite anlegen
+  create_child_page_for: "Neue Unterseite anlegen: \"%{title}\""
+  create_new_page: Neue Seite anlegen
+
   label_index_by_title: Seiten nach Titel
   label_index_by_date: Seiten nach Datum
   label_current_version: Gegenwärtige Version
@@ -891,6 +907,7 @@ de:
   button_duplicate: Duplizieren
   button_show: Anzeigen
   button_remove_widget: Infobox löschen
+  button_wiki_menu_entry: Menüpunkt verwalten
 
   status_active: aktiv
   status_registered: angemeldet
@@ -911,8 +928,11 @@ de:
   text_are_you_sure: Sind Sie sicher?
   text_are_you_sure_with_children: "Lösche Aufgabe und alle Unteraufgaben?"
   text_journal_changed: "%{label} wurde von %{old} zu %{new} geändert"
+  text_journal_changed_with_diff: "%{label} geändert (%{link})"
   text_journal_set_to: "%{label} wurde auf %{value} gesetzt"
+  text_journal_set_with_diff: "%{label} gesetzt (%{link})"
   text_journal_deleted: "%{label} %{old} wurde gelöscht"
+  text_journal_deleted_with_diff: "%{label} wurde gelöscht (%{link})"
   text_journal_added: "%{label} %{value} wurde hinzugefügt"
   text_tip_issue_begin_day: Aufgabe, die an diesem Tag beginnt
   text_tip_issue_end_day: Aufgabe, die an diesem Tag endet
@@ -950,7 +970,7 @@ de:
   text_enumeration_destroy_question: "%{count} Objekt(e) sind diesem Wert zugeordnet."
   text_enumeration_category_reassign_to: 'Die Objekte stattdessen diesem Wert zuordnen:'
   text_email_delivery_not_configured: "Der SMTP-Server ist nicht konfiguriert und Mailbenachrichtigungen sind ausgeschaltet.\nNehmen Sie die Einstellungen für Ihren SMTP-Server in config/configuration.yml vor und starten Sie die Applikation neu."
-  text_repository_usernames_mapping: "Bitte legen Sie die Zuordnung der Redmine-Benutzer zu den Benutzernamen der Commit-Log-Meldungen des Projektarchivs fest.\nBenutzer mit identischen Redmine- und Projektarchiv-Benutzernamen oder -E-Mail-Adressen werden automatisch zugeordnet."
+  text_repository_usernames_mapping: "Bitte legen Sie die Zuordnung der OpenProject-Benutzer zu den Benutzernamen der Commit-Log-Meldungen des Projektarchivs fest.\nBenutzer mit identischen OpenProject- und Projektarchiv-Benutzernamen oder -E-Mail-Adressen werden automatisch zugeordnet."
   text_diff_truncated: '... Dieser Diff wurde abgeschnitten, weil er die maximale Anzahl anzuzeigender Zeilen überschreitet.'
   text_custom_field_possible_values_info: 'Eine Zeile pro Wert'
   text_wiki_page_destroy_question: "Diese Seite hat %{descendants} Unterseite(n). Was möchten Sie tun?"
@@ -1096,3 +1116,21 @@ de:
           Von den von Ihnen im Zuge der Nutzung der Anwendung erstellen Daten (z.B. E-Mail-Adresse, Systemeinstellungen, Tickets, Wiki-Einträgen) werden so viele wie möglich gelöscht. Bitte beachten Sie allerdings, dass Daten wie Tickets und Wiki-Einträge nicht gelöscht werden können, da dies die Arbeit der anderen Nutzer behindern würde. Solche Daten werden daher einem "Gelöschten Nutzer" zugewiesen. Da die Daten aller gelöschter Accounts dem "Gelöschten Nutzer" zugewiesen werden ist es unmöglich die von ihnen erstellten Daten auf Ihre Person zurückzuführen.
         other: |
           Von den vom Nutzer im Zuge der Nutzung der Anwendung erstellen Daten (z.B. E-Mail-Adresse, Systemeinstellungen, Tickets, Wiki-Einträgen) werden so viele wie möglich gelöscht. Bitte beachten Sie allerdings, dass Daten wie Tickets und Wiki-Einträge nicht gelöscht werden können, da dies die Arbeit der anderen Nutzer behindern würde. Solche Daten werden daher einem "Gelöschten Nutzer" zugewiesen. Da die Daten aller gelöschter Accounts dem "Gelöschten Nutzer" zugewiesen werden ist es unmöglich die von Nutzer erstellten Daten auf seine Person zurückzuführen.
+
+
+  js:
+    select2:
+      searching: Suche ...
+      load_more: Mehr Ergebnisse werden geladen ...
+      no_matches: Keine Treffer
+      input_too_short:
+        one: Bitte geben Sie ein weiteres Zeichen ein
+        other: Bitte geben Sie {{count}} weitere Zeichen ein
+        zero: Bitte geben Sie weitere Zeichen ein
+      selection_too_big:
+        one: Sie dürfen nur ein Element auswählen
+        other: Sie dürfen nur {{limit}} Elemente auswählen
+        zero: Sie dürfen keine Elemente auswählen
+    ajax:
+      loading: Lädt ...
+      hide: Verbergen

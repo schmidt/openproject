@@ -5,6 +5,7 @@
 <title><%= html_title %></title>
 <meta name="description" content="<%= Redmine::Info.app_name %>" />
 <meta name="keywords" content="issue,bug,tracker" />
+<meta name="current_menu_item" content="<%= current_menu_item %>" />
 <%= csrf_meta_tag %>
 <%= favicon %>
 <%= stylesheet_link_tag 'reset', :media => 'all' %>
@@ -20,8 +21,13 @@
 <%= javascript_include_tag 'jquery-ui.min.js' %>
 <%= javascript_include_tag 'jquery.menu_expand.js' %>
 <%= javascript_include_tag 'breadcrumb.js' %>
-<%= javascript_include_tag 'chosen.js'%>
-<%= stylesheet_link_tag 'chosen'%>
+<%= javascript_include_tag 'select2.js' %>
+<%= javascript_include_tag 'findDomElement.js' %>
+<%= stylesheet_link_tag 'select2'%>
+<%= stylesheet_link_tag 'select2_customizing'%>
+
+<%= i18n_js_tags %>
+
 <% if User.current.impaired? && accessibility_css_enabled? %>
   <%= stylesheet_link_tag 'accessibility' %>
 <% end %>
@@ -97,19 +103,7 @@
       <%= render_flash_messages %>
 
       <!-- Action menu -->
-      <% if @content_for_action_menu_main %>
-        <ul class="action_menu_main">
-          <%= yield :action_menu_main %>
-          <% if @content_for_action_menu_more %>
-            <li class="drop-down">
-              <a href="javascript:" class="icon icon-more"><%= l(:more_actions) %></a>
-              <ul class="action_menu_more" style="display:none;">
-                <%= yield :action_menu_more %>
-              </ul>
-            </li>
-          <% end %>
-        </ul>
-      <% end %>
+      <%= render :partial => 'layouts/action_menu' %>
 
       <%= yield %>
       <%= call_hook :view_layouts_base_content %>

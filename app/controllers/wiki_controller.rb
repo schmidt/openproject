@@ -34,11 +34,29 @@ class WikiController < ApplicationController
   before_filter :find_existing_page, :only => [:rename, :protect, :history, :diff, :annotate, :add_attachment, :destroy]
 
   verify :method => :post, :only => [:protect], :redirect_to => { :action => :show }
+  verify :method => :get,  :only => [:new, :new_child], :render => {:nothing => true, :status => :method_not_allowed}
+  verify :method => :post, :only => :create,            :render => {:nothing => true, :status => :method_not_allowed}
 
   include AttachmentsHelper
 
+  attr_reader :page, :related_page
+
+  current_menu_item :index do |controller|
+    controller.current_menu_item_sym :related_page, "_toc"
+  end
+
+  current_menu_item :new_child do |controller|
+    controller.current_menu_item_sym :page, "_new_page"
+  end
+
+  current_menu_item do |controller|
+    controller.current_menu_item_sym :page
+  end
+
   # List of pages, sorted alphabetically and by parent (hierarchy)
   def index
+    @related_page = WikiPage.find_by_wiki_id_and_title(@wiki.id, params[:id])
+
     load_pages_for_index
     @pages_by_parent_id = @pages.group_by(&:parent_id)
   end
@@ -47,6 +65,45 @@ class WikiController < ApplicationController
   def date_index
     load_pages_for_index
     @pages_by_date = @pages.group_by {|p| p.updated_on.to_date}
+  end
+
+  def new
+    @page = WikiPage.new(:wiki => @wiki)
+    @page.content = WikiContent.new(:page => @page)
+
+    @content = @page.content_for_version(nil)
+    @content.text = initial_page_content(@page)
+  end
+
+  def new_child
+    find_existing_page
+    return if performed?
+
+    old_page = @page
+
+    new
+
+    @page.parent = old_page
+    render :action => 'new'
+  end
+
+  def create
+    new
+
+    @page.title     = params[:page][:title]
+    @page.parent_id = params[:page][:parent_id]
+
+    @content.attributes = params[:content].slice(:comments, :text)
+    @content.author = User.current
+
+    if @page.save
+      attachments = Attachment.attach_files(@page, params[:attachments])
+      render_attachment_warning_if_needed(@page)
+      call_hook(:controller_wiki_edit_after_save, :params => params, :page => @page)
+      redirect_to :action => 'show', :project_id => @project, :id => @page.title
+    else
+      render :action => 'new'
+    end
   end
 
   # display a page (in editing mode if it doesn't exist)
@@ -233,6 +290,14 @@ class WikiController < ApplicationController
     attachments = Attachment.attach_files(@page, params[:attachments])
     render_attachment_warning_if_needed(@page)
     redirect_to :action => 'show', :id => @page.title, :project_id => @project
+  end
+
+  def current_menu_item_sym page, symbol_postfix = ""
+    menu_item = self.send(page).try(:nearest_menu_item)
+
+    menu_item.present? ?
+      :"#{menu_item.item_class}#{symbol_postfix}" :
+      nil
   end
 
 private

@@ -14,6 +14,7 @@
 
 class IssuesController < ApplicationController
   EXPORT_FORMATS = %w[atom rss api xls csv pdf]
+  DEFAULT_SORT_ORDER = ['parent', 'desc']
 
   menu_item :new_issue, :only => [:new, :create]
   menu_item :view_all_issues, :only => [:all]
@@ -55,7 +56,7 @@ class IssuesController < ApplicationController
   verify :method => :put, :only => :update, :render => {:nothing => true, :status => :method_not_allowed }
 
   def index
-    sort_init(@query.sort_criteria.empty? ? [['parent', 'desc']] : @query.sort_criteria)
+    sort_init(@query.sort_criteria.empty? ? [DEFAULT_SORT_ORDER] : @query.sort_criteria)
     sort_update(@query.sortable_columns)
 
     if @query.valid?
@@ -103,12 +104,30 @@ class IssuesController < ApplicationController
   def show
     @journals = @issue.journals.changing.find(:all, :include => [:user], :order => "#{Journal.table_name}.created_at ASC")
     @journals.reverse! if User.current.wants_comments_in_reverse_order?
-    @changesets = @issue.changesets.visible.all
+    @changesets = @issue.changesets.visible.all(:include => [{ :repository => {:project => :enabled_modules} }, :user])
     @changesets.reverse! if User.current.wants_comments_in_reverse_order?
-    @relations = @issue.relations.select {|r| r.other_issue(@issue) && r.other_issue(@issue).visible? }
-    @allowed_statuses = @issue.new_statuses_allowed_to(User.current)
+
+    @relations = @issue.relations(:include => { :other_issue => [:status,
+                                                                 :priority,
+                                                                 :tracker,
+                                                                 { :project => :enabled_modules }]
+                                              }
+                                 ).select{ |r| r.other_issue(@issue) && r.other_issue(@issue).visible? }
+
+    @ancestors = @issue.ancestors.visible.all(:include => [:tracker,
+                                                           :assigned_to,
+                                                           :status,
+                                                           :priority,
+                                                           :fixed_version,
+                                                           :project])
+    @descendants = @issue.descendants.visible.all(:include => [:tracker,
+                                                               :assigned_to,
+                                                               :status,
+                                                               :priority,
+                                                               :fixed_version,
+                                                               :project])
+
     @edit_allowed = User.current.allowed_to?(:edit_issues, @project)
-    @priorities = IssuePriority.all
     @time_entry = TimeEntry.new(:issue => @issue, :project => @issue.project)
     respond_to do |format|
       format.html { render :template => 'issues/show.rhtml' }
@@ -158,6 +177,7 @@ class IssuesController < ApplicationController
     @journal = @issue.current_journal
 
     respond_to do |format|
+      format.js { render :partial => 'edit' }
       format.html { }
       format.xml  { }
     end
@@ -251,7 +271,14 @@ class IssuesController < ApplicationController
 
 private
   def find_issue
-    @issue = Issue.find(params[:id], :include => [:project, :tracker, :status, :author, :priority, :category])
+    @issue = Issue.find(params[:id], :include => [{ :project => :enabled_modules },
+                                                  { :tracker => :custom_fields },
+                                                  :status,
+                                                  :author,
+                                                  :priority,
+                                                  :watcher_users,
+                                                  :custom_values,
+                                                  :category])
     @project = @issue.project
   rescue ActiveRecord::RecordNotFound
     render_404
@@ -305,6 +332,12 @@ private
         @issue.watcher_user_ids = params[:issue]['watcher_user_ids']
       end
     end
+
+    # Copy watchers if we're copying an issue
+    if params[:copy_from] && User.current.allowed_to?(:add_issue_watchers, @project)
+      @issue.watcher_user_ids = Issue.visible.find(params[:copy_from]).watcher_user_ids
+    end
+
     @issue.author = User.current
     @priorities = IssuePriority.all
     @allowed_statuses = @issue.new_statuses_allowed_to(User.current, true)

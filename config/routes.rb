@@ -38,7 +38,13 @@ ActionController::Routing::Routes.draw do |map|
   end
 
   map.resources :time_entries, :controller => 'timelog'
+  map.resource :wiki_menu_item, :path_prefix => "projects/:project_id/wiki/:id", :only => [:edit, :update]
 
+  map.wiki_new       'projects/:project_id/wiki/new',     :controller => 'wiki', :action => 'new',    :conditions => { :method => :get }
+  map.wiki_create    'projects/:project_id/wiki/new',     :controller => 'wiki', :action => 'create', :conditions => { :method => :post }
+  map.wiki_preview   'projects/:project_id/wiki/preview', :controller => 'wiki', :action => 'preview', :conditions => { :method => :post }
+  map.wiki_new_child 'projects/:project_id/wiki/:id/new', :controller => 'wiki', :action => 'new_child', :conditions => { :method => :get }
+  map.wiki_page_toc 'projects/:project_id/wiki/:id/toc', :controller => 'wiki', :action => 'index', :conditions => { :method => :get }
   map.connect 'projects/:id/wiki', :controller => 'wikis', :action => 'edit', :conditions => {:method => :post}
   map.connect 'projects/:id/wiki/destroy', :controller => 'wikis', :action => 'destroy', :conditions => {:method => :get}
   map.connect 'projects/:id/wiki/destroy', :controller => 'wikis', :action => 'destroy', :conditions => {:method => :post}
@@ -94,7 +100,8 @@ ActionController::Routing::Routes.draw do |map|
   map.bulk_update_issue 'issues/bulk_edit', :controller => 'issues', :action => 'bulk_update', :conditions => { :method => :post }
   map.quoted_issue '/issues/:id/quoted', :controller => 'journals', :action => 'new', :id => /\d+/, :conditions => { :method => :post }
   map.connect '/issues/:id/destroy', :controller => 'issues', :action => 'destroy', :conditions => { :method => :post } # legacy
-
+  map.journal_diff '/journals/:id/diff/:field', :controller => 'journals', :action => 'diff', :conditions => { :method => :get }
+  
   map.resource :gantt, :path_prefix => '/issues', :controller => 'gantts', :only => [:show, :update]
   map.resource :gantt, :path_prefix => '/projects/:project_id/issues', :controller => 'gantts', :only => [:show, :update]
   map.resource :calendar, :path_prefix => '/issues', :controller => 'calendars', :only => [:show, :update]
@@ -155,6 +162,8 @@ ActionController::Routing::Routes.draw do |map|
     :modules => :post,
     :archive => :post,
     :unarchive => :post
+  }, :collection => {
+    :level_list => :get
   } do |project|
     project.resource :project_enumerations, :as => 'enumerations', :only => [:update, :destroy]
     project.resources :files, :only => [:index, :new, :create]

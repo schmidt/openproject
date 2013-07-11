@@ -22,9 +22,19 @@ class Project < ActiveRecord::Base
   # Maximum length for project identifiers
   IDENTIFIER_MAX_LENGTH = 100
 
+  # reserved identifiers
+  RESERVED_IDENTIFIERS = %w( new level_list )
+
   # Specific overidden Activities
   has_many :time_entry_activities
   has_many :members, :include => [:user, :roles], :conditions => "#{User.table_name}.type='User' AND #{User.table_name}.status=#{User::STATUS_ACTIVE}"
+  has_many :assignable_members,
+           :class_name => 'Member',
+           :include => [:user, :roles],
+           :conditions => ["#{User.table_name}.type=? AND #{User.table_name}.status=? AND roles.assignable = ?",
+                           'User',
+                           User::STATUS_ACTIVE,
+                           true]
   has_many :memberships, :class_name => 'Member'
   has_many :member_principals, :class_name => 'Member',
                                :include => :principal,
@@ -74,7 +84,7 @@ class Project < ActiveRecord::Base
   # donwcase letters, digits, dashes but not digits only
   validates_format_of :identifier, :with => /^(?!\d+$)[a-z0-9\-_]*$/, :if => Proc.new { |p| p.identifier_changed? }
   # reserved words
-  validates_exclusion_of :identifier, :in => %w( new )
+  validates_exclusion_of :identifier, :in => RESERVED_IDENTIFIERS
 
   before_destroy :delete_all_members
 
@@ -425,7 +435,7 @@ class Project < ActiveRecord::Base
 
   # Users issues can be assigned to
   def assignable_users
-    members.select {|m| m.roles.detect {|role| role.assignable?}}.collect {|m| m.user}.sort
+    assignable_members.map(&:user).sort
   end
 
   # Returns the mail adresses of users that should be always notified on project events
@@ -687,6 +697,23 @@ class Project < ActiveRecord::Base
     project_tree_from_hierarchy(projects_hierarchy, 0, &block)
   end
 
+  def self.project_level_list(projects)
+    list = []
+    project_tree(projects) do |project, level|
+
+      element = {
+        :project => project,
+        :level   => level
+      }
+
+      element.merge!(yield(project)) if block_given?
+
+      list << element
+    end
+    list
+  end
+
+
   private
 
   # Copies wiki from +project+
@@ -845,8 +872,9 @@ class Project < ActiveRecord::Base
 
   def allowed_permissions
     @allowed_permissions ||= begin
-      module_names = enabled_modules.all(:select => :name).collect {|m| m.name}
-      Redmine::AccessControl.modules_permissions(module_names).collect {|p| p.name}
+      names = enabled_modules.loaded? ? enabled_module_names : enabled_modules.all(:select => :name).map(&:name)
+
+      Redmine::AccessControl.modules_permissions(names).map(&:name)
     end
   end
 

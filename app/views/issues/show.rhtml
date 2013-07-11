@@ -1,6 +1,7 @@
 <%= render :partial => 'action_menu' %>
 
-<% breadcrumb_paths(*[link_to(l(:label_issue_plural), {:controller => 'issues', :action => 'index'})] << @issue.ancestors.collect {|parent| link_to '#' + h(parent.id), {:controller => 'issues', :action => 'show', :id => parent}}) unless @issue.ancestors.empty? %>
+<% breadcrumb_paths(*[link_to(l(:label_issue_plural), {:controller => 'issues', :action => 'index'})] << @ancestors.collect {|parent| link_to '#' + h(parent.id), {:controller => 'issues', :action => 'show', :id => parent}}) unless @ancestors.empty? %>
+
 <%= content_tag('h2', h(@issue.tracker.name) + ' #' +@issue.id.to_s) %>
 
 <div class="<%= @issue.css_classes %> details">
@@ -75,7 +76,7 @@
 
 <%= render :partial => 'subissues_paragraph' %>
 
-<% if authorize_for('issue_relations', 'new') || @issue.relations.present? %>
+<% if authorize_for('issue_relations', 'new') || @relations.present? %>
 <div id="relations">
 <%= render :partial => 'relations' %>
 </div>
@@ -107,13 +108,12 @@
 <div style="clear: both;"></div>
 
 <div class="title-bar" id="lower-title-bar">
-  <%= javascript_include_tag 'copy_issue_actions' %>
+  <%= render :partial => 'layouts/action_menu' %>
 </div>
 
 <div style="clear: both;"></div>
 <% if authorize_for('issues', 'edit') %>
-<div id="update" style="display:none;">
-  <%= render :partial => 'edit' %>
+  <div id="update">
   </div>
 <% end %>
 
@@ -137,3 +137,6 @@
 <% end %>
 <div id="context-menu" style="display: none;"></div>
 <%= javascript_tag "new ContextMenu('#{issues_context_menu_path}')" %>
+
+<% #include calendar js files in case they are needed for edit
+  include_calendar_headers_tags -%>

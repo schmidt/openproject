@@ -44,10 +44,11 @@ module JournalsHelper
       </h4>
     HTML
 
+
     if journal.details.any?
       details = content_tag "ul", :class => "details journal-attributes" do
         journal.details.collect do |detail|
-          if d = journal.render_detail(detail)
+          if d = journal.render_detail(detail, :cache => options[:cache])
             content_tag("li", d)
           end
         end.compact.join(' ')
@@ -75,7 +76,7 @@ module JournalsHelper
     unless journal.notes.blank?
       links = [].tap do |l|
         if reply_links
-          l << link_to_remote(image_tag('comment.png', :alt => l(:button_quote), :title => l(:button_quote)),
+          l << link_to_remote(image_tag('quote.png', :alt => l(:button_quote), :title => l(:button_quote)),
             :url => {:controller => controller, :action => action, :id => model, :journal_id => journal})
         end
         if editable

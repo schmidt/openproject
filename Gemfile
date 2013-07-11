@@ -1,14 +1,16 @@
 source :rubygems
 
-gem "rails", "2.3.14"
+gem "rails", "2.3.18"
 
 gem "coderay", "~> 0.9.7"
-gem "i18n", "~> 0.4.2"
+gem "i18n", "> 0.4"
 gem "rubytree", "~> 0.5.2", :require => 'tree'
 gem "rdoc", ">= 2.4.2"
 # Needed only on RUBY_VERSION = 1.8, ruby 1.9+ compatible interpreters should bring their csv
 gem "fastercsv", "~> 1.5.0", :platforms => [:ruby_18, :jruby, :mingw_18]
 gem 'delayed_job', "~>2.0.4"
+
+gem "i18n-js", "~> 2.1.2"
 
 group :test do
   gem 'shoulda', '~> 2.10.3'
@@ -94,15 +96,9 @@ platforms :jruby do
   end
 end
 
-# Load a "local" Gemfile
-gemfile_local = File.join(File.dirname(__FILE__), "Gemfile.local")
-if File.readable?(gemfile_local)
-  puts "Loading #{gemfile_local} ..." if $DEBUG
-  instance_eval(File.read(gemfile_local))
-end
+# Load Gemfile.local and plugins' Gemfiles
+Dir.glob File.expand_path("../{Gemfile.local,vendor/plugins/*/Gemfile}", __FILE__) do |file|
+  next unless File.readable?(file)
 
-# Load plugins' Gemfiles
-Dir.glob File.expand_path("../vendor/plugins/*/Gemfile", __FILE__) do |file|
-  puts "Loading #{file} ..." if $DEBUG # `ruby -d` or `bundle -v`
   instance_eval File.read(file)
 end
