@@ -1,6 +1,6 @@
 source :rubygems
 
-gem "rails", "2.3.14"
+gem "rails", "2.3.15"
 gem "i18n", "~> 0.4.2"
 gem "coderay", "~> 1.0.6"
 gem "fastercsv", "~> 1.5.0", :platforms => [:mri_18, :mingw_18, :jruby]
@@ -39,7 +39,7 @@ end
 
 platforms :mri_18, :mingw_18 do
   group :mysql do
-    gem "mysql"
+    gem "mysql", "~> 2.8.1"
   end
 end
 
@@ -71,8 +71,10 @@ end
 
 group :test do
   gem "shoulda", "~> 2.10.3"
+  # Shoulda does not work nice on Ruby 1.9.3 and seems to need test-unit explicitely.
+  gem "test-unit", :platforms => [:mri_19]
   gem "edavis10-object_daddy", :require => "object_daddy"
-  gem "mocha"
+  gem "mocha", "0.12.3"
 end
 
 local_gemfile = File.join(File.dirname(__FILE__), "Gemfile.local")
