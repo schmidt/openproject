@@ -66,6 +66,7 @@ class Repository::Darcs < Repository
         end
       end
     end
+    load_entries_changesets(entries)
     entries
   end
 
@@ -79,7 +80,7 @@ class Repository::Darcs < Repository
     return nil if patch_from.nil?
     patch_to = changesets.find_by_revision(rev_to) if rev_to
     if path.blank?
-      path = patch_from.changes.collect{|change| change.path}.join(' ')
+      path = patch_from.filechanges.collect{|change| change.path}.join(' ')
     end
     patch_from ? scm.diff(path, patch_from.scmid, patch_to ? patch_to.scmid : nil) : nil
   end
