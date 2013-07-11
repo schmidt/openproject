@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -94,6 +94,20 @@ module IssuesHelper
     s.html_safe
   end
 
+  # Returns an array of error messages for bulk edited issues
+  def bulk_edit_error_messages(issues)
+    messages = {}
+    issues.each do |issue|
+      issue.errors.full_messages.each do |message|
+        messages[message] ||= []
+        messages[message] << issue
+      end
+    end
+    messages.map { |message, issues|
+      "#{message}: " + issues.map {|i| "##{i.id}"}.join(', ')
+    }
+ end
+
   # Returns a link for adding a new subtask to the given issue
   def link_to_new_subtask(issue)
     attrs = {
@@ -184,33 +198,35 @@ module IssuesHelper
 
   def sidebar_queries
     unless @sidebar_queries
-      @sidebar_queries = Query.visible.all(
-        :order => "#{Query.table_name}.name ASC",
+      @sidebar_queries = IssueQuery.visible.
+        order("#{Query.table_name}.name ASC").
         # Project specific queries and global queries
-        :conditions => (@project.nil? ? ["project_id IS NULL"] : ["project_id IS NULL OR project_id = ?", @project.id])
-      )
+        where(@project.nil? ? ["project_id IS NULL"] : ["project_id IS NULL OR project_id = ?", @project.id]).
+        all
     end
     @sidebar_queries
   end
 
   def query_links(title, queries)
+    return '' if queries.empty?
     # links to #index on issues/show
     url_params = controller_name == 'issues' ? {:controller => 'issues', :action => 'index', :project_id => @project} : params
 
-    content_tag('h3', h(title)) +
-      queries.collect {|query|
-          css = 'query'
-          css << ' selected' if query == @query
-          link_to(h(query.name), url_params.merge(:query_id => query), :class => css)
-        }.join('<br />').html_safe
+    content_tag('h3', title) + "\n" +
+      content_tag('ul',
+        queries.collect {|query|
+            css = 'query'
+            css << ' selected' if query == @query
+            content_tag('li', link_to(query.name, url_params.merge(:query_id => query), :class => css))
+          }.join("\n").html_safe,
+        :class => 'queries'
+      ) + "\n"
   end
 
   def render_sidebar_queries
     out = ''.html_safe
-    queries = sidebar_queries.select {|q| !q.is_public?}
-    out << query_links(l(:label_my_queries), queries) if queries.any?
-    queries = sidebar_queries.select {|q| q.is_public?}
-    out << query_links(l(:label_query_plural), queries) if queries.any?
+    out << query_links(l(:label_my_queries), sidebar_queries.select(&:is_private?))
+    out << query_links(l(:label_query_plural), sidebar_queries.reject(&:is_private?))
     out
   end
 
@@ -290,6 +306,17 @@ module IssuesHelper
       end
     when 'attachment'
       label = l(:label_attachment)
+    when 'relation'
+      if detail.value && !detail.old_value
+        rel_issue = Issue.visible.find_by_id(detail.value)
+        value = rel_issue.nil? ? "#{l(:label_issue)} ##{detail.value}" :
+                  (no_html ? rel_issue : link_to_issue(rel_issue))
+      elsif detail.old_value && !detail.value
+        rel_issue = Issue.visible.find_by_id(detail.old_value)
+        old_value = rel_issue.nil? ? "#{l(:label_issue)} ##{detail.old_value}" :
+                          (no_html ? rel_issue : link_to_issue(rel_issue))
+      end
+      label = l(detail.prop_key.to_sym)
     end
     call_hook(:helper_issues_show_detail_after_setting,
               {:detail => detail, :label => label, :value => value, :old_value => old_value })
@@ -301,7 +328,9 @@ module IssuesHelper
     unless no_html
       label = content_tag('strong', label)
       old_value = content_tag("i", h(old_value)) if detail.old_value
-      old_value = content_tag("del", old_value) if detail.old_value and detail.value.blank?
+      if detail.old_value && detail.value.blank? && detail.property != 'relation'
+        old_value = content_tag("del", old_value)
+      end
       if detail.property == 'attachment' && !value.blank? && atta = Attachment.find_by_id(detail.prop_key)
         # Link to the attachment if it has not been removed
         value = link_to_attachment(atta, :download => true, :only_path => options[:only_path])
@@ -337,7 +366,7 @@ module IssuesHelper
         else
           l(:text_journal_set_to, :label => label, :value => value).html_safe
         end
-      when 'attachment'
+      when 'attachment', 'relation'
         l(:text_journal_added, :label => label, :value => value).html_safe
       end
     else
@@ -347,10 +376,16 @@ module IssuesHelper
 
   # Find the name of an associated record stored in the field attribute
   def find_name_by_reflection(field, id)
+    unless id.present?
+      return nil
+    end
     association = Issue.reflect_on_association(field.to_sym)
     if association
       record = association.class_name.constantize.find_by_id(id)
-      return record.name if record
+      if record
+        record.name.force_encoding('UTF-8') if record.name.respond_to?(:force_encoding)
+        return record.name
+      end
     end
   end
 
@@ -366,42 +401,5 @@ module IssuesHelper
         end
       end
     end
-  end
-
-  def issues_to_csv(issues, project, query, options={})
-    decimal_separator = l(:general_csv_decimal_separator)
-    encoding = l(:general_csv_encoding)
-    columns = (options[:columns] == 'all' ? query.available_columns : query.columns)
-
-    export = FCSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
-      # csv header fields
-      csv << [ "#" ] + columns.collect {|c| Redmine::CodesetUtil.from_utf8(c.caption.to_s, encoding) } +
-        (options[:description] ? [Redmine::CodesetUtil.from_utf8(l(:field_description), encoding)] : [])
-
-      # csv lines
-      issues.each do |issue|
-        col_values = columns.collect do |column|
-          s = if column.is_a?(QueryCustomFieldColumn)
-            cv = issue.custom_field_values.detect {|v| v.custom_field_id == column.custom_field.id}
-            show_value(cv)
-          else
-            value = column.value(issue)
-            if value.is_a?(Date)
-              format_date(value)
-            elsif value.is_a?(Time)
-              format_time(value)
-            elsif value.is_a?(Float)
-              ("%.2f" % value).gsub('.', decimal_separator)
-            else
-              value
-            end
-          end
-          s.to_s
-        end
-        csv << [ issue.id.to_s ] + col_values.collect {|c| Redmine::CodesetUtil.from_utf8(c.to_s, encoding) } +
-          (options[:description] ? [Redmine::CodesetUtil.from_utf8(issue.description, encoding)] : [])
-      end
-    end
-    export
   end
 end
