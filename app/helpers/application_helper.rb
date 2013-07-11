@@ -468,9 +468,9 @@ module ApplicationHelper
   # Returns the theme, controller name, and action as css classes for the
   # HTML body.
   def body_css_classes
-    theme = Redmine::Themes.theme(Setting.ui_theme)
+    theme = OpenProject::Themes.theme(Setting.ui_theme)
 
-    css = ['theme-' + theme.name.to_s]
+    css = ['theme-' + theme.identifier.to_s]
 
     if params[:controller] && params[:action]
       css << 'controller-' + params[:controller]
@@ -1026,7 +1026,7 @@ module ApplicationHelper
       end
       return gravatar(email.to_s.downcase, options) unless email.blank? rescue nil
     else
-      ''
+      ''.html_safe
     end
   end
 
