@@ -82,6 +82,7 @@ module Redmine #:nodoc:
       view_path = File.join(p.directory, 'app', 'views')
       if File.directory?(view_path)
         ActionController::Base.prepend_view_path(view_path)
+        ActionMailer::Base.prepend_view_path(view_path)
       end
 
       # Adds the app/{controllers,helpers,models} directories of the plugin to the autoload path
@@ -244,13 +245,15 @@ module Redmine #:nodoc:
     #   permission :destroy_contacts, { :contacts => :destroy }
     #   permission :view_contacts, { :contacts => [:index, :show] }
     #
-    # The +options+ argument can be used to make the permission public (implicitly given to any user)
-    # or to restrict users the permission can be given to.
+    # The +options+ argument is a hash that accept the following keys:
+    # * :public => the permission is public if set to true (implicitly given to any user)
+    # * :require => can be set to one of the following values to restrict users the permission can be given to: :loggedin, :member
+    # * :read => set it to true so that the permission is still granted on closed projects
     #
     # Examples
     #   # A permission that is implicitly given to any user
     #   # This permission won't appear on the Roles & Permissions setup screen
-    #   permission :say_hello, { :example => :say_hello }, :public => true
+    #   permission :say_hello, { :example => :say_hello }, :public => true, :read => true
     #
     #   # A permission that can be given to any user
     #   permission :say_hello, { :example => :say_hello }
@@ -333,7 +336,11 @@ module Redmine #:nodoc:
 
       unless source_files.empty?
         base_target_dir = File.join(destination, File.dirname(source_files.first).gsub(source, ''))
-        FileUtils.mkdir_p(base_target_dir)
+        begin
+          FileUtils.mkdir_p(base_target_dir)
+        rescue Exception => e
+          raise "Could not create directory #{base_target_dir}: " + e.message
+        end
       end
 
       source_dirs.each do |dir|
@@ -343,7 +350,7 @@ module Redmine #:nodoc:
         begin
           FileUtils.mkdir_p(target_dir)
         rescue Exception => e
-          raise "Could not create directory #{target_dir}: \n" + e
+          raise "Could not create directory #{target_dir}: " + e.message
         end
       end
 
@@ -354,7 +361,7 @@ module Redmine #:nodoc:
             FileUtils.cp(file, target)
           end
         rescue Exception => e
-          raise "Could not copy #{file} to #{target}: \n" + e
+          raise "Could not copy #{file} to #{target}: " + e.message
         end
       end
     end

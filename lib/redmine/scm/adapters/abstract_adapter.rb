@@ -260,11 +260,21 @@ module Redmine
         def scm_iconv(to, from, str)
           return nil if str.nil?
           return str if to == from
-          begin
-            Iconv.conv(to, from, str)
-          rescue Iconv::Failure => err
-            logger.error("failed to convert from #{from} to #{to}. #{err}")
-            nil
+          if str.respond_to?(:force_encoding)
+            str.force_encoding(from)
+            begin
+              str.encode(to)
+            rescue Exception => err
+              logger.error("failed to convert from #{from} to #{to}. #{err}")
+              nil
+            end
+          else
+            begin
+              Iconv.conv(to, from, str)
+            rescue Iconv::Failure => err
+              logger.error("failed to convert from #{from} to #{to}. #{err}")
+              nil
+            end
           end
         end
 
@@ -278,7 +288,7 @@ module Redmine
 
       class Entries < Array
         def sort_by_name
-          sort {|x,y|
+          dup.sort! {|x,y|
             if x.kind == y.kind
               x.name.to_s <=> y.name.to_s
             else
@@ -301,7 +311,8 @@ module Redmine
       end
 
       class Entry
-        attr_accessor :name, :path, :kind, :size, :lastrev
+        attr_accessor :name, :path, :kind, :size, :lastrev, :changeset
+
         def initialize(attributes={})
           self.name = attributes[:name] if attributes[:name]
           self.path = attributes[:path] if attributes[:path]
@@ -320,6 +331,14 @@ module Redmine
 
         def is_text?
           Redmine::MimeType.is_type?('text', name)
+        end
+
+        def author
+          if changeset
+            changeset.author.to_s
+          elsif lastrev
+            Redmine::CodesetUtil.replace_invalid_utf8(lastrev.author.to_s.split('<').first)
+          end
         end
       end
 
@@ -356,6 +375,18 @@ module Redmine
         # Returns the readable identifier.
         def format_identifier
           self.identifier.to_s
+        end
+
+        def ==(other)
+          if other.nil?
+            false
+          elsif scmid.present?
+            scmid == other.scmid
+          elsif identifier.present?
+            identifier == other.identifier
+          elsif revision.present?
+            revision == other.revision
+          end
         end
       end
 

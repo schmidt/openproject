@@ -70,6 +70,8 @@ namespace :redmine do
       rescue Redmine::PluginNotFound
         abort "Plugin #{name} was not found."
       end
+
+      Rake::Task["db:schema:dump"].invoke
     end
 
     desc 'Copies plugins assets into the public directory.'
@@ -80,6 +82,36 @@ namespace :redmine do
         Redmine::Plugin.mirror_assets(name)
       rescue Redmine::PluginNotFound
         abort "Plugin #{name} was not found."
+      end
+    end
+
+    desc 'Runs the plugins tests.'
+    task :test do
+      Rake::Task["redmine:plugins:test:units"].invoke
+      Rake::Task["redmine:plugins:test:functionals"].invoke
+      Rake::Task["redmine:plugins:test:integration"].invoke
+    end
+
+    namespace :test do
+      desc 'Runs the plugins unit tests.'
+      Rake::TestTask.new :units => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/unit/**/*_test.rb"
+      end
+
+      desc 'Runs the plugins functional tests.'
+      Rake::TestTask.new :functionals => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/functional/**/*_test.rb"
+      end
+
+      desc 'Runs the plugins integration tests.'
+      Rake::TestTask.new :integration => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/integration/**/*_test.rb"
       end
     end
   end

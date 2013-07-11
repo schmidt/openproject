@@ -380,6 +380,21 @@ class ProjectsControllerTest < ActionController::TestCase
     assert_template 'settings'
   end
 
+  def test_settings_should_be_denied_for_member_on_closed_project
+    Project.find(1).close
+    @request.session[:user_id] = 2 # manager
+
+    get :settings, :id => 1
+    assert_response 403
+  end
+
+  def test_settings_should_be_denied_for_anonymous_on_closed_project
+    Project.find(1).close
+
+    get :settings, :id => 1
+    assert_response 302
+  end
+
   def test_update
     @request.session[:user_id] = 2 # manager
     post :update, :id => 1, :project => {:name => 'Test changed name',
@@ -394,7 +409,24 @@ class ProjectsControllerTest < ActionController::TestCase
     post :update, :id => 1, :project => {:name => ''}
     assert_response :success
     assert_template 'settings'
-    assert_error_tag :content => /name can't be blank/i
+    assert_error_tag :content => /name can&#x27;t be blank/i
+  end
+
+  def test_update_should_be_denied_for_member_on_closed_project
+    Project.find(1).close
+    @request.session[:user_id] = 2 # manager
+
+    post :update, :id => 1, :project => {:name => 'Closed'}
+    assert_response 403
+    assert_equal 'eCookbook', Project.find(1).name
+  end
+
+  def test_update_should_be_denied_for_anonymous_on_closed_project
+    Project.find(1).close
+
+    post :update, :id => 1, :project => {:name => 'Closed'}
+    assert_response 302
+    assert_equal 'eCookbook', Project.find(1).name
   end
 
   def test_modules
@@ -412,6 +444,10 @@ class ProjectsControllerTest < ActionController::TestCase
     assert_response :success
     assert_template 'destroy'
     assert_not_nil Project.find_by_id(1)
+    assert_tag :tag => 'strong',
+               :content => ['Private child of eCookbook',
+                            'Child of private child, eCookbook Subproject 1',
+                            'eCookbook Subproject 2'].join(', ')
   end
 
   def test_destroy
@@ -441,6 +477,21 @@ class ProjectsControllerTest < ActionController::TestCase
     Project.find(1).archive
     post :unarchive, :id => 1
     assert_redirected_to '/admin/projects'
+    assert Project.find(1).active?
+  end
+
+  def test_close
+    @request.session[:user_id] = 2
+    post :close, :id => 1
+    assert_redirected_to '/projects/ecookbook'
+    assert_equal Project::STATUS_CLOSED, Project.find(1).status
+  end
+
+  def test_reopen
+    Project.find(1).close
+    @request.session[:user_id] = 2
+    post :reopen, :id => 1
+    assert_redirected_to '/projects/ecookbook'
     assert Project.find(1).active?
   end
 
@@ -491,9 +542,7 @@ class ProjectsControllerTest < ActionController::TestCase
     assert_equal %w(issue_tracking time_tracking), project.enabled_module_names.sort
 
     assert_equal source.versions.count, project.versions.count, "All versions were not copied"
-    # issues assigned to a closed version won't be copied
-    assert_equal source.issues.select {|i| i.fixed_version.nil? || i.fixed_version.open?}.size,
-                 project.issues.count, "All issues were not copied"
+    assert_equal source.issues.count, project.issues.count, "All issues were not copied"
     assert_equal 0, project.members.count
   end
 

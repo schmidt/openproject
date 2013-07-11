@@ -35,6 +35,10 @@ class MailHandlerTest < ActiveSupport::TestCase
     Setting.notified_events = Redmine::Notifiable.all.collect(&:name)
   end
 
+  def teardown
+    Setting.clear_cache
+  end
+
   def test_add_issue
     ActionMailer::Base.deliveries.clear
     # This email contains: 'Project: onlinestore'
@@ -176,6 +180,28 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal 'Value for a custom field',
                  issue.custom_value_for(CustomField.find_by_name('Searchable field')).value
     assert !issue.description.match(/^searchable field:/i)
+  end
+
+  def test_add_issue_with_version_custom_fields
+    field = IssueCustomField.create!(:name => 'Affected version', :field_format => 'version', :is_for_all => true, :tracker_ids => [1,2,3])
+
+    issue = submit_email('ticket_with_custom_fields.eml', :issue => {:project => 'ecookbook'}) do |email|
+      email << "Affected version: 1.0\n"
+    end
+    assert issue.is_a?(Issue)
+    assert !issue.new_record?
+    issue.reload
+    assert_equal '2', issue.custom_field_value(field)
+  end
+
+  def test_add_issue_should_match_assignee_on_display_name
+    user = User.generate!(:firstname => 'Foo Bar', :lastname => 'Foo Baz')
+    User.add_to_project(user, Project.find(2))
+    issue = submit_email('ticket_on_given_project.eml') do |email|
+      email.sub!(/^Assigned to.*$/, 'Assigned to: Foo Bar Foo baz')
+    end
+    assert issue.is_a?(Issue)
+    assert_equal user, issue.assigned_to
   end
 
   def test_add_issue_with_cc
@@ -373,7 +399,8 @@ class MailHandlerTest < ActiveSupport::TestCase
     [
       "X-Auto-Response-Suppress: OOF",
       "Auto-Submitted: auto-replied",
-      "Auto-Submitted: Auto-Replied"
+      "Auto-Submitted: Auto-Replied",
+      "Auto-Submitted: auto-generated"
     ].each do |header|
       raw = IO.read(File.join(FIXTURES_PATH, 'ticket_on_given_project.eml'))
       raw = header + "\n" + raw
@@ -399,6 +426,7 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_equal User.find_by_login('jsmith'), journal.user
     assert_equal Issue.find(2), journal.journalized
     assert_match /This is reply/, journal.notes
+    assert_equal false, journal.private_notes
     assert_equal 'Feature request', journal.issue.tracker.name
   end
 
@@ -458,6 +486,20 @@ class MailHandlerTest < ActiveSupport::TestCase
     assert_match /This is reply/, journal.notes
     assert_equal 'Feature request', journal.issue.tracker.name
     assert_equal 'Normal', journal.issue.priority.name
+  end
+
+  def test_replying_to_a_private_note_should_add_reply_as_private
+    private_journal = Journal.create!(:notes => 'Private notes', :journalized => Issue.find(1), :private_notes => true, :user_id => 2)
+
+    assert_difference 'Journal.count' do
+      journal = submit_email('ticket_reply.eml') do |email|
+        email.sub! %r{^In-Reply-To:.*$}, "In-Reply-To: <redmine.journal-#{private_journal.id}.20060719210421@osiris>"
+      end
+
+      assert_kind_of Journal, journal
+      assert_match /This is reply/, journal.notes
+      assert_equal true, journal.private_notes
+    end
   end
 
   def test_reply_to_a_message
