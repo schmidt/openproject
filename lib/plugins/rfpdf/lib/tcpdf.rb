@@ -39,9 +39,6 @@ require 'core/rmagick'
 # @package com.tecnick.tcpdf
 #
  
-@@version = "1.53.0.TC031"
-@@fpdf_charwidths = {}
-
 PDF_PRODUCER = 'TCPDF via RFPDF 1.53.0.TC031 (http://tcpdf.sourceforge.net)'
 
 module TCPDFFontDescriptor
@@ -79,6 +76,9 @@ class TCPDF
     Rails.logger
   end
 
+  @@version = "1.53.0.TC031"
+  @@fpdf_charwidths = {}
+
   cattr_accessor :k_cell_height_ratio
   @@k_cell_height_ratio = 1.25
 
@@ -94,8 +94,6 @@ class TCPDF
   cattr_accessor :k_path_url_cache
   @@k_path_url_cache = Rails.root.join('tmp')
   
-  cattr_accessor :decoder
-		
 	attr_accessor :barcode
 	
 	attr_accessor :buffer
@@ -222,12 +220,6 @@ class TCPDF
 			
 		#Some checks
 		dochecks();
-		
-		begin	  
-		  @@decoder = HTMLEntities.new 
-		rescue
-		  @@decoder = nil
-		end
 		
 		#Initialization of properties
   	@barcode ||= false
@@ -403,6 +395,9 @@ class TCPDF
 			Error("Incorrect orientation: #{orientation}")
 		end
 
+    @fw = @w_pt/@k
+    @fh = @h_pt/@k
+    
 		@cur_orientation = @def_orientation
 		@w = @w_pt/@k
 		@h = @h_pt/@k
@@ -3615,9 +3610,9 @@ class TCPDF
 		restspace = GetPageHeight() - GetY() - GetBreakMargin();
 		
 		writeHTML(html, true, fill); # write html text
+    SetX(x)
 		
 		currentY =  GetY();
-		
 		@auto_page_break = false;
 		# check if a new page has been created
 		if (@page > pagenum)
@@ -3625,11 +3620,13 @@ class TCPDF
 			currentpage = @page;
 			@page = pagenum;
 			SetY(GetPageHeight() - restspace - GetBreakMargin());
+      SetX(x)
 			Cell(w, restspace - 1, "", b, 0, 'L', 0);
 			b = b2;
 			@page += 1;
 			while @page < currentpage
 				SetY(@t_margin); # put cursor at the beginning of text
+        SetX(x)
 				Cell(w, @page_break_trigger - @t_margin, "", b, 0, 'L', 0);
 				@page += 1;
 			end
@@ -3638,10 +3635,12 @@ class TCPDF
 			end
 			# design a cell around the text on last page
 			SetY(@t_margin); # put cursor at the beginning of text
+      SetX(x)
 			Cell(w, currentY - @t_margin, "", b, 0, 'L', 0);
 		else
 			SetY(y); # put cursor at the beginning of text
 			# design a cell around the text
+      SetX(x)
 			Cell(w, [h, (currentY - y)].max, "", border, 0, 'L', 0);
 		end
 		@auto_page_break = true;
@@ -3995,6 +3994,10 @@ class TCPDF
 				@quote_page[@quote_count] = @page;
 				@quote_count += 1
 			when 'br'
+				if @tdbegin
+					@tdtext << "\n"
+					return
+				end
 				Ln();
 
 				if (@li_spacer.length > 0)
@@ -4333,11 +4336,7 @@ class TCPDF
 	# @return string converted
 	#
 	def unhtmlentities(string)
-	  if @@decoder.nil?
       CGI.unescapeHTML(string)
-    else
-  	  @@decoder.decode(string)
-    end
   end
   
 end # END OF CLASS

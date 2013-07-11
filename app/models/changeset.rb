@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -14,8 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
-require 'iconv'
 
 class Changeset < ActiveRecord::Base
   belongs_to :repository
@@ -49,9 +47,9 @@ class Changeset < ActiveRecord::Base
   validates_uniqueness_of :revision, :scope => :repository_id
   validates_uniqueness_of :scmid, :scope => :repository_id, :allow_nil => true
 
-  scope :visible,
-     lambda {|*args| { :include => {:repository => :project},
-                                          :conditions => Project.allowed_to_condition(args.shift || User.current, :view_changesets, *args) } }
+  scope :visible, lambda {|*args|
+    includes(:repository => :project).where(Project.allowed_to_condition(args.shift || User.current, :view_changesets, *args))
+  }
 
   after_create :scan_for_issues
   before_create :before_create_cs

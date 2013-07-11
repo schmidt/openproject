@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -183,9 +183,7 @@ class RepositoryTest < ActiveSupport::TestCase
     Setting.default_language = 'en'
 
     # choosing a status to apply to fix issues
-    Setting.commit_fix_status_id = IssueStatus.find(
-                                     :first,
-                                     :conditions => ["is_closed = ?", true]).id
+    Setting.commit_fix_status_id = IssueStatus.where(:is_closed => true).first.id
     Setting.commit_fix_done_ratio = "90"
     Setting.commit_ref_keywords = 'refs , references, IssueID'
     Setting.commit_fix_keywords = 'fixes , closes'
@@ -209,7 +207,7 @@ class RepositoryTest < ActiveSupport::TestCase
     assert_equal [101], fixed_issue.changeset_ids
 
     # issue change
-    journal = fixed_issue.journals.find(:first, :order => 'created_on desc')
+    journal = fixed_issue.journals.reorder('created_on desc').first
     assert_equal User.find_by_login('dlopper'), journal.user
     assert_equal 'Applied in changeset r2.', journal.notes
 
@@ -278,7 +276,7 @@ class RepositoryTest < ActiveSupport::TestCase
   end
 
   def test_manual_user_mapping
-    assert_no_difference "Changeset.count(:conditions => 'user_id <> 2')" do
+    assert_no_difference "Changeset.where('user_id <> 2').count" do
       c = Changeset.create!(
               :repository => @repository,
               :committer => 'foo',
