@@ -253,7 +253,7 @@ module ApplicationHelper
   def project_tree_options_for_select(projects, options = {})
     s = ''
     project_tree(projects) do |project, level|
-      name_prefix = (level > 0 ? ('&nbsp;' * 2 * level + '&#187; ').html_safe : '')
+      name_prefix = (level > 0 ? ('&nbsp;' * 2 * level + '&#187; ') : '').html_safe
       tag_options = {:value => project.id}
       if project == options[:selected] || (options[:selected].respond_to?(:include?) && options[:selected].include?(project))
         tag_options[:selected] = 'selected'
@@ -812,7 +812,7 @@ module ApplicationHelper
     end
   end
 
-  HEADING_RE = /(<h(1|2|3|4)( [^>]+)?>(.+?)<\/h(1|2|3|4)>)/i unless const_defined?(:HEADING_RE)
+  HEADING_RE = /(<h(\d)( [^>]+)?>(.+?)<\/h(\d)>)/i unless const_defined?(:HEADING_RE)
 
   def parse_sections(text, project, obj, attr, only_path, options)
     return unless options[:edit_section_links]
@@ -883,6 +883,8 @@ module ApplicationHelper
   # Renders the TOC with given headings
   def replace_toc(text, headings)
     text.gsub!(TOC_RE) do
+      # Keep only the 4 first levels
+      headings = headings.select{|level, anchor, item| level <= 4}
       if headings.empty?
         ''
       else

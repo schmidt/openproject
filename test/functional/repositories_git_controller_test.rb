@@ -287,26 +287,53 @@ class RepositoriesGitControllerTest < ActionController::TestCase
       end
     end
 
+    def test_diff_with_rev_and_path
+      assert_equal 0, @repository.changesets.count
+      @repository.fetch_changesets
+      @project.reload
+      assert_equal NUM_REV, @repository.changesets.count
+      with_settings :diff_max_lines_displayed => 1000 do
+        # Full diff of changeset 2f9c0091
+        ['inline', 'sbs'].each do |dt|
+          get :diff,
+              :id   => PRJ_ID,
+              :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7',
+              :path => repository_path_hash(['sources', 'watchers_controller.rb'])[:param],
+              :type => dt
+          assert_response :success
+          assert_template 'diff'
+          # Line 22 removed
+          assert_tag :tag => 'th',
+                     :content => '22',
+                     :sibling => { :tag => 'td',
+                                   :attributes => { :class => /diff_out/ },
+                                   :content => /def remove/ }
+          assert_tag :tag => 'h2', :content => /2f9c0091/
+        end
+      end
+    end
+
     def test_diff_truncated
       assert_equal 0, @repository.changesets.count
       @repository.fetch_changesets
       @project.reload
       assert_equal NUM_REV, @repository.changesets.count
-      Setting.diff_max_lines_displayed = 5
 
-      # Truncated diff of changeset 2f9c0091
-      with_cache do
-        get :diff, :id   => PRJ_ID, :type => 'inline',
-            :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7'
-        assert_response :success
-        assert @response.body.include?("... This diff was truncated")
-
-        Setting.default_language = 'fr'
-        get :diff, :id   => PRJ_ID, :type => 'inline',
-            :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7'
-        assert_response :success
-        assert ! @response.body.include?("... This diff was truncated")
-        assert @response.body.include?("... Ce diff")
+      with_settings :diff_max_lines_displayed => 5 do
+        # Truncated diff of changeset 2f9c0091
+        with_cache do
+          get :diff, :id   => PRJ_ID, :type => 'inline',
+              :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7'
+          assert_response :success
+          assert @response.body.include?("... This diff was truncated")
+          with_settings :default_language => 'fr' do
+            get :diff, :id   => PRJ_ID, :type => 'inline',
+                :rev  => '2f9c0091c754a91af7a9c478e36556b4bde8dcf7'
+            assert_response :success
+            assert ! @response.body.include?("... This diff was truncated")
+            assert @response.body.include?("... Ce diff")
+          end
+        end
       end
     end
 
