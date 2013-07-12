@@ -2,7 +2,7 @@
 #-- copyright
 # ChiliProject is a project management system.
 #
-# Copyright (C) 2010-2012 the ChiliProject Team
+# Copyright (C) 2010-2013 the ChiliProject Team
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,9 +20,6 @@
 
 # use RACK_ENV if we are running as a simple rack app
 ENV['RAILS_ENV'] ||= ENV['RACK_ENV'] if ENV['RACK_ENV']
-
-# Specifies gem version of Rails to use when vendor/rails is not present
-RAILS_GEM_VERSION = '2.3.14' unless defined? RAILS_GEM_VERSION
 
 # this is replaced by config.encoding = "utf-8" in rails3
 if RUBY_VERSION >= '1.9'

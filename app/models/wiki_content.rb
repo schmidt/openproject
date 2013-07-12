@@ -2,7 +2,7 @@
 #-- copyright
 # ChiliProject is a project management system.
 #
-# Copyright (C) 2010-2012 the ChiliProject Team
+# Copyright (C) 2010-2013 the ChiliProject Team
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -98,7 +98,7 @@ class WikiContent < ActiveRecord::Base
       changes.delete("text")
       changes["data"] = hash[:text]
       changes["compression"] = hash[:compression]
-      update_attribute(:changes, changes.to_yaml)
+      update_attribute(:changes, changes)
     end
 
     def text

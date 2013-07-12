@@ -2,7 +2,7 @@
 #-- copyright
 # ChiliProject is a project management system.
 #
-# Copyright (C) 2010-2012 the ChiliProject Team
+# Copyright (C) 2010-2013 the ChiliProject Team
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -50,7 +50,6 @@ class UpdateJournalsForActsAsJournalized < ActiveRecord::Migration
       t.string :journalized_type, :limit => 30, :default => "", :null => false
     end
 
-    custom_field_names = CustomField.all.group_by(&:type)[IssueCustomField].collect(&:name)
     Journal.all.each do |j|
       # Can't used j.journalized.class.name because the model changes make it nil
       j.update_attribute(:journalized_type, j.type.to_s.sub("Journal","")) if j.type.present?

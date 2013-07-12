@@ -2,7 +2,7 @@
 #-- copyright
 # ChiliProject is a project management system.
 #
-# Copyright (C) 2010-2012 the ChiliProject Team
+# Copyright (C) 2010-2013 the ChiliProject Team
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -368,7 +368,7 @@ class Issue < ActiveRecord::Base
   def attachment_removed(obj)
     init_journal(User.current)
     create_journal
-    last_journal.update_attribute(:changes, {"attachments_" + obj.id.to_s => [obj.filename, nil]}.to_yaml)
+    last_journal.update_attribute(:changes, {"attachments_" + obj.id.to_s => [obj.filename, nil]})
   end
 
   # Return true if the issue is closed, otherwise false

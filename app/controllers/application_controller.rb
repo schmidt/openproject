@@ -2,7 +2,7 @@
 #-- copyright
 # ChiliProject is a project management system.
 #
-# Copyright (C) 2010-2012 the ChiliProject Team
+# Copyright (C) 2010-2013 the ChiliProject Team
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -54,7 +54,14 @@ class ApplicationController < ActionController::Base
 
   # FIXME: This doesn't work with Rails >= 3.0 anymore
   # Possible workaround: https://github.com/rails/rails/issues/671#issuecomment-1780159
-  rescue_from ActionController::RoutingError, :with => proc{render_404}
+  rescue_from ActionController::RoutingError, :with => proc{
+    # manually apply basic before_filters which aren't applied by default here
+    user_setup
+    check_if_login_required
+    set_localization
+
+    render_404
+  }
 
   include Redmine::Search::Controller
   include Redmine::MenuManager::MenuController
@@ -82,11 +89,11 @@ class ApplicationController < ActionController::Base
       user
     elsif params[:format] == 'atom' && params[:key] && accept_key_auth_actions.include?(params[:action])
       # RSS key authentication does not start a session
-      User.find_by_rss_key(params[:key])
+      User.find_by_rss_key(params[:key].to_s)
     elsif Setting.rest_api_enabled? && api_request?
       if (key = api_key_from_request) && accept_key_auth_actions.include?(params[:action])
         # Use API key
-        User.find_by_api_key(key)
+        User.find_by_api_key(key.to_s)
       else
         # HTTP Basic, either username/password or API key/random
         authenticate_with_http_basic do |username, password|

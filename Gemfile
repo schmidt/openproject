@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-source :rubygems
+source "https://rubygems.org"
 
-gem "rails", "2.3.14"
+gem "rails", "2.3.18"
 
+gem "json", "~> 1.7.7"
 gem "coderay", "~> 1.0.0"
 gem "i18n", "~> 0.4.2"
 gem "rubytree", "~> 0.5.2", :require => 'tree'
@@ -19,8 +20,9 @@ group :test do
   # Shoulda doesn't work nice on 1.9.3 and seems to need test-unit explicitely…
   gem 'test-unit', :platforms => [:mri_19]
   gem 'edavis10-object_daddy', :require => 'object_daddy'
-  gem 'mocha'
-  gem 'capybara'
+  gem 'mocha', '0.12.1'
+  # capybara 2 drops ruby 1.8.7 compatibility
+  gem 'capybara', '< 2.0.0'
 end
 
 group :ldap do

@@ -2,7 +2,7 @@
 #-- copyright
 # ChiliProject is a project management system.
 #
-# Copyright (C) 2010-2012 the ChiliProject Team
+# Copyright (C) 2010-2013 the ChiliProject Team
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -402,6 +402,8 @@ class User < Principal
       false
     when 'only_my_events'
       if object.is_a?(Issue) && (object.author == self || object.assigned_to == self)
+        true
+      elsif object.respond_to?(:watched_by?) && object.watched_by?(self) # Make it clear that we always want to be notified about things we watch in this case
         true
       else
         false
