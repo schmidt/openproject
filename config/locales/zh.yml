@@ -84,14 +84,14 @@ zh:
     human:
       format:
         delimiter: ""
-        precision: 1
+        precision: 3
       storage_units:
         format: "%n %u"
         units:
           byte:
             one: "Byte"
             other: "Bytes"
-          kb: "kB"
+          kb: "KB"
           mb: "MB"
           gb: "GB"
           tb: "TB"
@@ -133,6 +133,7 @@ zh:
         not_same_project: "不属于同一个项目"
         circular_dependency: "此关联将导致循环依赖"
         cant_link_an_issue_with_a_descendant: "问题不能关联到它的子任务"
+        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
 
   actionview_instancetag_blank_option: 请选择
 
@@ -166,7 +167,7 @@ zh:
   notice_not_authorized_archived_project: 要访问的项目已经归档。
   notice_email_sent: "邮件已发送至 %{value}"
   notice_email_error: "发送邮件时发生错误 (%{value})"
-  notice_feeds_access_key_reseted: 您的RSS存取键已被重置。
+  notice_feeds_access_key_reseted: 您的Atom存取键已被重置。
   notice_api_access_key_reseted: 您的API访问键已被重置。
   notice_failed_to_save_issues: "%{count} 个问题保存失败（共选择 %{total} 个问题）：%{ids}."
   notice_failed_to_save_members: "成员保存失败: %{errors}."
@@ -212,8 +213,6 @@ zh:
   mail_subject_wiki_content_updated: "'%{id}' wiki页面已更新。"
   mail_body_wiki_content_updated: "'%{id}' wiki页面已由 %{author} 更新。"
 
-  gui_validation_error: 1 个错误
-  gui_validation_error_plural: "%{count} 个错误"
 
   field_name: 名称
   field_description: 描述
@@ -327,7 +326,7 @@ zh:
   setting_host_name: 主机名称
   setting_text_formatting: 文本格式
   setting_wiki_compression: 压缩Wiki历史文档
-  setting_feeds_limit: RSS Feed内容条数限制
+  setting_feeds_limit: Atom Feed内容条数限制
   setting_default_projects_public: 新建项目默认为公开项目
   setting_autofetch_changesets: 自动获取程序变更
   setting_sys_api_enabled: 启用用于版本库管理的Web Service
@@ -400,7 +399,6 @@ zh:
   permission_edit_own_time_entries: 编辑自己的耗时
   permission_manage_news: 管理新闻
   permission_comment_news: 为新闻添加评论
-  permission_manage_documents: 管理文档
   permission_view_documents: 查看文档
   permission_manage_files: 管理文件
   permission_view_files: 查看文件
@@ -525,8 +523,6 @@ zh:
   label_text: 文本
   label_attribute: 属性
   label_attribute_plural: 属性
-  label_download: "%{count} 次下载"
-  label_download_plural: "%{count} 次下载"
   label_no_data: 没有任何数据可供显示
   label_change_status: 变更状态
   label_history: 历史记录
@@ -629,8 +625,6 @@ zh:
   label_repository: 版本库
   label_repository_plural: 版本库
   label_browse: 浏览
-  label_modification: "%{count} 个更新"
-  label_modification_plural: "%{count} 个更新"
   label_branch: 分支
   label_tag: 标签
   label_revision: 修订
@@ -726,9 +720,9 @@ zh:
   label_language_based: 根据用户的语言
   label_sort_by: "根据 %{value} 排序"
   label_send_test_email: 发送测试邮件
-  label_feeds_access_key: RSS存取键
-  label_missing_feeds_access_key: 缺少RSS存取键
-  label_feeds_access_key_created_on: "RSS存取键是在 %{value} 之前建立的"
+  label_feeds_access_key: Atom存取键
+  label_missing_feeds_access_key: 缺少Atom存取键
+  label_feeds_access_key_created_on: "Atom存取键是在 %{value} 之前建立的"
   label_module_plural: 模块
   label_added_time_by: "由 %{author} 在 %{age} 之前添加"
   label_updated_time: " 更新于 %{value} 之前"
@@ -863,7 +857,6 @@ zh:
   text_subprojects_destroy_warning: "以下子项目也将被同时删除：%{value}"
   text_workflow_edit: 选择角色和跟踪标签来编辑工作流程
   text_are_you_sure: 您确定？
-  text_are_you_sure_with_children: "删除问题及子任务？"
   text_journal_changed: "%{label} 从 %{old} 变更为 %{new}"
   text_journal_set_to: "%{label} 被设置为 %{value}"
   text_journal_deleted: "%{label} 已删除 (%{old})"
@@ -1086,3 +1079,27 @@ zh:
   setting_non_working_week_days: Non-working days
   label_in_the_next_days: in the next
   label_in_the_past_days: in the past
+  label_attribute_of_user: User's %{name}
+  text_turning_multiple_off: If you disable multiple values, multiple values will be
+    removed in order to preserve only one value per item.
+  label_attribute_of_issue: Issue's %{name}
+  permission_add_documents: Add documents
+  permission_edit_documents: Edit documents
+  permission_delete_documents: Delete documents
+  label_gantt_progress_line: Progress line
+  setting_jsonp_enabled: Enable JSONP support
+  field_inherit_members: Inherit members
+  field_closed_on: Closed
+  field_generate_password: Generate password
+  setting_default_projects_tracker_ids: Default trackers for new projects
+  label_total_time: 合计
+  notice_account_not_activated_yet: You haven't activated your account yet. If you want
+    to receive a new activation email, please <a href="%{url}">click this link</a>.
+  notice_account_locked: Your account is locked.
+  label_hidden: Hidden
+  label_visibility_private: to me only
+  label_visibility_roles: to these roles only
+  label_visibility_public: to any users
+  field_must_change_passwd: Must change password at next logon
+  notice_new_password_must_be_different: The new password must be different from the
+    current password

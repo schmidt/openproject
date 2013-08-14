@@ -97,6 +97,31 @@ class IssueQuery < Query
     !is_private?
   end
 
+  def draw_relations
+    r = options[:draw_relations]
+    r.nil? || r == '1'
+  end
+
+  def draw_relations=(arg)
+    options[:draw_relations] = (arg == '0' ? '0' : nil)
+  end
+
+  def draw_progress_line
+    r = options[:draw_progress_line]
+    r == '1'
+  end
+
+  def draw_progress_line=(arg)
+    options[:draw_progress_line] = (arg == '1' ? '1' : nil)
+  end
+
+  def build_from_params(params)
+    super
+    self.draw_relations = params[:draw_relations] || (params[:query] && params[:query][:draw_relations])
+    self.draw_progress_line = params[:draw_progress_line] || (params[:query] && params[:query][:draw_progress_line])
+    self
+  end
+
   def initialize_available_filters
     principals = []
     subprojects = []
@@ -225,8 +250,8 @@ class IssueQuery < Query
     @available_columns = self.class.available_columns.dup
     @available_columns += (project ?
                             project.all_issue_custom_fields :
-                            IssueCustomField.all
-                           ).collect {|cf| QueryCustomFieldColumn.new(cf) }
+                            IssueCustomField
+                           ).visible.collect {|cf| QueryCustomFieldColumn.new(cf) }
 
     if User.current.allowed_to?(:view_time_entries, project, :global => true)
       index = nil
@@ -442,10 +467,9 @@ class IssueQuery < Query
 
     if relation_options[:sym] == field && !options[:reverse]
       sqls = [sql, sql_for_relations(field, operator, value, :reverse => true)]
-      sqls.join(["!", "!*", "!p"].include?(operator) ? " AND " : " OR ")
-    else
-      sql
+      sql = sqls.join(["!", "!*", "!p"].include?(operator) ? " AND " : " OR ")
     end
+    "(#{sql})"
   end
 
   IssueRelation::TYPES.keys.each do |relation_type|

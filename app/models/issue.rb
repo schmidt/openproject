@@ -98,6 +98,7 @@ class Issue < ActiveRecord::Base
   # Should be after_create but would be called before previous after_save callbacks
   after_save :after_create_from_copy
   after_destroy :update_parent_attributes
+  after_create :send_notification
 
   # Returns a SQL conditions string used to find all issues visible by the specified user
   def self.visible_condition(user, options={})
@@ -196,6 +197,13 @@ class Issue < ActiveRecord::Base
   # Overrides Redmine::Acts::Customizable::InstanceMethods#available_custom_fields
   def available_custom_fields
     (project && tracker) ? (project.all_issue_custom_fields & tracker.custom_fields.all) : []
+  end
+
+  def visible_custom_field_values(user=nil)
+    user_real = user || User.current
+    custom_field_values.select do |value|
+      value.custom_field.visible_by?(project, user_real)
+    end
   end
 
   # Copies attributes from another issue, arg can be an id or an Issue
@@ -445,11 +453,15 @@ class Issue < ActiveRecord::Base
     end
 
     if attrs['custom_field_values'].present?
-      attrs['custom_field_values'] = attrs['custom_field_values'].reject {|k, v| read_only_attribute_names(user).include? k.to_s}
+      editable_custom_field_ids = editable_custom_field_values(user).map {|v| v.custom_field_id.to_s}
+      # TODO: use #select when ruby1.8 support is dropped
+      attrs['custom_field_values'] = attrs['custom_field_values'].reject {|k, v| !editable_custom_field_ids.include?(k.to_s)}
     end
 
     if attrs['custom_fields'].present?
-      attrs['custom_fields'] = attrs['custom_fields'].reject {|c| read_only_attribute_names(user).include? c['id'].to_s}
+      editable_custom_field_ids = editable_custom_field_values(user).map {|v| v.custom_field_id.to_s}
+      # TODO: use #select when ruby1.8 support is dropped
+      attrs['custom_fields'] = attrs['custom_fields'].reject {|c| !editable_custom_field_ids.include?(c['id'].to_s)}
     end
 
     # mass-assignment security bypass
@@ -462,7 +474,7 @@ class Issue < ActiveRecord::Base
 
   # Returns the custom_field_values that can be edited by the given user
   def editable_custom_field_values(user=nil)
-    custom_field_values.reject do |value|
+    visible_custom_field_values(user).reject do |value|
       read_only_attribute_names(user).include?(value.custom_field_id.to_s)
     end
   end
@@ -691,7 +703,7 @@ class Issue < ActiveRecord::Base
   # Is the amount of work done less than it should for the due date
   def behind_schedule?
     return false if start_date.nil? || due_date.nil?
-    done_date = start_date + ((due_date - start_date+1)* done_ratio/100).floor
+    done_date = start_date + ((due_date - start_date + 1) * done_ratio / 100).floor
     return done_date <= Date.today
   end
 
@@ -744,12 +756,16 @@ class Issue < ActiveRecord::Base
         initial_status = IssueStatus.find_by_id(status_id_was)
       end
       initial_status ||= status
-  
+
+      initial_assigned_to_id = assigned_to_id_changed? ? assigned_to_id_was : assigned_to_id
+      assignee_transitions_allowed = initial_assigned_to_id.present? && 
+        (user.id == initial_assigned_to_id || user.group_ids.include?(initial_assigned_to_id))
+
       statuses = initial_status.find_new_statuses_allowed_to(
         user.admin ? Role.all : user.roles_for_project(project),
         tracker,
         author == user,
-        assigned_to_id_changed? ? assigned_to_id_was == user.id : assigned_to_id == user.id
+        assignee_transitions_allowed
         )
       statuses << initial_status unless statuses.empty?
       statuses << IssueStatus.default if include_default
@@ -788,6 +804,21 @@ class Issue < ActiveRecord::Base
   # Returns the email addresses that should be notified
   def recipients
     notified_users.collect(&:mail)
+  end
+
+  def each_notification(users, &block)
+    if users.any?
+      if custom_field_values.detect {|value| !value.custom_field.visible?}
+        users_by_custom_field_visibility = users.group_by do |user|
+          visible_custom_field_values(user).map(&:custom_field_id).sort
+        end
+        users_by_custom_field_visibility.values.each do |users|
+          yield(users)
+        end
+      else
+        yield(users)
+      end
+    end
   end
 
   # Returns the number of hours spent on this issue
@@ -1487,6 +1518,12 @@ class Issue < ActiveRecord::Base
       @current_journal.save
       # reset current journal
       init_journal @current_journal.user, @current_journal.notes
+    end
+  end
+
+  def send_notification
+    if Setting.notified_events.include?('issue_added')
+      Mailer.deliver_issue_add(self)
     end
   end
 

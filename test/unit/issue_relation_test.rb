@@ -28,7 +28,8 @@ class IssueRelationTest < ActiveSupport::TestCase
            :issue_relations,
            :enabled_modules,
            :enumerations,
-           :trackers
+           :trackers,
+           :projects_trackers
 
   def test_create
     from = Issue.find(1)
@@ -112,7 +113,7 @@ class IssueRelationTest < ActiveSupport::TestCase
           :relation_type => IssueRelation::TYPE_PRECEDES
         )
     assert !r.save
-    assert_not_nil r.errors[:base]
+    assert_not_equal [], r.errors[:base]
   end
 
   def test_validates_circular_dependency_on_reverse_relations
@@ -130,6 +131,6 @@ class IssueRelationTest < ActiveSupport::TestCase
           :relation_type => IssueRelation::TYPE_BLOCKED
         )
     assert !r.save
-    assert_not_nil r.errors[:base]
+    assert_not_equal [], r.errors[:base]
   end
 end

@@ -1,5 +1,5 @@
 /* Redmine - project management software
-   Copyright (C) 2006-2012  Jean-Philippe Lang */
+   Copyright (C) 2006-2013  Jean-Philippe Lang */
 
 function checkAll(id, checked) {
   if (checked) {
@@ -14,12 +14,12 @@ function toggleCheckboxesBySelector(selector) {
   $(selector).each(function(index) {
     if (!$(this).is(':checked')) { all_checked = false; }
   });
-  $(selector).attr('checked', !all_checked)
+  $(selector).attr('checked', !all_checked);
 }
 
 function showAndScrollTo(id, focus) {
   $('#'+id).show();
-  if (focus!=null) {
+  if (focus !== null) {
     $('#'+focus).focus();
   }
   $('html, body').animate({scrollTop: $('#'+id).offset().top}, 100);
@@ -78,20 +78,20 @@ function hideFieldset(el) {
   fieldset.children('div').hide();
 }
 
-function initFilters(){
-  $('#add_filter_select').change(function(){
+function initFilters() {
+  $('#add_filter_select').change(function() {
     addFilter($(this).val(), '', []);
   });
-  $('#filters-table td.field input[type=checkbox]').each(function(){
+  $('#filters-table td.field input[type=checkbox]').each(function() {
     toggleFilter($(this).val());
   });
-  $('#filters-table td.field input[type=checkbox]').live('click',function(){
+  $('#filters-table td.field input[type=checkbox]').live('click', function() {
     toggleFilter($(this).val());
   });
-  $('#filters-table .toggle-multiselect').live('click',function(){
+  $('#filters-table .toggle-multiselect').live('click', function() {
     toggleMultiSelect($(this).siblings('select'));
   });
-  $('#filters-table input[type=text]').live('keypress', function(e){
+  $('#filters-table input[type=text]').live('keypress', function(e) {
     if (e.keyCode == 13) submit_query_form("query_form");
   });
 }
@@ -106,7 +106,7 @@ function addFilter(field, operator, values) {
   }
   $('#cb_'+fieldId).attr('checked', true);
   toggleFilter(field);
-  $('#add_filter_select').val('').children('option').each(function(){
+  $('#add_filter_select').val('').children('option').each(function() {
     if ($(this).attr('value') == field) {
       $(this).attr('disabled', true);
     }
@@ -129,14 +129,14 @@ function buildFilterRow(field, operator, values) {
   filterTable.append(tr);
 
   select = tr.find('td.operator select');
-  for (i=0;i<operators.length;i++){
+  for (i = 0; i < operators.length; i++) {
     var option = $('<option>').val(operators[i]).text(operatorLabels[operators[i]]);
-    if (operators[i] == operator) {option.attr('selected', true)};
+    if (operators[i] == operator) { option.attr('selected', true); }
     select.append(option);
   }
-  select.change(function(){toggleOperator(field)});
+  select.change(function(){ toggleOperator(field); });
 
-  switch (filterOptions['type']){
+  switch (filterOptions['type']) {
   case "list":
   case "list_optional":
   case "list_status":
@@ -146,8 +146,8 @@ function buildFilterRow(field, operator, values) {
       ' <span class="toggle-multiselect">&nbsp;</span></span>'
     );
     select = tr.find('td.values select');
-    if (values.length > 1) {select.attr('multiple', true)};
-    for (i=0;i<filterValues.length;i++){
+    if (values.length > 1) { select.attr('multiple', true); }
+    for (i = 0; i < filterValues.length; i++) {
       var filterValue = filterValues[i];
       var option = $('<option>');
       if ($.isArray(filterValue)) {
@@ -185,11 +185,11 @@ function buildFilterRow(field, operator, values) {
     );
     $('#values_'+fieldId).val(values[0]);
     select = tr.find('td.values select');
-    for (i=0;i<allProjects.length;i++){
+    for (i = 0; i < allProjects.length; i++) {
       var filterValue = allProjects[i];
       var option = $('<option>');
       option.val(filterValue[1]).text(filterValue[0]);
-      if (values[0] == filterValue[1]) {option.attr('selected', true)};
+      if (values[0] == filterValue[1]) { option.attr('selected', true); }
       select.append(option);
     }
   case "integer":
@@ -242,7 +242,13 @@ function toggleOperator(field) {
     case "!*":
     case "*":
     case "t":
+    case "ld":
     case "w":
+    case "lw":
+    case "l2w":
+    case "m":
+    case "lm":
+    case "y":
     case "o":
     case "c":
       enableValues(field, []);
@@ -284,45 +290,16 @@ function submit_query_form(id) {
   $('#'+id).submit();
 }
 
-var fileFieldCount = 1;
-function addFileField() {
-  var fields = $('#attachments_fields');
-  if (fields.children().length >= 10) return false;
-  fileFieldCount++;
-  var s = fields.children('span').first().clone();
-  s.children('input.file').attr('name', "attachments[" + fileFieldCount + "][file]").val('');
-  s.children('input.description').attr('name', "attachments[" + fileFieldCount + "][description]").val('');
-  fields.append(s);
-}
-
-function removeFileField(el) {
-  var fields = $('#attachments_fields');
-  var s = $(el).parents('span').first();
-  if (fields.children().length > 1) {
-    s.remove();
-  } else {
-    s.children('input.file').val('');
-    s.children('input.description').val('');
-  }
-}
-
-function checkFileSize(el, maxSize, message) {
-  var files = el.files;
-  if (files) {
-    for (var i=0; i<files.length; i++) {
-      if (files[i].size > maxSize) {
-        alert(message);
-        el.value = "";
-      }
-    }
-  }
-}
-
-function showTab(name) {
+function showTab(name, url) {
   $('div#content .tab-content').hide();
   $('div.tabs a').removeClass('selected');
   $('#tab-content-' + name).show();
   $('#tab-' + name).addClass('selected');
+  //replaces current URL with the "href" attribute of the current link
+  //(only triggered if supported by browser)
+  if ("replaceState" in window.history) {
+    window.history.replaceState(null, document.title, url);
+  }
   return false;
 }
 
@@ -330,7 +307,7 @@ function moveTabRight(el) {
   var lis = $(el).parents('div.tabs').first().find('ul').children();
   var tabsWidth = 0;
   var i = 0;
-  lis.each(function(){
+  lis.each(function() {
     if ($(this).is(':visible')) {
       tabsWidth += $(this).width() + 6;
     }
@@ -343,8 +320,8 @@ function moveTabRight(el) {
 function moveTabLeft(el) {
   var lis = $(el).parents('div.tabs').first().find('ul').children();
   var i = 0;
-  while (i<lis.length && !lis.eq(i).is(':visible')) { i++; }
-  if (i>0) {
+  while (i < lis.length && !lis.eq(i).is(':visible')) { i++; }
+  if (i > 0) {
     lis.eq(i-1).show();
   }
 }
@@ -380,7 +357,7 @@ function setPredecessorFieldsVisibility() {
 
 function showModal(id, width) {
   var el = $('#'+id).first();
-  if (el.length == 0 || el.is(':visible')) {return;}
+  if (el.length === 0 || el.is(':visible')) {return;}
   var title = el.find('h3.title').text();
   el.dialog({
     width: width,
@@ -450,7 +427,7 @@ function scmEntryClick(id, url) {
     el.addClass('loading');
     $.ajax({
       url: url,
-      success: function(data){
+      success: function(data) {
         el.after(data);
         el.addClass('open').addClass('loaded').removeClass('loading');
       }
@@ -459,10 +436,10 @@ function scmEntryClick(id, url) {
 }
 
 function randomKey(size) {
-  var chars = new Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z');
+  var chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
   var key = '';
-  for (i = 0; i < size; i++) {
-    key += chars[Math.floor(Math.random() * chars.length)];
+  for (var i = 0; i < size; i++) {
+    key += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return key;
 }
@@ -484,16 +461,22 @@ function updateBulkEditFrom(url) {
   });
 }
 
-function observeAutocompleteField(fieldId, url) {
-  $('#'+fieldId).autocomplete({
-    source: url,
-    minLength: 2
+function observeAutocompleteField(fieldId, url, options) {
+  $(document).ready(function() {
+    $('#'+fieldId).autocomplete($.extend({
+      source: url,
+      minLength: 2,
+      search: function(){$('#'+fieldId).addClass('ajax-loading');},
+      response: function(){$('#'+fieldId).removeClass('ajax-loading');}
+    }, options));
+    $('#'+fieldId).addClass('autocomplete');
   });
 }
 
 function observeSearchfield(fieldId, targetId, url) {
   $('#'+fieldId).each(function() {
     var $this = $(this);
+    $this.addClass('autocomplete');
     $this.attr('data-value-was', $this.val());
     var check = function() {
       var val = $this.val();
@@ -503,7 +486,7 @@ function observeSearchfield(fieldId, targetId, url) {
           url: url,
           type: 'get',
           data: {q: $this.val()},
-          success: function(data){ $('#'+targetId).html(data); },
+          success: function(data){ if(targetId) $('#'+targetId).html(data); },
           beforeSend: function(){ $this.addClass('ajax-loading'); },
           complete: function(){ $this.removeClass('ajax-loading'); }
         });
@@ -525,7 +508,7 @@ function observeProjectModules() {
     /* Hides trackers and issues custom fields on the new project form when issue_tracking module is disabled */
     if ($('#project_enabled_module_names_issue_tracking').attr('checked')) {
       $('#project_trackers').show();
-    }else{
+    } else {
       $('#project_trackers').hide();
     }
   };
@@ -552,11 +535,10 @@ function initMyPageSortable(list, url) {
 var warnLeavingUnsavedMessage;
 function warnLeavingUnsaved(message) {
   warnLeavingUnsavedMessage = message;
-
-  $('form').submit(function(){
+  $('form').live('submit', function(){
     $('textarea').removeData('changed');
   });
-  $('textarea').change(function(){
+  $('textarea').live('change', function(){
     $(this).data('changed', 'changed');
   });
   window.onbeforeunload = function(){
@@ -568,18 +550,18 @@ function warnLeavingUnsaved(message) {
     });
     if (warn) {return warnLeavingUnsavedMessage;}
   };
-};
+}
 
-$(document).ready(function(){
-  $('#ajax-indicator').bind('ajaxSend', function(){
-    if ($('.ajax-loading').length == 0) {
+function setupAjaxIndicator() {
+  $('#ajax-indicator').bind('ajaxSend', function(event, xhr, settings) {
+    if ($('.ajax-loading').length === 0 && settings.contentType != 'application/octet-stream') {
       $('#ajax-indicator').show();
     }
   });
-  $('#ajax-indicator').bind('ajaxStop', function(){
+  $('#ajax-indicator').bind('ajaxStop', function() {
     $('#ajax-indicator').hide();
   });
-});
+}
 
 function hideOnLoad() {
   $('.hol').hide();
@@ -599,5 +581,11 @@ function addFormObserversForDoubleSubmit() {
   });
 }
 
+function blockEventPropagation(event) {
+  event.stopPropagation();
+  event.preventDefault();
+}
+
+$(document).ready(setupAjaxIndicator);
 $(document).ready(hideOnLoad);
 $(document).ready(addFormObserversForDoubleSubmit);

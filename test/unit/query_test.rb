@@ -791,6 +791,21 @@ class QueryTest < ActiveSupport::TestCase
     assert_equal [1, 2, 3], find_issues_with_query(query).map(&:id).sort
   end
 
+  def test_filter_on_relations_should_not_ignore_other_filter
+    issue = Issue.generate!
+    issue1 = Issue.generate!(:status_id => 1)
+    issue2 = Issue.generate!(:status_id => 2)
+    IssueRelation.create!(:relation_type => "relates", :issue_from => issue, :issue_to => issue1)
+    IssueRelation.create!(:relation_type => "relates", :issue_from => issue, :issue_to => issue2)
+
+    query = IssueQuery.new(:name => '_')
+    query.filters = {
+      "status_id" => {:operator => '=', :values => ['1']},
+      "relates" => {:operator => '=', :values => [issue.id.to_s]}
+    }
+    assert_equal [issue1], find_issues_with_query(query)
+  end
+
   def test_statement_should_be_nil_with_no_filters
     q = IssueQuery.new(:name => '_')
     q.filters = {}
@@ -1199,6 +1214,28 @@ class QueryTest < ActiveSupport::TestCase
 
     assert ! query.available_filters["assigned_to_role"][:values].include?(['Non member','4'])
     assert ! query.available_filters["assigned_to_role"][:values].include?(['Anonymous','5'])
+  end
+
+  def test_available_filters_should_include_custom_field_according_to_user_visibility
+    visible_field = IssueCustomField.generate!(:is_for_all => true, :is_filter => true, :visible => true)
+    hidden_field = IssueCustomField.generate!(:is_for_all => true, :is_filter => true, :visible => false, :role_ids => [1])
+
+    with_current_user User.find(3) do
+      query = IssueQuery.new
+      assert_include "cf_#{visible_field.id}", query.available_filters.keys
+      assert_not_include "cf_#{hidden_field.id}", query.available_filters.keys
+    end
+  end
+
+  def test_available_columns_should_include_custom_field_according_to_user_visibility
+    visible_field = IssueCustomField.generate!(:is_for_all => true, :is_filter => true, :visible => true)
+    hidden_field = IssueCustomField.generate!(:is_for_all => true, :is_filter => true, :visible => false, :role_ids => [1])
+
+    with_current_user User.find(3) do
+      query = IssueQuery.new
+      assert_include :"cf_#{visible_field.id}", query.available_columns.map(&:name)
+      assert_not_include :"cf_#{hidden_field.id}", query.available_columns.map(&:name)
+    end
   end
 
   context "#statement" do

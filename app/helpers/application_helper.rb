@@ -481,12 +481,31 @@ module ApplicationHelper
     end
   end
 
+  # Returns a h2 tag and sets the html title with the given arguments
+  def title(*args)
+    strings = args.map do |arg|
+      if arg.is_a?(Array) && arg.size >= 2
+        link_to(*arg)
+      else
+        h(arg.to_s)
+      end
+    end
+    html_title args.reverse.map {|s| (s.is_a?(Array) ? s.first : s).to_s}
+    content_tag('h2', strings.join(' &#187; ').html_safe)
+  end
+
+  # Sets the html title
+  # Returns the html title when called without arguments
+  # Current project name and app_title and automatically appended
+  # Exemples:
+  #   html_title 'Foo', 'Bar'
+  #   html_title # => 'Foo - Bar - My Project - Redmine'
   def html_title(*args)
     if args.empty?
       title = @html_title || []
       title << @project.name if @project
       title << Setting.app_title unless Setting.app_title == title.last
-      title.select {|t| !t.blank? }.join(' - ')
+      title.reject(&:blank?).join(' - ')
     else
       @html_title ||= []
       @html_title += args
@@ -647,7 +666,7 @@ module ApplicationHelper
             else
               wiki_page_id = page.present? ? Wiki.titleize(page) : nil
               parent = wiki_page.nil? && obj.is_a?(WikiContent) && obj.page && project == link_project ? obj.page.title : nil
-              url_for(:only_path => only_path, :controller => 'wiki', :action => 'show', :project_id => link_project, 
+              url_for(:only_path => only_path, :controller => 'wiki', :action => 'show', :project_id => link_project,
                :id => wiki_page_id, :version => nil, :anchor => anchor, :parent => parent)
             end
           end
@@ -1008,7 +1027,7 @@ module ApplicationHelper
       html << "</ul></div>\n"
     end
     html.html_safe
-  end  
+  end
 
   def delete_link(url, options={})
     options = {
@@ -1022,8 +1041,8 @@ module ApplicationHelper
 
   def preview_link(url, form, target='preview', options={})
     content_tag 'a', l(:label_preview), {
-        :href => "#", 
-        :onclick => %|submitPreview("#{escape_javascript url_for(url)}", "#{escape_javascript form}", "#{escape_javascript target}"); return false;|, 
+        :href => "#",
+        :onclick => %|submitPreview("#{escape_javascript url_for(url)}", "#{escape_javascript form}", "#{escape_javascript target}"); return false;|,
         :accesskey => accesskey(:preview)
       }.merge(options)
   end
@@ -1111,12 +1130,12 @@ module ApplicationHelper
 
         tags = javascript_tag(
                    "var datepickerOptions={dateFormat: 'yy-mm-dd', firstDay: #{start_of_week}, " +
-                     "showOn: 'button', buttonImageOnly: true, buttonImage: '" + 
+                     "showOn: 'button', buttonImageOnly: true, buttonImage: '" +
                      path_to_image('/images/calendar.png') +
                      "', showButtonPanel: true};")
         jquery_locale = l('jquery.locale', :default => current_language.to_s)
         unless jquery_locale == 'en'
-          tags << javascript_include_tag("i18n/jquery.ui.datepicker-#{jquery_locale}.js") 
+          tags << javascript_include_tag("i18n/jquery.ui.datepicker-#{jquery_locale}.js")
         end
         tags
       end
