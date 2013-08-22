@@ -7,8 +7,10 @@ app_subtitle:
   default: Project management
 brute_force_block_minutes:
   default: 30
+  format: int
 brute_force_block_after_failed_logins:
   default: 20
+  format: int
 welcome_text:
   default:
 login_required:
@@ -46,7 +48,7 @@ activity_days_default:
   format: int
   default: 30
 per_page_options:
-  default: '25,50,100'
+  default: '100, 500, 1000'
 mail_from:
   default: openproject@example.net
 bcc_recipients:
@@ -134,7 +136,7 @@ mail_handler_api_key:
 issue_list_default_columns:
   serialized: true
   default:
-  - tracker
+  - type
   - status
   - priority
   - subject
@@ -153,15 +155,14 @@ default_projects_public:
 default_projects_modules:
   serialized: true
   default:
-  - issue_tracking
-  - time_tracking
-  - news
-  - documents
-  - files
-  - wiki
-  - repository
   - boards
   - calendar
+  - issue_tracking
+  - news
+  - repository
+  - time_tracking
+  - timelines
+  - wiki
 # Role given to a non-admin user who creates a project
 new_project_user_role_id:
   format: int

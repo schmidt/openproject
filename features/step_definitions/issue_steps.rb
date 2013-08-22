@@ -36,7 +36,76 @@ Given(/^the issue "(.*?)" has an attachment "(.*?)"$/) do |issue_subject, file_n
         :description => 'This is an attachment description'
 end
 
+Given /^the [Uu]ser "([^\"]*)" has (\d+) [iI]ssue(?:s)? with(?: the following)?:$/ do |user, count, table|
+  u = User.find_by_login user
+  raise "This user must be member of a project to have issues" unless u.projects.last
+  as_admin count do
+    i = Issue.generate_for_project!(u.projects.last)
+    i.author = u
+    i.assigned_to = u
+    i.type = Type.find_by_name(table.rows_hash.delete("type")) if table.rows_hash["type"]
+    send_table_to_object(i, table, {}, method(:add_custom_value_to_issue))
+    i.save!
+  end
+end
+
+Given /^the [Pp]roject "([^\"]*)" has (\d+) [iI]ssue(?:s)? with(?: the following)?:$/ do |project, count, table|
+  p = Project.find_by_name(project) || Project.find_by_identifier(project)
+  as_admin count do
+    i = FactoryGirl.build(:issue, :project => p,
+                                  :type => p.types.first)
+    send_table_to_object(i, table, {}, method(:add_custom_value_to_issue))
+  end
+end
+
 When(/^I click the first delete attachment link$/) do
   delete_link = find :xpath, "//a[@title='Delete'][1]"
   delete_link.click
+end
+
+Given (/^there are the following issues(?: in project "([^"]*)")?:$/) do |project_name, table|
+  project = get_project(project_name)
+  table.map_headers! { |header| header.underscore.gsub(' ', '_') }
+
+  table.hashes.each do |type_attributes|
+    assignee = User.find_by_login(type_attributes.delete("assignee"))
+    type_name = type_attributes.delete('type')
+    type = Type.find_by_name(type_name)
+
+    type_attributes[:type] = type unless type.nil?
+
+    factory = FactoryGirl.create(:issue, type_attributes.merge(:project_id => project.id))
+
+    factory.reload
+
+    factory.assignee = assignee unless assignee.nil?
+
+    factory.save! if factory.changed?
+  end
+end
+
+Given (/^there are the following issues with attributes:$/) do |table|
+
+  table.map_headers! { |header| header.underscore.gsub(' ', '_') }
+  table.hashes.each do |type_attributes|
+
+    project  = get_project(type_attributes.delete("project"))
+    attributes = type_attributes.merge(:project_id => project.id)
+
+    assignee = User.find_by_login(attributes.delete("assignee"))
+    attributes.merge! :assigned_to_id => assignee.id if assignee
+
+    author   = User.find_by_login(attributes.delete("author"))
+    attributes.merge! :author_id => author.id if author
+
+    watchers = attributes.delete("watched_by")
+    issue = FactoryGirl.create(:issue, attributes)
+
+    if watchers
+      watchers.split(",").each {|w| issue.add_watcher User.find_by_login(w)}
+      issue.save
+    end
+
+  end
+
 end

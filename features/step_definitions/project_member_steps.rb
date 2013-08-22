@@ -9,14 +9,6 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-def filter_user_by_login login
-  # method to be overridden by plugins
-  user = User.find_by_login(login)
-
-  steps %Q{ When I fill in "principal_search" with "#{user.name}"
-            And I wait for the AJAX requests to finish }
-end
-
 When /^I check the role "(.+?)" for the project member "(.+?)"$/ do |role_name, user_login|
   role = Role.find_by_name(role_name)
 
@@ -43,20 +35,25 @@ When /^I follow the delete link of the project member "(.+?)"$/ do |login_name|
   steps %Q{When I follow "Delete" within "#member-#{member.id}"}
 end
 
-
-When /^I add( the)? principal "(.+)" as( a)? "(.+)"$/ do |_, principal, _, role|
-  found_principal = Principal.like(principal).first
-  raise "No Principal #{principal} found" unless found_principal
-
-  found_role = Role.like(role).first
-  raise "No Role #{role} found" unless found_role
-
-  select_principal(found_principal)
-  select_role(found_role)
+When /^I add(?: the)? principal "(.+)" as(?: a)? "(.+)"$/ do |principal, role|
   steps %Q{
+    And I select the principal "#{principal}"
+    And I select the role "#{role}"
     And I click on "Add" within "#tab-content-members"
     And I wait for AJAX
   }
+end
+
+When /^I select(?: the)? principal "(.+)"$/ do | principal |
+  found_principal = Principal.like(principal).first
+  raise "No Principal #{principal} found" unless found_principal
+  select_principal(found_principal)
+end
+
+When /^I select(?: the)? role "(.+)"$/ do | role |
+  found_role = Role.like(role).first
+  raise "No Role #{role} found" unless found_role
+  select_role(found_role)
 end
 
 def select_principal(principal)
@@ -115,8 +112,12 @@ Then /^I should not see the principal "(.+)" as a member$/ do |principal_name|
   steps %Q{ Then I should not see "#{principal.name}" within "#tab-content-members .members" }
 end
 
-When /^I filter for the user "(.+?)"$/ do |login|
-  filter_user_by_login login
+When /^I enter the principal name "(.+)"$/ do |principal_name|
+  if !User.current.impaired?
+    step %Q{I fill in "s2id_autogen4" with "#{principal_name}" within "#s2id_member_user_ids"}
+  else
+    step %Q{I fill in "principal_search" with "#{principal_name}"}
+  end
 end
 
 When /^I delete the "([^"]*)" membership$/ do |group_name|

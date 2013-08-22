@@ -23,8 +23,8 @@ describe Issue do
 
       @priority_low ||= FactoryGirl.create(:priority_low, :is_default => true)
       @priority_high ||= FactoryGirl.create(:priority_high)
-      @tracker ||= FactoryGirl.create(:tracker_feature)
-      @project ||= FactoryGirl.create(:project_with_trackers)
+      @type ||= FactoryGirl.create(:type_feature)
+      @project ||= FactoryGirl.create(:project_with_types)
 
       @current = FactoryGirl.create(:user, :login => "user1", :mail => "user1@users.com")
       User.stub!(:current).and_return(@current)
@@ -32,7 +32,7 @@ describe Issue do
       @user2 = FactoryGirl.create(:user, :login => "user2", :mail => "user2@users.com")
 
 
-      @issue ||= FactoryGirl.create(:issue, :project => @project, :status => @status_open, :tracker => @tracker, :author => @current)
+      @issue ||= FactoryGirl.create(:issue, :project => @project, :status => @status_open, :type => @type, :author => @current)
     end
 
     describe 'ignore blank to blank transitions' do
@@ -49,20 +49,20 @@ describe Issue do
       it 'should not include certain attributes' do
         recreated_journal = @issue.recreate_initial_journal!
 
-        recreated_journal.attributes["changed_data"].include?('rgt').should == false
-        recreated_journal.attributes["changed_data"].include?('lft').should == false
-        recreated_journal.attributes["changed_data"].include?('lock_version').should == false
-        recreated_journal.attributes["changed_data"].include?('updated_at').should == false
-        recreated_journal.attributes["changed_data"].include?('updated_on').should == false
-        recreated_journal.attributes["changed_data"].include?('id').should == false
-        recreated_journal.attributes["changed_data"].include?('type').should == false
-        recreated_journal.attributes["changed_data"].include?('root_id').should == false
+        recreated_journal.changed_data.include?('rgt').should == false
+        recreated_journal.changed_data.include?('lft').should == false
+        recreated_journal.changed_data.include?('lock_version').should == false
+        recreated_journal.changed_data.include?('updated_at').should == false
+        recreated_journal.changed_data.include?('updated_on').should == false
+        recreated_journal.changed_data.include?('id').should == false
+        recreated_journal.changed_data.include?('type').should == false
+        recreated_journal.changed_data.include?('root_id').should == false
       end
 
       it 'should not include useless transitions' do
         recreated_journal = @issue.recreate_initial_journal!
 
-        recreated_journal.attributes["changed_data"].values.each do |change|
+        recreated_journal.changed_data.values.each do |change|
           change.first.should_not == change.last
         end
       end
@@ -81,7 +81,6 @@ describe Issue do
         @issue.status = @status_rejected
         @issue.priority = @priority_low
         @issue.estimated_hours = 3
-        @issue.remaining_hours = 43 if Redmine::Plugin.all.collect(&:id).include?(:backlogs)
         @issue.save!
 
         initial_journal = @issue.journals.first
@@ -101,4 +100,5 @@ describe Issue do
       end
     end
   end
+
 end

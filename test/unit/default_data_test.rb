@@ -33,7 +33,6 @@ class DefaultDataTest < ActiveSupport::TestCase
       begin
         delete_loaded_data!
         assert Redmine::DefaultData::Loader::load(lang)
-        assert_not_nil DocumentCategory.first
         assert_not_nil IssuePriority.first
         assert_not_nil TimeEntryActivity.first
       rescue ActiveRecord::RecordInvalid => e
@@ -46,7 +45,7 @@ private
 
   def delete_loaded_data!
     Role.delete_all("builtin = 0")
-    Tracker.delete_all
+    Type.delete_all
     IssueStatus.delete_all
     Enumeration.delete_all
   end

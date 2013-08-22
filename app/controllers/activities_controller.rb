@@ -12,7 +12,7 @@
 
 class ActivitiesController < ApplicationController
   menu_item :activity
-  before_filter :find_optional_project
+  before_filter :find_optional_project, :verify_activities_module_activated
   accept_key_auth :index
 
   def index
@@ -34,11 +34,12 @@ class ActivitiesController < ApplicationController
     @activity.scope = (@author.nil? ? :default : :all) if @activity.scope.empty?
 
     events = @activity.events(@date_from, @date_to)
+    censor_events_from_projects_with_disabled_activity!(events) unless @project
 
     if events.empty? || stale?(:etag => [@activity.scope, @date_to, @date_from, @with_subprojects, @author, events.first, User.current, current_language])
       respond_to do |format|
         format.html {
-          @events_by_day = events.group_by(&:event_date)
+          @events_by_day = events.group_by {|e| e.data.event_date}
           render :layout => false if request.xhr?
         }
         format.atom {
@@ -69,4 +70,32 @@ class ActivitiesController < ApplicationController
     render_404
   end
 
+  def verify_activities_module_activated
+    render_403 if @project && !@project.module_enabled?("activity")
+  end
+
+  # Do not show events, which are associated with projects where activities are disabled.
+  # In a better world this would be implemented (with better performance) in SQL.
+  # TODO: make the world a better place.
+  def censor_events_from_projects_with_disabled_activity!(events)
+    allowed_project_ids = EnabledModule.where(:name => 'activity').map(&:project_id)
+    events.select! do |event|
+      if event.respond_to?(:data) and event.data.respond_to? :project_id
+        project_id = event.data.project_id
+      elsif event.respond_to?(:project_id) or event.journable.respond_to?(:project_id)
+        # if possible access project_id (its faster)
+        project_id = event.project_id
+      elsif event.respond_to?(:project) or event.journable.respond_to?(:project)
+        # sometimes (e.g.) for wikis, we have no :project_id, but a :project method.
+        project_id = event.project.id
+      end
+      if project_id.nil?
+        # show this event if it is not associated with a project
+        true
+      else
+        # show this event if the activity module is enabled in any of the associated projects
+        allowed_project_ids.include? project_id
+      end
+    end
+  end
 end

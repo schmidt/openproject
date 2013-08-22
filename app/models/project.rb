@@ -44,13 +44,12 @@ class Project < ActiveRecord::Base
   has_many :principals, :through => :member_principals, :source => :principal
 
   has_many :enabled_modules, :dependent => :delete_all
-  has_and_belongs_to_many :trackers, :order => "#{Tracker.table_name}.position"
-  has_many :work_packages, :dependent => :destroy, :order => "#{WorkPackage.table_name}.created_at DESC", :include => [:status, :tracker]
+  has_and_belongs_to_many :types, :order => "#{Type.table_name}.position"
+  has_many :work_packages, :dependent => :destroy, :order => "#{WorkPackage.table_name}.created_at DESC", :include => [:status, :type]
   has_many :work_package_changes, :through => :work_packages, :source => :journals
   has_many :versions, :dependent => :destroy, :order => "#{Version.table_name}.effective_date DESC, #{Version.table_name}.name DESC"
   has_many :time_entries, :dependent => :delete_all
   has_many :queries, :dependent => :delete_all
-  has_many :documents, :dependent => :destroy
   has_many :news, :dependent => :destroy, :include => :author
   has_many :issue_categories, :dependent => :delete_all, :order => "#{IssueCategory.table_name}.name"
   has_many :boards, :dependent => :destroy, :order => "position ASC"
@@ -65,18 +64,21 @@ class Project < ActiveRecord::Base
                           :association_foreign_key => 'custom_field_id'
 
   acts_as_nested_set :order_column => :name, :dependent => :destroy
-  acts_as_attachable :view_permission => :view_files,
-                     :delete_permission => :manage_files
 
   acts_as_customizable
   acts_as_searchable :columns => ["#{table_name}.name", "#{table_name}.identifier", "#{table_name}.description", "#{table_name}.summary"], :project_key => 'id', :permission => nil
   acts_as_event :title => Proc.new {|o| "#{Project.model_name.human}: #{o.name}"},
                 :url => Proc.new {|o| {:controller => '/projects', :action => 'show', :id => o}},
-                :author => nil
+                :author => nil,
+                :datetime => :created_on
 
   attr_protected :status
 
   validates_presence_of :name, :identifier
+  #TODO: we temporarily disable this validation because it leads to failed tests
+  #it implicitely assumes a db:seed-created standard type to be present and currently
+  #neither development nor deployment setups are prepared for this
+  #validates_presence_of :types
   validates_uniqueness_of :identifier
   validates_associated :repository, :wiki
   validates_length_of :name, :maximum => 255
@@ -140,38 +142,28 @@ class Project < ActiveRecord::Base
   has_many :associated_b_projects, :through => :project_b_associations,
                                              :source  => :project_a
 
-
-  has_many :enabled_planning_element_types, :class_name  => "::EnabledPlanningElementType",
-                                                      :dependent => :delete_all
-
-  has_many :planning_element_types, :through => :enabled_planning_element_types,
-                                              :source  => :planning_element_type
-
-
   include TimelinesCollectionProxy
 
   collection_proxy :project_associations, :for => [:project_a_associations,
-                                                             :project_b_associations] do
+                                                   :project_b_associations] do
     def visible(user = User.current)
       all.select { |assoc| assoc.visible?(user) }
     end
   end
 
   collection_proxy :associated_projects, :for => [:associated_a_projects,
-                                                            :associated_b_projects] do
+                                                  :associated_b_projects] do
     def visible(user = User.current)
       all.select { |other| other.visible?(user) }
     end
   end
 
   collection_proxy :reportings, :for => [:reportings_via_source,
-                                                   :reportings_via_target],
-                                          :leave_public => true
-
-  after_save :assign_default_planning_element_types_as_enabled_planning_element_types
+                                         :reportings_via_target],
+                                         :leave_public => true
 
   safe_attributes 'project_type_id',
-                  'planning_element_type_ids',
+                  'type_ids',
                   'responsible_id'
 
   def associated_project_candidates(user = User.current)
@@ -214,13 +206,6 @@ class Project < ActiveRecord::Base
     end
   end
 
-  def assign_default_planning_element_types_as_enabled_planning_element_types
-    return if enabled_planning_element_types.present?
-    return if project_type.blank?
-
-    self.planning_element_types = project_type.planning_element_types
-  end
-
   def has_many_dependent_for_planning_elements
     # Overwrites :dependent => :destroy - before_destroy callback
     # since we need to call the destroy! method instead of the destroy
@@ -251,8 +236,8 @@ class Project < ActiveRecord::Base
     if !initialized.key?('enabled_module_names')
       self.enabled_module_names = Setting.default_projects_modules
     end
-    if !initialized.key?('trackers') && !initialized.key?('tracker_ids')
-      self.trackers = Tracker.all
+    if !initialized.key?('types') && !initialized.key?('type_ids')
+      self.types = Type.where(is_default: true)
     end
   end
 
@@ -427,6 +412,12 @@ class Project < ActiveRecord::Base
     end
   end
 
+  def self.find_visible(user, *args)
+    with_scope(:find => where(Project.visible_by(user))) do
+      find(*args)
+    end
+  end
+
   def to_param
     # id is used for projects with a numeric identifier (compatibility)
     @to_param ||= (identifier.to_s =~ %r{^\d*$} ? id : identifier)
@@ -537,13 +528,13 @@ class Project < ActiveRecord::Base
     end
   end
 
-  # Returns an array of the trackers used by the project and its active sub projects
-  def rolled_up_trackers
-    @rolled_up_trackers ||=
-      Tracker.find(:all, :joins => :projects,
-                         :select => "DISTINCT #{Tracker.table_name}.*",
-                         :conditions => ["#{Project.table_name}.lft >= ? AND #{Project.table_name}.rgt <= ? AND #{Project.table_name}.status = #{STATUS_ACTIVE}", lft, rgt],
-                         :order => "#{Tracker.table_name}.position")
+  # Returns an array of the types used by the project and its active sub projects
+  def rolled_up_types
+    @rolled_up_types ||=
+      Type.find(:all, :joins => :projects,
+                      :select => "DISTINCT #{Type.table_name}.*",
+                      :conditions => ["#{Project.table_name}.lft >= ? AND #{Project.table_name}.rgt <= ? AND #{Project.table_name}.status = #{STATUS_ACTIVE}", lft, rgt],
+                      :order => "#{Type.table_name}.position")
   end
 
   # Closes open and locked project versions that are completed
@@ -730,7 +721,7 @@ class Project < ActiveRecord::Base
     'identifier',
     'custom_field_values',
     'custom_fields',
-    'tracker_ids',
+    'type_ids',
     'work_package_custom_field_ids'
 
   safe_attributes 'enabled_module_names',
@@ -742,7 +733,7 @@ class Project < ActiveRecord::Base
   def hierarchy
     parents = project.self_and_ancestors || []
     descendants = project.descendants || []
-    project_hierarchy = parents | descendants # Set union
+    parents | descendants # Set union
   end
 
   # Returns an auto-generated project identifier based on the last identifier used
@@ -795,7 +786,7 @@ class Project < ActiveRecord::Base
         attributes = project.attributes.dup.except('id', 'name', 'identifier', 'status', 'parent_id', 'lft', 'rgt')
         copy = Project.new(attributes)
         copy.enabled_modules = project.enabled_modules
-        copy.trackers = project.trackers
+        copy.types = project.types
         copy.custom_values = project.custom_values.collect {|v| v.clone}
         copy.work_package_custom_fields = project.work_package_custom_fields
         return copy
@@ -877,6 +868,33 @@ class Project < ActiveRecord::Base
     list
   end
 
+  # TODO: merge with add_issue once type or similar is defined there
+  def add_planning_element(attributes = {})
+    attributes ||= {}
+
+    self.planning_elements.build do |pe|
+      pe.attributes = attributes
+    end
+  end
+
+  # TODO: merge with add_planning_elemement once type or similar is defined there
+  def add_issue(attributes = {})
+    attributes ||= {}
+
+    Issue.new do |i|
+      i.project = self
+
+      type_attribute = attributes.delete(:type) || attributes.delete(:type_id)
+
+      i.type = if type_attribute
+                    project.types.find(type_attribute)
+                  else
+                    project.types.first
+                  end
+
+      i.attributes = attributes
+    end
+  end
 
   private
 
@@ -949,7 +967,7 @@ class Project < ActiveRecord::Base
       # Parent issue
       if issue.parent_id
         if copied_parent = work_packages_map[issue.parent_id]
-          new_issue.parent_issue_id = copied_parent.id
+          new_issue.parent_id = copied_parent.id
         end
       end
 

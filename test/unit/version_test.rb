@@ -148,7 +148,7 @@ class VersionTest < ActiveSupport::TestCase
     setup do
       ProjectCustomField.destroy_all # Custom values are a mess to isolate in tests
       @project = Project.generate!(:identifier => 'test0')
-      @project.trackers << Tracker.generate!
+      @project.types << Type.generate!
 
       (@version = Version.new.tap do |v|
         v.force_attributes = { :project => @project, :effective_date => nil, :name => "test" }
@@ -220,8 +220,8 @@ class VersionTest < ActiveSupport::TestCase
 
     should "return the sum of leaves estimated hours" do
       parent = add_issue(@version)
-      add_issue(@version, :estimated_hours => 2.5, :parent_issue_id => parent.id)
-      add_issue(@version, :estimated_hours => 5, :parent_issue_id => parent.id)
+      add_issue(@version, :estimated_hours => 2.5, :parent_id => parent.id)
+      add_issue(@version, :estimated_hours => 5, :parent_id => parent.id)
       assert_equal 7.5, @version.estimated_hours
     end
   end
@@ -269,7 +269,7 @@ class VersionTest < ActiveSupport::TestCase
                              :fixed_version => version,
                              :subject => 'Test',
                              :author => User.first,
-                             :tracker => version.project.trackers.first }.merge(attributes)
+                             :type => version.project.types.first }.merge(attributes)
     end).save!
 
     v

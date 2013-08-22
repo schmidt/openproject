@@ -11,13 +11,31 @@
 
 require File.expand_path('../boot', __FILE__)
 
-require 'rails/all'
+require 'benchmark'
+module SimpleBenchmark
+  #
+  # Measure execution of block and display result
+  #
+  # Time is measured by Benchmark module, displayed time is total
+  # (user cpu time + system cpu time + user and system cpu time of children)
+  # This is not wallclock time.
+  def self.bench(title)
+    print "#{title}... "
+    result = Benchmark.measure do
+      yield
+    end
+    print "%.03fs\n" % result.total
+  end
+end
+
+SimpleBenchmark.bench "require 'rails/all'" do
+  require 'rails/all'
+end
 
 if defined?(Bundler)
-  # If you precompile assets before deploying to production, use this line
-  #Bundler.require(*Rails.groups(:assets => %w(development test)))
-  # If you want your assets lazily compiled in production, use this line
-  Bundler.require(:default, :assets, :opf_plugins, Rails.env)
+  SimpleBenchmark.bench 'Bundler.require' do
+    Bundler.require(:default, :assets, :opf_plugins, Rails.env)
+  end
 end
 
 module OpenProject
@@ -37,7 +55,7 @@ module OpenProject
     # Activate observers that should always be running.
     # config.active_record.observers = :cacher, :garbage_collector, :forum_observer
     config.active_record.observers = :journal_observer, :message_observer, :issue_observer,
-                                     :news_observer, :document_observer, :wiki_content_observer,
+                                     :news_observer, :wiki_content_observer,
                                      :comment_observer
 
     # Set Time.zone default to the specified zone and make Active Record auto-convert to this zone.
@@ -68,12 +86,11 @@ module OpenProject
     # like if you have constraints or database-specific column types
     # config.active_record.schema_format = :sql
 
-    # needed?
     # Load any local configuration that is kept out of source control
     # (e.g. patches).
-    #if File.exists?(File.join(File.dirname(__FILE__), 'additional_environment.rb'))
-    #  instance_eval File.read(File.join(File.dirname(__FILE__), 'additional_environment.rb'))
-    #end
+    if File.exists?(File.join(File.dirname(__FILE__), 'additional_environment.rb'))
+      instance_eval File.read(File.join(File.dirname(__FILE__), 'additional_environment.rb'))
+    end
 
     # Enforce whitelist mode for mass assignment.
     # This will create an empty whitelist of attributes available for mass-assignment for all models

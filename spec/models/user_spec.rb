@@ -13,13 +13,13 @@ require 'spec_helper'
 
 describe User do
   let(:user) { FactoryGirl.build(:user) }
-  let(:project) { FactoryGirl.create(:project_with_trackers) }
+  let(:project) { FactoryGirl.create(:project_with_types) }
   let(:role) { FactoryGirl.create(:role, :permissions => [:view_work_packages]) }
   let(:member) { FactoryGirl.build(:member, :project => project,
                                         :roles => [role],
                                         :principal => user) }
   let(:issue_status) { FactoryGirl.create(:issue_status) }
-  let(:issue) { FactoryGirl.build(:issue, :tracker => project.trackers.first,
+  let(:issue) { FactoryGirl.build(:issue, :type => project.types.first,
                                       :author => user,
                                       :project => project,
                                       :status => issue_status) }
@@ -154,6 +154,68 @@ describe User do
 
     it { @u.password.should_not be_blank }
     it { @u.password_confirmation.should_not be_blank }
+    it { @u.force_password_change.should be_true}
+  end
+
+  describe :try_authentication_for_existing_user do
+    def build_user_double_with_expired_password(is_expired)
+      user_double = double('User')
+      user_double.stub(:check_password?) { true }
+      user_double.stub(:active?) { true }
+      user_double.stub(:auth_source) { nil }
+      user_double.stub(:force_password_change) { false }
+
+      # check for expired password should always happen
+      user_double.should_receive(:password_expired?) { is_expired }
+
+      user_double
+    end
+
+    it 'should not allow login with an expired password' do
+      user_double = build_user_double_with_expired_password(true)
+
+      # use !! to ensure value is boolean
+      (!!User.try_authentication_for_existing_user(user_double, 'anypassword')).should \
+        == false
+    end
+    it 'should allow login with a not expired password' do
+      user_double = build_user_double_with_expired_password(false)
+
+      # use !! to ensure value is boolean
+      (!!User.try_authentication_for_existing_user(user_double, 'anypassword')).should \
+        == true
+    end
+
+    context 'with an external auth source' do
+      let(:auth_source) { FactoryGirl.build(:auth_source) }
+      let(:user_with_external_auth_source) do
+        user = FactoryGirl.build(:user, :login => 'user')
+        user.stub(:auth_source).and_return(auth_source)
+        user
+      end
+
+      context 'and successful external authentication' do
+        before do
+          auth_source.should_receive(:authenticate).with('user', 'password').and_return(true)
+        end
+
+        it 'should succeed' do
+          User.try_authentication_for_existing_user(user_with_external_auth_source, 'password').
+            should == user_with_external_auth_source
+        end
+      end
+
+      context 'and failing external authentication' do
+        before do
+          auth_source.should_receive(:authenticate).with('user', 'password').and_return(false)
+        end
+
+        it 'should fail when the authentication fails' do
+          User.try_authentication_for_existing_user(user_with_external_auth_source, 'password').
+            should == nil
+        end
+      end
+    end
   end
 
   describe '.system' do
@@ -183,6 +245,49 @@ describe User do
           system_user.should == @u
         end.should change(User, :count).by(0)
       end
+    end
+  end
+
+  describe ".default_admin_account_deleted_or_changed?" do
+    let(:default_admin) { FactoryGirl.build(:user, :login => 'admin', :password => 'admin', :password_confirmation => 'admin', :admin => true) }
+
+    before do
+      Setting.password_min_length = 5
+    end
+
+    context "default admin account exists with default password" do
+      before do
+        default_admin.save
+      end
+      it { User.default_admin_account_changed?.should be_false }
+    end
+
+    context "default admin account exists with changed password" do
+      before do
+        default_admin.update_attribute :password, 'dafaultAdminPwd'
+        default_admin.update_attribute :password_confirmation, 'dafaultAdminPwd'
+        default_admin.save
+      end
+
+      it { User.default_admin_account_changed?.should be_true }
+    end
+
+    context "default admin account was deleted" do
+      before do
+        default_admin.save
+        default_admin.delete
+      end
+
+      it { User.default_admin_account_changed?.should be_true }
+    end
+
+    context "default admin account was disabled" do
+      before do
+        default_admin.status = User::STATUSES[:locked]
+        default_admin.save
+      end
+
+      it { User.default_admin_account_changed?.should be_true }
     end
   end
 end

@@ -16,7 +16,7 @@ Feature: Tracking Time
       | name        | project1      |
       | identifier  | project1      |
     And I am working in project "parent"
-    And the project "project1" has the following trackers:
+    And the project "project1" has the following types:
       | name | position |
       | Bug  |     1    |
     And there is a role "member"
@@ -35,7 +35,7 @@ Feature: Tracking Time
       |  start_date   | 2011-05-04         |
       |  description  | Aioli Sali Grande  |
     And there is a time entry for "issue1" with 4 hours
-    And I am logged in as "admin"
+    And I am already admin
     And I am on the time entry page of issue "issue1"
 
   Scenario: Adding a time entry

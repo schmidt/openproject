@@ -16,7 +16,6 @@ require 'cgi'
 module ApplicationHelper
   include Redmine::WikiFormatting::Macros::Definitions
   include Redmine::I18n
-  include GravatarHelper::PublicMethods
   include ERB::Util # for h()
 
   extend Forwardable
@@ -87,6 +86,20 @@ module ApplicationHelper
             :class => 'preview'
   end
 
+  def link_to_work_package_preview(context = nil, options = {})
+    url = context.is_a?(Project) ?
+            preview_project_work_packages_path(context) :
+            preview_work_package_path(context)
+
+    id = options[:form_id] || 'work_package-form-preview'
+
+    link_to l(:label_preview),
+              url,
+              :id => id,
+              :class => 'preview'
+
+  end
+
   # Show a sorted linkified (if active) comma-joined list of users
   def list_users(users, options={})
     users.sort.collect{|u| link_to_user(u, options)}.join(", ")
@@ -101,34 +114,10 @@ module ApplicationHelper
     l(('status_' + user.status_name).to_sym)
   end
 
-  # Displays a link to +issue+ with its subject.
-  # Examples:
-  #
-  #   link_to_issue(issue)                        # => Defect #6: This is the subject
-  #   link_to_issue(issue, :truncate => 6)        # => Defect #6: This i...
-  #   link_to_issue(issue, :subject => false)     # => Defect #6
-  #   link_to_issue(issue, :project => true)      # => Foo - Defect #6
-  #
   def link_to_issue(issue, options={})
-    title = nil
-    subject = nil
-    if options[:subject] == false
-      title = truncate(issue.subject, :length => 60)
-    else
-      subject = issue.subject
-      if options[:truncate]
-        subject = truncate(subject, :length => options[:truncate])
-      end
-    end
-    closed = issue.closed? ? content_tag(:span, l(:label_closed_issues), :class => "hidden-for-sighted") : ""
-    s = ActiveSupport::SafeBuffer.new
-    s << "#{issue.project} - " if options[:project]
-    s << link_to("#{closed}#{h(options[:before_text].to_s)}#{h(issue.tracker)} ##{issue.id}".html_safe,
-                issue,
-                :class => issue.css_classes,
-                :title => h(title))
-    s << ": #{subject}" if subject
-    s
+    warn "[DEPRECATION] link_to_issue will be removed - use link_to_work_package instead.\n" +
+         "Called from: #{caller[0]}"
+    link_to_work_package(issue, options)
   end
 
   # Generates a link to an attachment.
@@ -390,8 +379,8 @@ module ApplicationHelper
 
   def time_tag(time)
     text = distance_of_time_in_words(Time.now, time)
-    if @project
-      link_to(text, {:controller => '/activities', :action => 'index', :id => @project, :from => time.to_date}, :title => format_time(time))
+    if @project and @project.module_enabled?("activity")
+      link_to(text, {:controller => '/activities', :action => 'index', :project_id => @project, :from => time.to_date}, :title => format_time(time))
     else
       content_tag('label', text, :title => format_time(time), :class => "timestamp")
     end
@@ -695,7 +684,7 @@ module ApplicationHelper
   #     identifier:version:1.0.0
   #     identifier:source:some/file
   def parse_redmine_links(text, project, obj, attr, only_path, options)
-    text.gsub!(%r{([\s\(,\-\[\>]|^)(!)?(([a-z0-9\-_]+):)?(attachment|document|version|commit|source|export|message|project)?((#+|r)(\d+)|(:)([^"\s<>][^\s<>]*?|"[^"]+?"))(?=(?=[[:punct:]]\W)|,|\s|\]|<|$)}) do |m|
+    text.gsub!(%r{([\s\(,\-\[\>]|^)(!)?(([a-z0-9\-_]+):)?(attachment|version|commit|source|export|message|project)?((#+|r)(\d+)|(:)([^"\s<>][^\s<>]*?|"[^"]+?"))(?=(?=[[:punct:]]\W)|,|\s|\]|<|$)}) do |m|
       leading, esc, project_prefix, project_identifier, prefix, sep, identifier = $1, $2, $3, $4, $5, $7 || $9, $8 || $10
       link = nil
       if project_identifier
@@ -713,15 +702,10 @@ module ApplicationHelper
           oid = identifier.to_i
           case prefix
           when nil
-            if issue = Issue.visible.find_by_id(oid, :include => :status)
-              link = link_to("##{oid}", {:only_path => only_path, :controller => '/issues', :action => 'show', :id => oid},
-                                        :class => issue.css_classes,
-                                        :title => "#{truncate(issue.subject, :length => 100)} (#{issue.status.name})")
-            end
-          when 'document'
-            if document = Document.visible.find_by_id(oid)
-              link = link_to h(document.title), {:only_path => only_path, :controller => '/documents', :action => 'show', :id => document},
-                                                :class => 'document'
+            if work_package = WorkPackage.visible.find_by_id(oid, :include => :status)
+              link = link_to("##{oid}", work_package_path(:id => oid, :only_path => only_path),
+                                        :class => work_package_css_classes(work_package),
+                                        :title => "#{truncate(work_package.subject, :length => 100)} (#{work_package.status.try(:name)})")
             end
           when 'version'
             if version = Version.visible.find_by_id(oid)
@@ -739,25 +723,18 @@ module ApplicationHelper
           end
         elsif sep == '##'
           oid = identifier.to_i
-          if issue = Issue.visible.find_by_id(oid, :include => :status)
-            extend IssuesHelper # TODO: remove me from here
-            link = issue_quick_info(issue)
+          if work_package = WorkPackage.visible.find_by_id(oid, :include => :status)
+            link = work_package_quick_info(work_package)
           end
         elsif sep == '###'
           oid = identifier.to_i
-          if issue = Issue.visible.find_by_id(oid, :include => :status)
-            extend IssuesHelper # TODO: remove me from here
-            link = issue_quick_info_with_description(issue)
+          if work_package = WorkPackage.visible.find_by_id(oid, :include => :status)
+            link = work_package_quick_info_with_description(work_package)
           end
         elsif sep == ':'
           # removes the double quotes if any
           name = identifier.gsub(%r{^"(.*)"$}, "\\1")
           case prefix
-          when 'document'
-            if project && document = project.documents.visible.find_by_title(name)
-              link = link_to h(document.title), {:only_path => only_path, :controller => '/documents', :action => 'show', :id => document},
-                                                :class => 'document'
-            end
           when 'version'
             if project && version = project.versions.visible.find_by_name(name)
               link = link_to h(version.name), {:only_path => only_path, :controller => '/versions', :action => 'show', :id => version},
@@ -1013,23 +990,6 @@ module ApplicationHelper
     end
   end
 
-  # Returns the avatar image tag for the given +user+ if avatars are enabled
-  # +user+ can be a User or a string that will be scanned for an email address (eg. 'joe <joe@foo.bar>')
-  def avatar(user, options = { })
-    if Setting.gravatar_enabled?
-      options.merge!({:ssl => (defined?(request) && request.ssl?), :default => Setting.gravatar_default})
-      email = nil
-      if user.respond_to?(:mail)
-        email = user.mail
-      elsif user.to_s =~ %r{<(.+?)>}
-        email = $1
-      end
-      return gravatar(email.to_s.downcase, options) unless email.blank? rescue nil
-    else
-      ''.html_safe
-    end
-  end
-
   # Returns the javascript tags that are included in the html layout head
   def user_specific_javascript_includes
     tags = ''
@@ -1120,112 +1080,6 @@ module ApplicationHelper
     elements << I18n.t(:text_powered_by, :link => link_to(Redmine::Info.app_name, Redmine::Info.url))
     elements.join(", ").html_safe
   end
-
-  # start timelines stuff
-  #
-  def link_to_planning_element(planning_element, options = {})
-    return if planning_element.new_record?
-
-    options = options.stringify_keys
-    options.assert_valid_keys("include_id", "include_name", "text")
-
-    options.reverse_merge!("include_id"   => true,
-                           "include_name" => true)
-
-    if options["text"].blank?
-      text = []
-
-      text << "*#{planning_element.id}" if options["include_id"]
-      text << "#{planning_element.subject}" if options["include_name"]
-
-      text = text.join(" ")
-    else
-      text = options[:text]
-    end
-
-    link_to(h(text),
-            project_planning_element_path(planning_element.project, planning_element),
-            :title => planning_element.subject)
-  end
-
-  def planning_element_quick_info(planning_element)
-    start_date_change = ""
-    end_date_change = ""
-
-    journals = planning_element.journals.find(:all, :conditions => ["created_at >= ?", Date.today.to_time - 7.day], :order => "created_at desc")
-
-    journals.each do |journal|
-      break if !start_date_change.empty? and !end_date_change.empty?
-
-      if start_date_change.empty?
-        unless journal.changes["start_date"].nil?
-          unless journal.changes["start_date"].first.nil?
-            start_date_change = " (<del>#{journal.changes["start_date"].first}</del>)"
-          end
-        end
-      end
-
-      if end_date_change.empty?
-        unless journal.changes["end_date"].nil?
-          unless journal.changes["end_date"].first.nil?
-            end_date_change = " (<del>#{journal.changes["end_date"].first}</del>)"
-          end
-        end
-      end
-    end
-
-    link = link_to(h("*#{planning_element.id} #{planning_element.planning_element_status.nil? ? "" : planning_element.planning_element_status.name + ":"} #{planning_element.subject} "),
-                   project_planning_element_path(planning_element.project, planning_element),
-                   :title => h("#{truncate(planning_element.subject, :length => 100)} #{planning_element.planning_element_status.nil? ? "" :
-                               "(" + planning_element.planning_element_status.name + ")"}"))
-    link += "#{planning_element.start_date.nil? ? "[?]" : planning_element.start_date.to_s}#{start_date_change} – #{planning_element.end_date.nil? ? "[?]" :
-      planning_element.end_date.to_s}#{end_date_change}"
-    link += "#{planning_element.responsible.nil? ? "" : h(" (#{planning_element.responsible.to_s})")}"
-
-    return link
-  end
-
-  def planning_element_quick_info_with_description(planning_element, lines)
-    description_lines = planning_element.description.to_s.lines.to_a[0,lines]
-
-    if description_lines[lines-1] && planning_element.description.to_s.lines.to_a.size > lines
-      description_lines[lines-1].strip!
-
-      while !description_lines[lines-1].end_with?("...") do
-        description_lines[lines-1] = description_lines[lines-1] + "."
-      end
-    end
-
-    planning_element_quick_info(planning_element) +
-      content_tag(:div, textilizable("\n" + description_lines.to_s), :class => "indent")
-  end
-
-  def parse_redmine_links_with_planning_element_links(text, project, obj, attr, only_path, options)
-    parse_redmine_links_without_planning_element_links(text, project, obj, attr, only_path, options)
-    text.gsub!(%r{(?:\W|^|\A)((\*+)(\d+))(?:\W|$|\z)}) do |match|
-      text, stars, id = $1, $2, $3
-      planning_element = PlanningElement.without_deleted.visible.find_by_id(id)
-
-      if planning_element.present?
-        if stars == "*"
-          match.sub(text, link_to_planning_element(planning_element, :include_name => false))
-        elsif stars == "**"
-          replace = planning_element_quick_info(planning_element)
-          match.sub(text, replace)
-        elsif stars == "***"
-          replace = planning_element_quick_info_with_description(planning_element,3)
-          match.sub(text, replace)
-        end
-      else
-        match
-      end
-    end
-  end
-
-  #TODO remove method chain!
-  alias_method_chain :parse_redmine_links, :planning_element_links
-
-  # end timelines stuff
 
   private
 

@@ -55,24 +55,23 @@ JS
   end
 
   def update
-    if member = update_member_from_params and
-      member.save
+    member = update_member_from_params
+    member.save
 
-  	 respond_to do |format|
-        format.html { redirect_to :controller => '/projects', :action => 'settings', :tab => 'members', :id => @project, :page => params[:page] }
-        format.js {
-          render(:update) { |page|
-            if params[:membership]
-              @user = member.user
-              page.replace_html "tab-content-memberships", :partial => 'users/memberships'
-            else
-              page.replace_html "tab-content-members", :partial => 'projects/settings/members'
-            end
-            page << TAB_SCRIPTS
-            page.visual_effect(:highlight, "member-#{@member.id}") unless Member.find_by_id(@member.id).nil?
-          }
+    respond_to do |format|
+      format.html { redirect_to :controller => '/projects', :action => 'settings', :tab => 'members', :id => @project, :page => params[:page] }
+      format.js {
+        render(:update) { |page|
+          if params[:membership]
+            @user = member.user
+            page.replace_html "tab-content-memberships", :partial => 'users/memberships'
+          else
+            page.replace_html "tab-content-members", :partial => 'projects/settings/members'
+          end
+          page << TAB_SCRIPTS
+          page.visual_effect(:highlight, "member-#{@member.id}") unless Member.find_by_id(@member.id).nil?
         }
-      end
+      }
     end
   end
 
@@ -106,7 +105,7 @@ JS
     end
 
     respond_to do |format|
-      format.json 
+      format.json
       format.html {
         if request.xhr?
           partial = "members/autocomplete_for_member"
@@ -137,7 +136,10 @@ JS
       member.user_id = user_id
       members << member
     end
-
+    # most likely wrong user input, use a dummy member for error handling
+    if !members.present? && roles.present?
+      members = [Member.new(attrs.merge({ :member_roles => roles.collect {|r| MemberRole.new :role => r } }))]
+    end
     members
   end
 
@@ -175,20 +177,8 @@ JS
     attrs.delete(:project_id)
 
     role_ids = attrs.delete(:role_ids).map(&:to_i).select{ |i| i > 0 }
-    roles = Role.find_all_by_id(role_ids)
 
-    # Keep inherited roles
-    role_ids += @member.member_roles.select { |mr| !mr.inherited_from.nil? }.collect(&:role_id)
-
-    new_role_ids = role_ids - @member.role_ids
-    # Add new roles
-    new_role_ids.each { |id| @member.member_roles.build.tap { |r| r.role_id = id } }
-    # Remove roles (Rails' #role_ids= will not trigger MemberRole#on_destroy)
-    member_roles_to_destroy = @member.member_roles.select { |mr| !role_ids.include?(mr.role_id) }
-    if member_roles_to_destroy.any?
-      member_roles_to_destroy.each(&:mark_for_destruction)
-      Watcher.prune(:user => @member.principal, :project => @member.project)
-    end
+    @member.assign_roles(role_ids)
 
     @member.attributes = attrs
     @member

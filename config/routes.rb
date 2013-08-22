@@ -75,10 +75,10 @@ OpenProject::Application.routes.draw do
     end
   end
 
-  match '/roles/workflow/:id/:role_id/:tracker_id' => 'roles#workflow'
+  match '/roles/workflow/:id/:role_id/:type_id' => 'roles#workflow'
   match '/help/:ctrl/:page' => 'help#index'
 
-  resources :trackers
+  resources :types
 
   # only providing routes for journals when there are multiple subclasses of journals
   # all subclasses will look for the journals routes
@@ -142,10 +142,6 @@ OpenProject::Application.routes.draw do
     end
 
     resource :enumerations, :controller => 'project_enumerations', :only => [:update, :destroy]
-
-    resources :documents, :shallow => true
-
-    resources :files, :only => [:index, :new, :create]
 
     resources :versions, :only => [:new, :create] do
       collection do
@@ -212,6 +208,11 @@ OpenProject::Application.routes.draw do
         # get a preview of a new issue (i.e. one without an ID)
         match '/new/preview' => 'issues/previews#create', :as => 'preview_new', :via => :post
       end
+    end
+
+    resources :work_packages, :only => [:new, :create] do
+      get :new_type, :on => :collection
+      post :preview, :on => :collection
     end
 
     resources :activity, :activities, :only => :index, :controller => 'activities'
@@ -301,6 +302,18 @@ OpenProject::Application.routes.draw do
     end
   end
 
+  resources :work_packages, :only => [:show, :edit, :update] do
+    get :new_type, :on => :member
+    post :preview, :on => :member
+
+    resources :relations, :controller => 'work_package_relations', :only => [:create, :destroy]
+
+    resource :moves, :controller => 'work_packages/moves', :only => [:new, :create]
+
+    resources :time_entries, :controller => 'timelog',
+                             :only => [:new]
+  end
+
   resources :versions, :only => [:show, :edit, :update, :destroy] do
     member do
       get :status_by
@@ -361,6 +374,8 @@ OpenProject::Application.routes.draw do
       match '/projects/:id/repository', :action => :show
       match '/projects/:id/repository/edit', :action => :edit
       match '/projects/:id/repository/statistics', :action => :stats
+      match '/projects/:id/repository/committers', :action => :committers
+      match '/projects/:id/repository/graph', :action => :graph
       match '/projects/:id/repository/revisions', :action => :revisions
       match '/projects/:id/repository/revisions.:format', :action => :revisions
       match '/projects/:id/repository/revisions/:rev', :action => :revision

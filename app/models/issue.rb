@@ -16,17 +16,12 @@
 class Issue < WorkPackage
   include Redmine::SafeAttributes
 
-  has_and_belongs_to_many :changesets, :order => "#{Changeset.table_name}.committed_on ASC, #{Changeset.table_name}.id ASC"
-
-  has_many :relations_from, :class_name => 'IssueRelation', :foreign_key => 'issue_from_id', :dependent => :delete_all
-  has_many :relations_to, :class_name => 'IssueRelation', :foreign_key => 'issue_to_id', :dependent => :delete_all
-
   DONE_RATIO_OPTIONS = %w(issue_field issue_status)
   ATTRIBS_WITH_VALUES_FROM_CHILDREN = %w(priority_id start_date due_date estimated_hours done_ratio)
 
   attr_protected :project_id, :author_id, :lft, :rgt
 
-  validates_presence_of :subject, :priority, :project, :tracker, :author, :status
+  validates_presence_of :subject, :priority, :project, :type, :author, :status
 
   validates_length_of :subject, :maximum => 255
   validates_inclusion_of :done_ratio, :in => 0..100
@@ -37,15 +32,14 @@ class Issue < WorkPackage
   validate :validate_start_date_before_soonest_start_date
   validate :validate_fixed_version_is_assignable
   validate :validate_fixed_version_is_still_open
-  validate :validate_enabled_tracker
-  validate :validate_correct_parent
+  validate :validate_enabled_type
 
   scope :open, :conditions => ["#{IssueStatus.table_name}.is_closed = ?", false], :include => :status
 
-  scope :with_limit, lambda { |limit| { :limit => limit} } 
+  scope :with_limit, lambda { |limit| { :limit => limit} }
 
   scope :on_active_project, lambda { {
-    :include => [:status, :project, :tracker],
+    :include => [:status, :project, :type],
     :conditions => "#{Project.table_name}.status=#{Project::STATUS_ACTIVE}" }}
 
   scope :without_version, lambda {
@@ -59,124 +53,14 @@ class Issue < WorkPackage
       :conditions => ::Query.merge_conditions(query.statement)
     }
   }
-  #
-  # Used for activities list
-  def title
-    title = ''
-    title << subject
-    title << ' ('
-    title << status.name << ' ' if status
-    title << '*'
-    title << id.to_s
-    title << ')'
-  end
-
-  # find all issues
-  # * having set a parent_id where the root_id
-  #   1) points to self
-  #   2) points to an issue with a parent
-  #   3) points to an issue having a different root_id
-  # * having not set a parent_id but a root_id
-  # This unfortunately does not find the issue with the id 3 in the following example
-  # | id  | parent_id | root_id |
-  # | 1   |           | 1       |
-  # | 2   | 1         | 2       |
-  # | 3   | 2         | 2       |
-  # This would only be possible using recursive statements
-  #scope :invalid_root_ids, { :conditions => "(issues.parent_id IS NOT NULL AND " +
-  #                                                  "(issues.root_id = issues.id OR " +
-  #                                                  "(issues.root_id = parent_issues.id AND parent_issues.parent_id IS NOT NULL) OR " +
-  #                                                  "(issues.root_id != parent_issues.root_id))" +
-  #                                                ") OR " +
-  #                                                "(issues.parent_id IS NULL AND issues.root_id != issues.id)",
-  #                                 :joins => "LEFT OUTER JOIN issues parent_issues ON parent_issues.id = issues.parent_id" }
 
   before_create :default_assign
   before_save :close_duplicates, :update_done_ratio_from_issue_status
-  after_save :reschedule_following_issues, :update_nested_set_attributes, :update_parent_attributes
-  after_destroy :update_parent_attributes
   before_destroy :remove_attachments
-
-  after_initialize :set_default_values
-
-  def set_default_values
-    if new_record? # set default values for new records only
-      self.status   ||= IssueStatus.default
-      self.priority ||= IssuePriority.default
-    end
-  end
 
   # Overrides Redmine::Acts::Customizable::InstanceMethods#available_custom_fields
   def available_custom_fields
-    (project && tracker) ? (project.all_work_package_custom_fields & tracker.custom_fields.all) : []
-  end
-
-  # Moves/copies an issue to a new project and tracker
-  # Returns the moved/copied issue on success, false on failure
-  def move_to_project(*args)
-    ret = Issue.transaction do
-      move_to_project_without_transaction(*args) || raise(ActiveRecord::Rollback)
-    end || false
-  end
-
-  def move_to_project_without_transaction(new_project, new_tracker = nil, options = {})
-    options ||= {}
-    issue = options[:copy] ? self.class.new.copy_from(self) : self
-
-    if new_project && issue.project_id != new_project.id
-      # delete issue relations
-      unless Setting.cross_project_issue_relations?
-        issue.relations_from.clear
-        issue.relations_to.clear
-      end
-      # issue is moved to another project
-      # reassign to the category with same name if any
-      new_category = issue.category.nil? ? nil : new_project.issue_categories.find_by_name(issue.category.name)
-      issue.category = new_category
-      # Keep the fixed_version if it's still valid in the new_project
-      unless new_project.shared_versions.include?(issue.fixed_version)
-        issue.fixed_version = nil
-      end
-      issue.project = new_project
-
-      if !Setting.cross_project_issue_relations? &&
-         parent && parent.project_id != project_id
-        self.parent_issue_id = nil
-      end
-    end
-    if new_tracker
-      issue.tracker = new_tracker
-      issue.reset_custom_values!
-    end
-    if options[:copy]
-      issue.author = User.current
-      issue.custom_field_values = self.custom_field_values.inject({}) {|h,v| h[v.custom_field_id] = v.value; h}
-      issue.status = if options[:attributes] && options[:attributes][:status_id]
-                       IssueStatus.find_by_id(options[:attributes][:status_id])
-                     else
-                       self.status
-                     end
-    end
-    # Allow bulk setting of attributes on the issue
-    if options[:attributes]
-      issue.attributes = options[:attributes]
-    end
-    if issue.save
-      unless options[:copy]
-        # Manually update project_id on related time entries
-        TimeEntry.update_all("project_id = #{new_project.id}", {:work_package_id => id})
-
-        issue.children.each do |child|
-          unless child.move_to_project_without_transaction(new_project)
-            # Move failed and transaction was rollback'd
-            return false
-          end
-        end
-      end
-    else
-      return false
-    end
-    issue
+    (project && type) ? (project.all_work_package_custom_fields & type.custom_fields.all) : []
   end
 
   def status_id=(sid)
@@ -189,33 +73,33 @@ class Issue < WorkPackage
     write_attribute(:priority_id, pid)
   end
 
-  def tracker_id=(tid)
-    self.tracker = nil
-    result = write_attribute(:tracker_id, tid)
+  def type_id=(tid)
+    self.type = nil
+    result = write_attribute(:type_id, tid)
     @custom_field_values = nil
     result
   end
 
-  # Overrides attributes= so that tracker_id gets assigned first
-  def attributes_with_tracker_first=(new_attributes)
+  # Overrides attributes= so that type_id gets assigned first
+  def attributes_with_type_first=(new_attributes)
     return if new_attributes.nil?
-    new_tracker_id = new_attributes['tracker_id'] || new_attributes[:tracker_id]
-    if new_tracker_id
-      self.tracker_id = new_tracker_id
+    new_type_id = new_attributes['type_id'] || new_attributes[:type_id]
+    if new_type_id
+      self.type_id = new_type_id
     end
-    send :attributes_without_tracker_first=, new_attributes
+    send :attributes_without_type_first=, new_attributes
   end
   # Do not redefine alias chain on reload (see #4838)
-  alias_method_chain(:attributes=, :tracker_first) unless method_defined?(:attributes_without_tracker_first=)
+  alias_method_chain(:attributes=, :type_first) unless method_defined?(:attributes_without_type_first=)
 
   def estimated_hours=(h)
     converted_hours = (h.is_a?(String) ? h.to_hours : h)
     write_attribute :estimated_hours, !!converted_hours ? converted_hours : h
   end
 
-  safe_attributes 'tracker_id',
+  safe_attributes 'type_id',
     'status_id',
-    'parent_issue_id',
+    'parent_id',
     'category_id',
     'assigned_to_id',
     'priority_id',
@@ -249,9 +133,9 @@ class Issue < WorkPackage
     attrs = delete_unsafe_attributes(attrs, user)
     return if attrs.empty?
 
-    # Tracker must be set before since new_statuses_allowed_to depends on it.
-    if t = attrs.delete('tracker_id')
-      self.tracker_id = t
+    # Type must be set before since new_statuses_allowed_to depends on it.
+    if t = attrs.delete('type_id')
+      self.type_id = t
     end
 
     if attrs['status_id']
@@ -260,15 +144,15 @@ class Issue < WorkPackage
       end
     end
 
-    if @parent_issue.present?
+    if parent.present?
       attrs.reject! {|k,v| %w(priority_id done_ratio start_date due_date estimated_hours).include?(k)}
     end
 
-    if attrs.has_key?('parent_issue_id')
+    if attrs.has_key?('parent_id')
       if !user.allowed_to?(:manage_subtasks, project)
-        attrs.delete('parent_issue_id')
-      elsif !attrs['parent_issue_id'].blank?
-        attrs.delete('parent_issue_id') unless Issue.visible(user).exists?(attrs['parent_issue_id'].to_i)
+        attrs.delete('parent_id')
+      elsif !attrs['parent_id'].blank?
+        attrs.delete('parent_id') unless WorkPackage.visible(user).exists?(attrs['parent_id'].to_i)
       end
     end
 
@@ -288,10 +172,6 @@ class Issue < WorkPackage
     else
       read_attribute(:done_ratio)
     end
-  end
-
-  def self.use_status_for_done_ratio?
-    Setting.issue_done_ratio == 'issue_status'
   end
 
   def self.use_field_for_done_ratio?
@@ -328,28 +208,10 @@ class Issue < WorkPackage
     end
   end
 
-  def validate_enabled_tracker
-    # Checks that the issue can not be added/moved to a disabled tracker
-    if project && (tracker_id_changed? || project_id_changed?)
-      errors.add :tracker_id, :inclusion unless project.trackers.include?(tracker)
-    end
-  end
-
-  def validate_correct_parent
-    # Checks parent issue assignment
-    if @parent_issue
-      if !Setting.cross_project_issue_relations? && @parent_issue.project_id != self.project_id
-        errors.add :parent_issue_id, :not_a_valid_parent
-      elsif !new_record?
-        # moving an existing issue
-        if @parent_issue.root_id != root_id
-          # we can always move to another tree
-        elsif move_possible?(@parent_issue)
-          # move accepted inside tree
-        else
-          errors.add :parent_issue_id, :not_a_valid_parent
-        end
-      end
+  def validate_enabled_type
+    # Checks that the issue can not be added/moved to a disabled type
+    if project && (type_id_changed? || project_id_changed?)
+      errors.add :type_id, :inclusion unless project.types.include?(type)
     end
   end
 
@@ -359,11 +221,6 @@ class Issue < WorkPackage
     if Issue.use_status_for_done_ratio? && status && status.default_done_ratio
       self.done_ratio = status.default_done_ratio
     end
-  end
-
-  # Return true if the issue is closed, otherwise false
-  def closed?
-    self.status.is_closed?
   end
 
   # Return true if the issue is being reopened
@@ -390,52 +247,11 @@ class Issue < WorkPackage
     false
   end
 
-  # Returns true if the issue is overdue
-  def overdue?
-    !due_date.nil? && (due_date < Date.today) && !status.is_closed?
-  end
-
   # Is the amount of work done less than it should for the due date
   def behind_schedule?
     return false if start_date.nil? || due_date.nil?
     done_date = start_date + ((due_date - start_date+1)* done_ratio/100).floor
     return done_date <= Date.today
-  end
-
-  # Does this issue have children?
-  def children?
-    !leaf?
-  end
-
-  # Users the issue can be assigned to
-  def assignable_users
-    users = project.assignable_users
-    users << author if author
-    users.uniq.sort
-  end
-
-  # Versions that the issue can be assigned to
-  def assignable_versions
-    @assignable_versions ||= (project.shared_versions.open + [Version.find_by_id(fixed_version_id_was)]).compact.uniq.sort
-  end
-
-  # Returns true if this issue is blocked by another issue that is still open
-  def blocked?
-    !relations_to.detect {|ir| ir.relation_type == 'blocks' && !ir.issue_from.closed?}.nil?
-  end
-
-  # Returns an array of status that user is able to apply
-  def new_statuses_allowed_to(user, include_default=false)
-    statuses = status.find_new_statuses_allowed_to(
-      user.roles_for_project(project),
-      tracker,
-      author == user,
-      assigned_to_id_changed? ? assigned_to_id_was == user.id : assigned_to_id == user.id
-      )
-    statuses << status unless statuses.empty?
-    statuses << IssueStatus.default if include_default
-    statuses = statuses.uniq.sort
-    blocked? ? statuses.reject {|s| s.is_closed?} : statuses
   end
 
   # Returns the mail adresses of users that should be notified
@@ -451,60 +267,6 @@ class Issue < WorkPackage
     notified.collect(&:mail)
   end
 
-  # Returns the total number of hours spent on this issue and its descendants
-  #
-  # Example:
-  #   spent_hours => 0.0
-  #   spent_hours => 50.2
-  def spent_hours
-    @spent_hours ||= self_and_descendants.joins(:time_entries).sum("#{TimeEntry.table_name}.hours").to_f || 0.0
-  end
-
-  def relations(options = {})
-    options_to = options.clone
-    options_from = options.clone
-
-    if options[:include]
-      if options[:include].is_a?(Hash) && options[:include][:other_issue]
-        options_to[:include] = options_to[:include].dup
-        options_from[:include] = options_from[:include].dup
-        options_to[:include][:issue_from] = options_to[:include].delete(:other_issue)
-        options_from[:include][:issue_to] = options_from[:include].delete(:other_issue)
-      elsif options[:include].is_a?(Array) && options[:include].include?(:other_issue)
-        options_to[:include] = options[:include].dup - [:other_issue] + [:issue_from]
-        options_from[:include] = options[:include].dup - [:other_issue] + [:issue_to]
-      end
-    end
-
-
-    (relations_from.all(options_from) + relations_to.all(options_to)).sort
-  end
-
-  def relation(id)
-    IssueRelation.of_issue(self).find(id)
-  end
-
-  def new_relation
-    self.relations_from.build
-  end
-
-  def all_dependent_issues(except=[])
-    except << self
-    dependencies = []
-    relations_from.each do |relation|
-      if relation.issue_to && !except.include?(relation.issue_to)
-        dependencies << relation.issue_to
-        dependencies += relation.issue_to.all_dependent_issues(except)
-      end
-    end
-    dependencies
-  end
-
-  # Returns an array of issues that duplicate this one
-  def duplicates
-    relations_to.select {|r| r.relation_type == IssueRelation::TYPE_DUPLICATES}.collect {|r| r.issue_from}
-  end
-
   # Returns the time scheduled for this issue.
   #
   # Example:
@@ -512,13 +274,6 @@ class Issue < WorkPackage
   #   duration => 6
   def duration
     (start_date && due_date) ? due_date - start_date : 0
-  end
-
-  def soonest_start
-    @soonest_start ||= (
-        relations_to.collect{|relation| relation.successor_soonest_start} +
-        ancestors.collect(&:soonest_start)
-      ).compact.max
   end
 
   def reschedule_after(date)
@@ -543,36 +298,6 @@ class Issue < WorkPackage
     else
       (lft || 0) <=> (issue.lft || 0)
     end
-  end
-
-  def to_s
-    "#{tracker} ##{id}: #{subject}"
-  end
-
-  # The number of "items" this issue spans in it's nested set
-  #
-  # A parent issue would span all of it's children + 1 left + 1 right (3)
-  #
-  #   |  parent |
-  #   || child ||
-  #
-  # A child would span only itself (1)
-  #
-  #   |child|
-  def nested_set_span
-    rgt - lft
-  end
-
-  # Returns a string of css classes that apply to the issue
-  def css_classes
-    s = "issue status-#{status.position} priority-#{priority.position}"
-    s << ' closed' if closed?
-    s << ' overdue' if overdue?
-    s << ' child' if child?
-    s << ' parent' unless leaf?
-    s << ' created-by-me' if User.current.logged? && author_id == User.current.id
-    s << ' assigned-to-me' if User.current.logged? && assigned_to_id == User.current.id
-    s
   end
 
   # Saves an issue, time_entry, attachments, and a journal from the parameters
@@ -635,31 +360,11 @@ class Issue < WorkPackage
     Issue.update_versions(["#{Version.table_name}.project_id IN (?) OR #{Issue.table_name}.project_id IN (?)", moved_project_ids, moved_project_ids])
   end
 
-  def parent_issue_id=(arg)
-    parent_issue_id = arg.blank? ? nil : arg.to_i
-    if parent_issue_id && @parent_issue = Issue.find_by_id(parent_issue_id)
-      journal_changes["parent_id"] = [self.parent_id, @parent_issue.id]
-      @parent_issue.id
-    else
-      @parent_issue = nil
-      journal_changes["parent_id"] = [self.parent_id, nil]
-      nil
-    end
-  end
-
-  def parent_issue_id
-    if instance_variable_defined? :@parent_issue
-      @parent_issue.nil? ? nil : @parent_issue.id
-    else
-      parent_id
-    end
-  end
-
   # Extracted from the ReportsController.
-  def self.by_tracker(project)
+  def self.by_type(project)
     count_and_group_by(:project => project,
-                       :field => 'tracker_id',
-                       :joins => Tracker.table_name)
+                       :field => 'type_id',
+                       :joins => Type.table_name)
   end
 
   def self.by_version(project)
@@ -706,123 +411,7 @@ class Issue < WorkPackage
   end
   # End ReportsController extraction
 
-  # Returns an array of projects that current user can move issues to
-  def self.allowed_target_projects_on_move
-    projects = []
-    if User.current.admin?
-      # admin is allowed to move issues to any active (visible) project
-      projects = Project.visible.all
-    elsif User.current.logged?
-      if Role.non_member.allowed_to?(:move_issues)
-        projects = Project.visible.all
-      else
-        User.current.memberships.each {|m| projects << m.project if m.roles.detect {|r| r.allowed_to?(:move_issues)}}
-      end
-    end
-    projects
-  end
-
-  # method from acts_as_nested_set
-  def self.valid?
-    super && invalid_root_ids.empty?
-  end
-
-  def self.all_invalid
-    (super + invalid_root_ids).uniq
-  end
-
-  def self.rebuild_silently!(roots = nil)
-
-    invalid_root_ids_to_fix = if roots.is_a? Array
-                                roots
-                              elsif roots.present?
-                                [roots]
-                              else
-                                []
-                              end
-
-    known_issue_parents = Hash.new do |hash, ancestor_id|
-      hash[ancestor_id] = Issue.find_by_id(ancestor_id)
-    end
-
-    fix_known_invalid_root_ids = lambda do
-      issues = invalid_root_ids
-
-      issues_roots = []
-
-      issues.each do |issue|
-        # At this point we can not trust nested set methods as the root_id is invalid.
-        # Therefore we trust the parent_issue_id to fetch all ancestors until we find the root
-        ancestor = issue
-
-        while ancestor.parent_issue_id do
-          ancestor = known_issue_parents[ancestor.parent_issue_id]
-        end
-
-        issues_roots << ancestor
-
-        if invalid_root_ids_to_fix.empty? || invalid_root_ids_to_fix.map(&:id).include?(ancestor.id)
-          Issue.update_all({ :root_id => ancestor.id },
-                           { :id => issue.id })
-        end
-      end
-
-      fix_known_invalid_root_ids.call unless (issues_roots.map(&:id) & invalid_root_ids_to_fix.map(&:id)).empty?
-    end
-
-    fix_known_invalid_root_ids.call
-
-    super
-  end
-
   private
-
-  def update_nested_set_attributes
-    if root_id.nil?
-      # issue was just created
-      self.root_id = (@parent_issue.nil? ? id : @parent_issue.root_id)
-      set_default_left_and_right
-      Issue.update_all("root_id = #{root_id}, lft = #{lft}, rgt = #{rgt}", ["id = ?", id])
-      if @parent_issue
-        move_to_child_of(@parent_issue)
-      end
-      reload
-    elsif parent_issue_id != parent_id
-      former_parent_id = parent_id
-      # moving an existing issue
-      if @parent_issue && @parent_issue.root_id == root_id
-        # inside the same tree
-        move_to_child_of(@parent_issue)
-      else
-        # to another tree
-        unless root?
-          move_to_right_of(root)
-          reload
-        end
-        old_root_id = root_id
-        self.root_id = (@parent_issue.nil? ? id : @parent_issue.root_id )
-        target_maxright = nested_set_scope.maximum(right_column_name) || 0
-        offset = target_maxright + 1 - lft
-        Issue.update_all("root_id = #{root_id}, lft = lft + #{offset}, rgt = rgt + #{offset}",
-                          ["root_id = ? AND lft >= ? AND rgt <= ? ", old_root_id, lft, rgt])
-        self[left_column_name] = lft + offset
-        self[right_column_name] = rgt + offset
-        if @parent_issue
-          move_to_child_of(@parent_issue)
-        end
-      end
-      reload
-      # delete invalid relations of all descendants
-      self_and_descendants.each do |issue|
-        issue.relations.each do |relation|
-          relation.destroy unless relation.valid?
-        end
-      end
-      # update former parent
-      recalculate_attributes_for(former_parent_id) if former_parent_id
-    end
-    remove_instance_variable(:@parent_issue) if instance_variable_defined?(:@parent_issue)
-  end
 
   # this removes all attachments separately before destroying the issue
   # avoids getting a ActiveRecord::StaleObjectError when deleting an issue
@@ -832,52 +421,6 @@ class Issue < WorkPackage
     reload # important
   end
 
-  def update_parent_attributes
-    recalculate_attributes_for(parent_id) if parent_id
-  end
-
-  def recalculate_attributes_for(issue_id)
-    if issue_id.is_a? Issue
-      p = issue_id
-    else
-      p = Issue.find_by_id(issue_id)
-    end
-
-    if p
-      # priority = highest priority of children
-      if priority_position = p.children.joins(:priority).maximum("#{IssuePriority.table_name}.position")
-        p.priority = IssuePriority.find_by_position(priority_position)
-      end
-
-      # start/due dates = lowest/highest dates of children
-      p.start_date = p.children.minimum(:start_date)
-      p.due_date = p.children.maximum(:due_date)
-      if p.start_date && p.due_date && p.due_date < p.start_date
-        p.start_date, p.due_date = p.due_date, p.start_date
-      end
-
-      # done ratio = weighted average ratio of leaves
-      unless Issue.use_status_for_done_ratio? && p.status && p.status.default_done_ratio
-        leaves_count = p.leaves.count
-        if leaves_count > 0
-          average = p.leaves.average(:estimated_hours).to_f
-          if average == 0
-            average = 1
-          end
-          done = p.leaves.joins(:status).sum("COALESCE(estimated_hours, #{average}) * (CASE WHEN is_closed = #{connection.quoted_true} THEN 100 ELSE COALESCE(done_ratio, 0) END)").to_f
-          progress = done / (average * leaves_count)
-          p.done_ratio = progress.round
-        end
-      end
-
-      # estimate = sum of leaves estimates
-      p.estimated_hours = p.leaves.sum(:estimated_hours).to_f
-      p.estimated_hours = nil if p.estimated_hours == 0.0
-
-      # ancestors will be recursively updated
-      p.save(:validate => false) if p.changed?
-    end
-  end
 
   # Update issues so their versions are not pointing to a
   # fixed_version that is not shared with the issue's project
@@ -902,15 +445,6 @@ class Issue < WorkPackage
   def default_assign
     if assigned_to.nil? && category && category.assigned_to
       self.assigned_to = category.assigned_to
-    end
-  end
-
-  # Updates start/due dates of following issues
-  def reschedule_following_issues
-    if start_date_changed? || due_date_changed?
-      relations_from.each do |relation|
-        relation.set_issue_to_dates
-      end
     end
   end
 

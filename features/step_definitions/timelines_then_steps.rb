@@ -14,7 +14,7 @@ Then /^I should see the planning element edit modal$/ do
  steps 'Then I should see a modal window with selector "#planningElementDialog"'
 end
 Then /^I should see a modal window with selector "(.*?)"$/ do |selector|
-  page.should have_selector(selector, visible: true)
+  page.should have_selector(selector)
   dialog = find(selector)
 
   dialog["class"].include?("ui-dialog-content").should be_true
@@ -110,10 +110,6 @@ Then /^I should see that "([^"]*)" is a color$/ do |name|
   cell.should_not be_empty
 end
 
-Then /^I should not see the "([^"]*)" planning element type$/ do |name|
-  page.all(:css, '.timelines-pet-name', :text => name).should be_empty
-end
-
 Then /^I should not see the "([^"]*)" color$/ do |name|
   cell = page.all(:css, ".timelines-color-name", :text => name)
   cell.should be_empty
@@ -159,21 +155,6 @@ Then /^I should (not )?see a planning element link for "([^"]*)"$/ do |negate, p
   text = "*#{planning_element.id}"
 
   step %Q{I should #{negate}see "#{text}"}
-end
-
-Then /^I should (not )?see a planning element quickinfo link for "([^"]*)"$/ do |negate, planning_element_subject|
-  planning_element = PlanningElement.find_by_subject(planning_element_subject)
-
-
-  text = "*#{planning_element.id} #{planning_element.planning_element_status.nil? ? "" : planning_element.planning_element_status.name + ":"} #{planning_element.subject} #{planning_element.start_date.to_s} – #{planning_element.end_date.to_s} (#{planning_element.responsible.to_s})"
-  step %Q{I should #{negate}see "#{text}"}
-end
-
-Then /^I should (not )?see a planning element quickinfo link with description for "([^"]*)"$/ do |negate, planning_element_subject|
-  planning_element = PlanningElement.find_by_subject(planning_element_subject)
-
-  step %Q{I should #{negate}see a planning element quickinfo link for "#{planning_element_subject}"}
-  step %Q{I should #{negate}see "#{planning_element.description}"}
 end
 
 Then /^I should (not )?see the timeline "([^"]*)"$/ do |negate, timeline_name|

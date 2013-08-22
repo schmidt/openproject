@@ -147,7 +147,7 @@ class ProjectsControllerTest < ActionController::TestCase
             :identifier => "blog",
             :is_public => 1,
             :custom_field_values => { '3' => 'Beta' },
-            :tracker_ids => ['1', '3'],
+            :type_ids => ['1', '3'],
             # an issue custom field that is not for all project
             :work_package_custom_field_ids => ['9'],
             :enabled_module_names => ['issue_tracking', 'news', 'repository']
@@ -162,7 +162,7 @@ class ProjectsControllerTest < ActionController::TestCase
         assert_equal true, project.is_public?
         assert_nil project.parent
         assert_equal 'Beta', project.custom_value_for(3).value
-        assert_equal [1, 3], project.trackers.map(&:id).sort
+        assert_equal [1, 3], project.types.map(&:id).sort
         assert_equal ['issue_tracking', 'news', 'repository'], project.enabled_module_names.sort
         assert project.work_package_custom_fields.include?(WorkPackageCustomField.find(9))
       end
@@ -195,7 +195,7 @@ class ProjectsControllerTest < ActionController::TestCase
                                  :identifier => "blog",
                                  :is_public => 1,
                                  :custom_field_values => { '3' => 'Beta' },
-                                 :tracker_ids => ['1', '3'],
+                                 :type_ids => ['1', '3'],
                                  :enabled_module_names => ['issue_tracking', 'news', 'repository']
                                 }
 
@@ -205,7 +205,7 @@ class ProjectsControllerTest < ActionController::TestCase
         assert_kind_of Project, project
         assert_equal 'weblog', project.description
         assert_equal true, project.is_public?
-        assert_equal [1, 3], project.trackers.map(&:id).sort
+        assert_equal [1, 3], project.types.map(&:id).sort
         assert_equal ['issue_tracking', 'news', 'repository'], project.enabled_module_names.sort
 
         # User should be added as a project member
@@ -381,9 +381,9 @@ class ProjectsControllerTest < ActionController::TestCase
     @request.session[:user_id] = 2
     Project.find(1).enabled_module_names = ['issue_tracking', 'news']
 
-    put :modules, :id => 1, :enabled_module_names => ['issue_tracking', 'repository', 'documents']
+    put :modules, :id => 1, :enabled_module_names => ['issue_tracking', 'repository']
     assert_redirected_to '/projects/ecookbook/settings/modules'
-    assert_equal ['documents', 'issue_tracking', 'repository'], Project.find(1).enabled_module_names.sort
+    assert_equal ['issue_tracking', 'repository'], Project.find(1).enabled_module_names.sort
   end
 
   def test_get_destroy_info
@@ -450,7 +450,7 @@ class ProjectsControllerTest < ActionController::TestCase
   end
 
   def test_jump_should_not_redirect_to_inactive_tab
-    get :show, :id => 3, :jump => 'documents'
+    get :show, :id => 3, :jump => 'news'
     assert_response :success
     assert_template 'show'
   end

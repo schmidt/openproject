@@ -11,6 +11,7 @@
 
 class UserMailer < ActionMailer::Base
   helper :application,  # for textilizable
+         :work_packages, # for css classes
          :custom_fields # for show_value
 
   # wrap in a lambda to allow changing at run-time
@@ -38,14 +39,16 @@ class UserMailer < ActionMailer::Base
     message_id @issue
 
     with_locale_for(user) do
-      subject = "[#{@issue.project.name} - #{@issue.tracker.name} ##{@issue.id}] (#{@issue.status.name}) #{@issue.subject}"
+      subject = "[#{@issue.project.name} - #{ @issue.to_s }]"
+      subject << " (#{@issue.status.name})" if @issue.status
+      subject << " #{@issue.subject}"
       mail :to => user.mail, :subject => subject
     end
   end
 
   def issue_updated(user, journal)
     @journal = journal
-    @issue   = journal.journaled.reload
+    @issue   = journal.journable.reload
 
     open_project_headers 'Project'        => @issue.project.identifier,
                          'Issue-Id'       => @issue.id,
@@ -57,8 +60,8 @@ class UserMailer < ActionMailer::Base
     references @issue
 
     with_locale_for(user) do
-      subject =  "[#{@issue.project.name} - #{@issue.tracker.name} ##{@issue.id}] "
-      subject << "(#{@issue.status.name}) " if @journal.details['status_id']
+      subject =  "[#{@issue.project.name} - #{@issue.type.name} ##{@issue.id}] "
+      subject << "(#{@issue.status.name}) " if @journal.details[:status_id]
       subject << @issue.subject
 
       mail :to => user.mail, :subject => subject
@@ -182,18 +185,6 @@ class UserMailer < ActionMailer::Base
     end
   end
 
-  def document_added(user, document)
-    @document = document
-
-    open_project_headers 'Project' => @document.project.identifier,
-                         'Type'    => 'Document'
-
-    with_locale_for(user) do
-      subject = "[#{@document.project.name}] #{t(:label_document_new)}: #{@document.title}"
-      mail :to => user.mail, :subject => subject
-    end
-  end
-
   def account_activated(user)
     @user = user
 
@@ -232,33 +223,6 @@ class UserMailer < ActionMailer::Base
     end
   end
 
-  def attachments_added(user, attachments)
-    @attachments = attachments
-
-    container = attachments.first.container
-
-    open_project_headers 'Type'    => 'Attachment'
-    open_project_headers 'Project' => container.project.identifier if container.project
-
-    case container.class.name
-    when 'Project'
-      @added_to     = "#{Project.model_name.human}: #{container}"
-      @added_to_url = url_for(:controller => '/files', :action => 'index', :project_id => container)
-    when 'Version'
-      @added_to     = "#{Version.model_name.human}: #{container.name}"
-      @added_to_url = url_for(:controller => '/files', :action => 'index', :project_id => container.project)
-    when 'Document'
-      @added_to     = "#{Document.model_name.human}: #{container.title}"
-      @added_to_url = url_for(:controller => '/documents', :action => 'show', :id => container.id)
-    end
-
-    with_locale_for(user) do
-      subject = t(:label_attachment_new)
-      subject = "[#{container.project.name}] #{subject}" if container.project
-      mail :to => user.mail, :subject => subject
-    end
-  end
-
   def reminder_mail(user, issues, days)
     @issues = issues
     @days   = days
@@ -289,6 +253,8 @@ class UserMailer < ActionMailer::Base
   def self.generate_message_id(object)
     # id + timestamp should reduce the odds of a collision
     # as far as we don't send multiple emails for the same object
+    object = object.journable if object.is_a? Journal
+
     if object.is_a? WorkPackage
       timestamp = object.send(object.respond_to?(:created_at) ? :created_at : :updated_at)
     else
@@ -299,6 +265,28 @@ class UserMailer < ActionMailer::Base
     host = Setting.mail_from.to_s.gsub(%r{^.*@}, '')
     host = "#{::Socket.gethostname}.openproject" if host.empty?
     "#{hash}@#{host}"
+  end
+
+protected
+
+  # Option 1 to take out an html part: Leave the part out
+  # while creating the mail. Since rails internally uses three
+  # different ways to create a mail (passing a block, giving parameters
+  # with optional template, or passing the body directly), we would have
+  # to replicate a lot of rails code to modify all three ways.
+  # Therefore, we use option 2: modiyfing the set of parts rails
+  # created internally as a result of the above ways, as this is
+  # much shorter.
+  # On the downside, this might break if ActionMailer changes the signature
+  # or semantics of the following funtion. However, we should at least
+  # notice this as there are tests for checking the no-html setting.
+  def collect_responses_and_parts_order(headers)
+    responses, parts_order = super(headers)
+    if Setting.plain_text_mail?
+      responses.delete_if { |response| response[:content_type]=="text/html" }
+      parts_order.delete_if { |part| part == "text/html"} unless parts_order.nil?
+    end
+    [responses, parts_order]
   end
 
 private
@@ -317,13 +305,6 @@ private
 
   def self.default_url_options
     super.merge :host => host, :protocol => protocol
-  end
-
-  def mail(headers = {})
-    super(headers) do |format|
-      format.text
-      format.html unless Setting.plain_text_mail?
-    end
   end
 
   def message_id(object)
@@ -388,10 +369,10 @@ UserMailer.register_interceptor(DoNotSendMailsWithoutReceiverInterceptor.new)
 # helper object for `rake redmine:send_reminders`
 
 class DueIssuesReminder
-  def initialize(days = nil, project_id = nil, tracker_id = nil, user_ids = [])
+  def initialize(days = nil, project_id = nil, type_id = nil, user_ids = [])
     @days     = days ? days.to_i : 7
     @project  = Project.find_by_id(project_id)
-    @tracker  = Tracker.find_by_id(tracker_id)
+    @type  = Type.find_by_id(type_id)
     @user_ids = user_ids
   end
 
@@ -401,9 +382,9 @@ class DueIssuesReminder
     s << ["#{Issue.table_name}.assigned_to_id IN (?)", @user_ids] if @user_ids.any?
     s << "#{Project.table_name}.status = #{Project::STATUS_ACTIVE}"
     s << "#{Issue.table_name}.project_id = #{@project.id}" if @project
-    s << "#{Issue.table_name}.tracker_id = #{@tracker.id}" if @tracker
+    s << "#{Issue.table_name}.type_id = #{@type.id}" if @type
 
-    issues_by_assignee = Issue.find(:all, :include => [:status, :assigned_to, :project, :tracker],
+    issues_by_assignee = Issue.find(:all, :include => [:status, :assigned_to, :project, :type],
                                           :conditions => s.conditions
                                    ).group_by(&:assigned_to)
     issues_by_assignee.each do |assignee, issues|

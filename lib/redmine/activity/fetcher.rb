@@ -40,7 +40,7 @@ module Redmine
                 p.activity_provider_options[o].try(:[], :permission)
               end.compact
               return @user.allowed_to?("view_#{o}".to_sym, @project) if permissions.blank?
-              permissions.all? {|p| @user.allowed_to?(p, @project) } if @project
+              permissions.all? {|p| @user.allowed_to?(p, @project) }
             end
           end
         end
@@ -82,7 +82,7 @@ module Redmine
           end
         end
 
-        e.sort! {|a,b| b.event_datetime <=> a.event_datetime}
+        e.sort! {|a,b| b.data.event_datetime <=> a.data.event_datetime}
 
         if options[:limit]
           e = e.slice(0, options[:limit])

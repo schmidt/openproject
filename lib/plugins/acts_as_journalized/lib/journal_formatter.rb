@@ -67,7 +67,9 @@ module JournalFormatter
     hash[klass] = {}
   end
 
-  def render_detail(detail, options = { :no_html => false })
+  def render_detail(detail, options = { })
+    merge_options = { :no_html => false, :only_path => true }.merge(options)
+
     if detail.respond_to? :to_ary
       key = detail.first
       values = detail.last
@@ -76,11 +78,11 @@ module JournalFormatter
       values = details[key.to_s]
     end
 
-    formatter = formatter_instance(key)
+    formatter = formatter_instance(key.to_s)
 
     return nil if formatter.nil?
 
-    formatter.render(key, values, options).html_safe
+    formatter.render(key, values, merge_options).html_safe
   end
 
   def formatter_instance(formatter_key)
@@ -88,12 +90,13 @@ module JournalFormatter
     # This is especially true for associations created by plugins. Those are sometimes nameed according to
     # the schema "association_name[n]" or "association_name_[n]" where n is an integer representing an id.
     # Using regexp we are able to handle those fields with the rest.
-    formatter = JournalFormatter.registered_fields[self.class.name.to_sym].keys.detect{ |k| formatter_key.match(k) }
+    formatter_type = data.class.to_s.to_sym
+    formatter = JournalFormatter.registered_fields[formatter_type].keys.detect{ |k| formatter_key.match(k) }
 
     return nil if formatter.nil?
 
     @formatter_instances ||= Hash.new do |hash, key|
-      f = JournalFormatter.formatters[JournalFormatter.registered_fields[self.class.name.to_sym][key]]
+      f = JournalFormatter.formatters[JournalFormatter.registered_fields[formatter_type][key]]
       hash[key] = f.new(self)
     end
 

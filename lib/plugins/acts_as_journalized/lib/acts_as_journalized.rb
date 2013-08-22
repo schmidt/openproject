@@ -69,11 +69,14 @@ module Redmine
         # Versioning and acting as an Event may only be applied once.
         # To apply more than on activity, use acts_as_activity
         def acts_as_journalized(options = {}, &block)
+
+          acts_as_activity = options.delete(:acts_as_activity)
+
           activity_hash, event_hash, journal_hash = split_option_hashes(options)
 
           self.journal_class_name = journal_hash.delete(:class_name) || "#{name.gsub("::", "_")}Journal"
 
-          acts_as_activity(activity_hash)
+          acts_as_activity(activity_hash) if acts_as_activity!=false
 
           return if journaled?
 
@@ -91,7 +94,8 @@ module Redmine
           # FIXME: When the transition to the new API is complete, remove me
           include Deprecated
 
-          journal_class.acts_as_event journalized_event_hash(event_hash)
+          JournalManager.journal_class(self).acts_as_event journalized_event_hash(event_hash)
+          #journal_class.acts_as_event journalized_event_hash(event_hash)
 
           (journal_hash[:except] ||= []) << self.primary_key << inheritance_column <<
             :updated_on << :updated_at << :lock_version << :lft << :rgt
@@ -170,13 +174,13 @@ module Redmine
           def journalized_activity_hash(options)
             options.tap do |h|
               h[:type] ||= plural_name
-              h[:timestamp] ||= "#{journal_class.table_name}.created_at"
-              h[:author_key] ||= "#{journal_class.table_name}.user_id"
+              h[:timestamp] ||= "#{Journal.table_name}.created_at"
+              h[:author_key] ||= "#{Journal.table_name}.user_id"
 
               h[:find_options] ||= {} # in case it is nil
               h[:find_options] = {}.tap do |opts|
                 cond = ::ARCondition.new
-                cond.add(["#{journal_class.table_name}.activity_type = ?", h[:type]])
+                cond.add(["#{Journal.table_name}.activity_type = ?", h[:type]])
                 cond.add(h[:find_options][:conditions]) if h[:find_options][:conditions]
                 opts[:conditions] = cond.conditions
 
@@ -189,7 +193,7 @@ module Redmine
                   end
                 end
                 include_opts.uniq!
-                opts[:include] = [:journaled => include_opts]
+                opts[:include] = [:journable => include_opts]
 
                 #opts[:joins] = h[:find_options][:joins] if h[:find_options][:joins]
               end
@@ -200,11 +204,11 @@ module Redmine
           # The defaults take their details from the journal
           def journalized_event_hash(options)
             unless options.has_key? :url
-              options[:url] = Proc.new do |journal|
+              options[:url] = Proc.new do |data|
                 { :controller => plural_name,
                   :action => 'show',
-                  :id => journal.journaled_id,
-                  :anchor => ("note-#{journal.anchor}" unless journal.initial?) }
+                  :id => data.journal.journable_id,
+                  :anchor => ("note-#{data.journal.anchor}" unless data.journal.initial?) }
               end
             end
             options[:type] ||= self.name.underscore.dasherize # Make sure the name of the journalized model and not the name of the journal is used for events

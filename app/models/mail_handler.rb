@@ -174,7 +174,7 @@ class MailHandler < ActionMailer::Base
 
     issue.safe_attributes = issue_attributes_from_keywords(issue)
     issue.safe_attributes = {'custom_field_values' => custom_field_values_from_keywords(issue)}
-    issue.init_journal(user, cleaned_up_text_body)
+    issue.add_journal(user, cleaned_up_text_body)
     add_attachments(issue)
     issue.save!
     logger.info "MailHandler: issue ##{issue.id} updated by #{user}" if logger && logger.info
@@ -229,7 +229,8 @@ class MailHandler < ActionMailer::Base
   # Adds To and Cc as watchers of the given object if the sender has the
   # appropriate permission
   def add_watchers(obj)
-    if user.allowed_to?("add_#{obj.class.name.underscore}_watchers".to_sym, obj.project)
+    if user.allowed_to?("add_#{obj.class.name.underscore}_watchers".to_sym, obj.project) ||
+       user.allowed_to?("add_#{obj.class.lookup_ancestors.last.name.underscore}_watchers".to_sym, obj.project)
       addresses = [email.to, email.cc].flatten.compact.uniq.collect {|a| a.strip.downcase}
       unless addresses.empty?
         watchers = User.active.find(:all, :conditions => ['LOWER(mail) IN (?)', addresses])
@@ -287,7 +288,7 @@ class MailHandler < ActionMailer::Base
     assigned_to = (k = get_keyword(:assigned_to, :override => true)) && find_assignee_from_keyword(k, issue)
 
     attrs = {
-      'tracker_id' => (k = get_keyword(:tracker)) && issue.project.trackers.find_by_name(k).try(:id),
+      'type_id' => (k = get_keyword(:type)) && issue.project.types.find_by_name(k).try(:id),
       'status_id' =>  (k = get_keyword(:status)) && IssueStatus.find_by_name(k).try(:id),
       'priority_id' => (k = get_keyword(:priority)) && IssuePriority.find_by_name(k).try(:id),
       'category_id' => (k = get_keyword(:category)) && issue.project.issue_categories.find_by_name(k).try(:id),
@@ -299,8 +300,8 @@ class MailHandler < ActionMailer::Base
       'done_ratio' => get_keyword(:done_ratio, :override => true, :format => '(\d|10)?0')
     }.delete_if {|_, v| v.blank? }
 
-    if issue.new_record? && attrs['tracker_id'].nil?
-      attrs['tracker_id'] = issue.project.trackers.find(:first).try(:id)
+    if issue.new_record? && attrs['type_id'].nil?
+      attrs['type_id'] = issue.project.types.find(:first).try(:id)
     end
     attrs
   end
@@ -402,7 +403,7 @@ class MailHandler < ActionMailer::Base
                  }
     if assignee.nil? && keyword.match(/ /)
       firstname, lastname = *(keyword.split) # "First Last Throwaway"
-      assignee ||= assignable.detect {|a| 
+      assignee ||= assignable.detect {|a|
                      a.is_a?(User) && a.firstname.to_s.downcase == firstname &&
                        a.lastname.to_s.downcase == lastname
                    }

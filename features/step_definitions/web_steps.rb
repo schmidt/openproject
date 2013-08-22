@@ -35,8 +35,8 @@ require File.expand_path(File.join(File.dirname(__FILE__), "..", "support", "pat
 require File.expand_path(File.join(File.dirname(__FILE__), "..", "support", "selectors"))
 
 module WithinHelpers
-  def with_scope(locator)
-    locator ? within(*selector_for(locator)) { yield } : yield
+  def with_scope(locator, options={})
+    locator ? within(*selector_for(locator), options) { yield } : yield
   end
 end
 World(WithinHelpers)
@@ -44,6 +44,11 @@ World(WithinHelpers)
 # Single-line step scoper
 When /^(.*) within (.*[^:])$/ do |step_name, parent|
   with_scope(parent) { step step_name }
+end
+
+# Single-line step scoper
+When /^(.*) within_hidden (.*[^:])$/ do |step_name, parent|
+  with_scope(parent, visible: false) { step step_name }
 end
 
 # Multi-line step scoper
@@ -83,12 +88,18 @@ end
 #     | Note           | Nice guy   |
 #     | Wants Email?   |            |
 #
-# TODO: Add support for checkbox, select or option
+# TODO: Add support for checkbox and option
 # based on naming conventions.
 #
 When /^(?:|I )fill in the following:$/ do |fields|
   fields.rows_hash.each do |name, value|
-    step(%{I fill in "#{name}" with "#{value}"})
+    field = find_field(name)
+
+    if field.tag_name == "select"
+      step(%{I select "#{value}" from "#{name}"})
+    else
+      step(%{I fill in "#{name}" with "#{value}"})
+    end
   end
 end
 
@@ -305,37 +316,22 @@ When /^I wait(?: (\d+) seconds)? for(?: the)? [Aa][Jj][Aa][Xx](?: requests?(?: t
   end
 end
 
-Then /^there should be a( disabled)? "(.+)" field( visible| invisible)?(?: within "([^\"]*)")?(?: if plugin "(.+)" is loaded)?$/ do |disabled, fieldname, visible, selector, plugin_name|
-  if plugin_name.nil? || Redmine::Plugin.installed?(plugin_name)
-    with_scope(selector) do
-      if defined?(Spec::Rails::Matchers)
-        find_field(fieldname).should_not be_nil
-        if visible && visible == " visible"
-          find_field(fieldname).should be_visible
-        elsif visible && visible == " invisible"
-          find_field(fieldname).should_not be_visible
-        end
+Then /^there should be a( disabled)? "(.+)" field( visible| invisible)?$/ do |disabled, fieldname, visible|
+  # Checking for a disabled field will only work for field with labels where the label
+  # has a correctly filled "for" attribute
+  visibility = visible && visible.include?("invisible") ? false : true
 
-        if disabled
-          find_field(fieldname)[:disabled].should == "disabled"
-        else
-          find_field(fieldname)[:disabled].should == nil
-        end
-      else
-        assert_not_nil find_field(fieldname)
-      end
-    end
+  if disabled
+    # disabled fields can not be found via find_field
+    field_id = find('label', :text => fieldname)["for"]
+    should have_css("##{field_id}", :visible => visibility)
+  else
+    should have_field(fieldname, :visible => visibility)
   end
 end
 
-Then /^there should not be a "(.+)" field(?: within "([^\"]*)")?$/ do |fieldname, selector|
-  with_scope(selector) do
-    if defined?(Spec::Rails::Matchers)
-      lambda {find_field(fieldname)}.should raise_error(Capybara::ElementNotFound)
-    else
-      assert_nil find_field(fieldname)
-    end
-  end
+Then /^there should not be a "(.+)" field$/ do |fieldname|
+  should_not have_field(fieldname)
 end
 
 Then /^there should be a "(.+)" button$/ do |button_label|
@@ -395,18 +391,6 @@ rescue Nokogiri::CSS::SyntaxError
   elements
 end
 
-def disable_warn_unsaved_popup
-  # disable WarnLeavingUnsaved function call when testing with selenium as this
-  # will freeze the server
-
-  if defined?(ChiliProject::VERSION::MAJOR) &&
-     ChiliProject::VERSION::MAJOR > 1 &&
-     Capybara.current_driver.to_s.include?("selenium")
-
-    page.execute_script("window.onbeforeunload = null")
-  end
-end
-
 require 'timeout'
 
 def wait_until(seconds = 5, options = {}, &block)
@@ -422,7 +406,7 @@ See http://www.elabs.se/blog/53-why-wait_until-was-removed-from-capybara
 end
 
 When /^I confirm popups$/ do
-  page.driver.browser.switch_to.alert.accept    
+  page.driver.browser.switch_to.alert.accept
 end
 
 Then(/^I should see a confirm dialog$/) do

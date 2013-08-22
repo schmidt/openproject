@@ -19,7 +19,7 @@ class ActivityTest < ActiveSupport::TestCase
     @project = Project.find(1)
     [1,4,5,6].each do |issue_id|
       i = Issue.find(issue_id)
-      i.init_journal(User.current, "A journal to find")
+      i.add_journal(User.current, "A journal to find")
       i.save!
     end
   end
@@ -44,6 +44,7 @@ class ActivityTest < ActiveSupport::TestCase
   end
 
   def test_global_activity_anonymous
+    Message.all.each { |m| m.recreate_initial_journal! }
     events = find_events(User.anonymous)
     assert_not_nil events
 
@@ -63,24 +64,15 @@ class ActivityTest < ActiveSupport::TestCase
   end
 
   def test_user_activity
+    Issue.all.each { |m| m.recreate_initial_journal! }
+    Message.all.each { |m| m.recreate_initial_journal! }
+
     user = User.find(2)
     events = Redmine::Activity::Fetcher.new(User.anonymous, :author => user).events(nil, nil, :limit => 10)
 
     assert(events.size > 0)
     assert(events.size <= 10)
     assert_nil(events.detect {|e| e.event_author != user})
-  end
-
-  def test_files_activity
-    f = Redmine::Activity::Fetcher.new(User.anonymous, :project => Project.find(1))
-    f.scope = ['files']
-    events = f.events
-
-    assert_kind_of Array, events
-    assert events.include?(Attachment.find_by_container_type_and_container_id('Project', 1).last_journal)
-    assert events.include?(Attachment.find_by_container_type_and_container_id_and_id('Version', 1, 9).last_journal)
-    assert_equal [Attachment], events.collect(&:journaled).collect(&:class).uniq
-    assert_equal %w(Project Version), events.collect(&:journaled).collect(&:container_type).uniq.sort
   end
 
   private

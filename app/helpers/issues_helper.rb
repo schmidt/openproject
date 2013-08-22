@@ -147,7 +147,7 @@ module IssuesHelper
     api.array :children do
       issue.children.each do |child|
         api.issue(:id => child.id) do
-          api.tracker(:id => child.tracker_id, :name => child.tracker.name) unless child.tracker.nil?
+          api.type(:id => child.type_id, :name => child.type.name) unless child.type.nil?
           api.subject child.subject
           render_api_issue_children(child, api)
         end
@@ -161,7 +161,7 @@ module IssuesHelper
     css_classes << "idnt" << "idnt-#{level}" if level > 0
 
     if relation == "root"
-      issue_text = link_to("#{h(issue.tracker.name)} ##{issue.id}",
+      issue_text = link_to("#{h(issue.type.name)} ##{issue.id}",
                              'javascript:void(0)',
                              :style => "color:inherit; font-weight: bold; text-decoration:none; cursor:default;",
                              :class => issue.css_classes)
@@ -173,7 +173,7 @@ module IssuesHelper
       elsif relation == "child"
         title << content_tag(:span, l(:description_sub_issue), :class => "hidden-for-sighted")
       end
-      title << h(issue.tracker.name)
+      title << h(issue.type.name)
       title << "##{issue.id}"
 
       issue_text = link_to(title.join(' ').html_safe, issue_path(issue), :class => issue.css_classes)
@@ -192,12 +192,12 @@ module IssuesHelper
 
   def issues_to_csv(issues, project = nil)
     decimal_separator = l(:general_csv_decimal_separator)
-    export = FCSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
+    export = CSV.generate(:col_sep => l(:general_csv_separator)) do |csv|
       # csv header fields
       headers = [ "#",
                   Issue.human_attribute_name(:status),
                   Issue.human_attribute_name(:project),
-                  Issue.human_attribute_name(:tracker),
+                  Issue.human_attribute_name(:type),
                   Issue.human_attribute_name(:priority),
                   Issue.human_attribute_name(:subject),
                   Issue.human_attribute_name(:assigned_to),
@@ -224,7 +224,7 @@ module IssuesHelper
         fields = [issue.id,
                   issue.status.name,
                   issue.project.name,
-                  issue.tracker.name,
+                  issue.type.name,
                   issue.priority.name,
                   issue.subject,
                   issue.assigned_to,
@@ -257,32 +257,6 @@ module IssuesHelper
 
   end
 
-  def issue_quick_info(issue)
-    ret = link_to(h("#{issue.tracker.name} ##{issue.id} #{issue.status}: #{issue.subject} "),
-                  { :controller => '/issues', :action => 'show', :id => issue.id },
-                    :class => issue.css_classes,
-                    :title => "#{ truncate(issue.subject, :length => 100) } (#{ issue.status.name })")
-    ret += "#{ issue.start_date.nil? ? "[?]" : issue.start_date.to_s }"
-    ret += " – #{ issue.due_date.nil? ? "[?]" : issue.due_date.to_s }"
-    ret += "#{ issue.assigned_to.nil? ?  " " : " (#{h(issue.assigned_to.to_s)})" }"
-    ret
-  end
-
-  def issue_quick_info_with_description(issue, lines = 3)
-    description_lines = issue.description.to_s.lines.to_a[0,lines]
-
-    if description_lines[lines-1] && issue.description.to_s.lines.to_a.size > lines
-      description_lines[lines-1].strip!
-
-      while !description_lines[lines-1].end_with?("...") do
-        description_lines[lines-1] = description_lines[lines-1] + "."
-      end
-    end
-
-    issue_quick_info(issue) +
-      content_tag(:div, textilizable("\n" + description_lines.to_s), :class => "indent")
-  end
-
   def entries_for_filter_select_sorted(query)
     [["",""]] + query.available_filters.collect{|field| [ field[1][:name] || Issue.human_attribute_name(field[0]), field[0]] unless query.has_filter?(field[0])}.compact.sort_by do |el|
       ActiveSupport::Inflector.transliterate(el[0]).downcase
@@ -295,5 +269,12 @@ module IssuesHelper
 
   def attrib_disabled?(issue, attrib)
     value_overridden_by_children?(attrib) && !(issue.new_record? || issue.leaf?)
+  end
+
+  def entries_for_filter_select_sorted(query)
+    # with rails 3.2 ActiveSupport::Inflector.transliterate should be used instead of I18n.transliterate
+    [["",""]] + query.available_filters.collect{|field| [ field[1][:name] || l(("field_"+field[0].to_s.gsub(/_id$/, "")).to_sym), field[0]] unless query.has_filter?(field[0])}.compact.sort_by do |el| 
+      I18n.transliterate(el[0]).downcase
+    end
   end
 end

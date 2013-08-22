@@ -9,18 +9,47 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
+InstanceFinder.register(User, Proc.new { |name| User.find_by_login(name) })
+
+##
+# Editing/creating users (admin UI)
+#
+#
+
+When /^I create a new user$/ do
+  visit '/users/new'
+  fill_in('user_login', :with => 'newbobby')
+  fill_in('user_firstname', :with => 'newbobby')
+  fill_in('user_lastname', :with => 'newbobby')
+  fill_in('user_mail', :with => 'newbobby@example.com')
+end
+
 When /^I edit the user "([^\"]*)"$/ do |user|
   user_id = User.find_by_login(user).id
   visit "/users/#{user_id}/edit"
 end
 
-When /^I (activate_and_reset_failed_logins|lock|unlock) the user "([^\"]*)"$/ do |action, user|
-  button_title = {
-    'activate' => 'Unlock and reset failed logins'
-  }
-  click_button()
+When /^I assign the user "([^\"]*)" a random password$/ do |user|
+  step "I edit the user \"#{user}\""
+  step "I check the assign random password to user field"
+  step "I save the user"
 end
 
+When /^I check the assign random password to user field$/ do
+  check(I18n.t(:assign_random_password, :scope => :user))
+end
+
+Given /^I save the user$/ do
+  click_button('Save')
+end
+
+Given /^I save the new user$/ do
+  find('input[name=commit]').click
+end
+
+##
+# Creating users (on the DB)
+#
 Given /^there is 1 [Uu]ser with(?: the following)?:$/ do |table|
   login = table.rows_hash[:Login].to_s + table.rows_hash[:login].to_s
   user = User.find_by_login(login) unless login.blank?
@@ -37,6 +66,12 @@ Given /^the [Uu]ser "([^\"]*)" has:$/ do |user, table|
   u = User.find_by_login(user)
   raise "No such user: #{user}" unless u
   modify_user(u, table)
+end
+
+Given /^the [Uu]ser "([^\"]*)" has the following preferences$/ do |user, table|
+  u = User.find_by_login(user)
+
+  send_table_to_object(u.pref, table)
 end
 
 Given /^the user "([^\"]*)" is locked$/ do |user|

@@ -129,9 +129,14 @@ class Setting < ActiveRecord::Base
   def self.[]=(name, v)
     setting = find_or_default(name)
     setting.value = (v ? v : "")
-    Rails.cache.delete_matched(Regexp.compile(base_cache_key(name, '.+')))
+    Rails.cache.delete(cache_key(name))
     setting.save
     setting.value
+  end
+
+  # Check whether a setting was defined
+  def self.exists?(name)
+    @@available_settings.has_key?(name)
   end
 
   # this should be fixed with globalize plugin
@@ -147,7 +152,7 @@ class Setting < ActiveRecord::Base
     END_SRC
     class_eval src, __FILE__, __LINE__
   end
-  
+
   # Helper that returns an array based on per_page_options setting
   def self.per_page_options_array
     per_page_options.split(%r{[\s,]}).collect(&:to_i).select {|n| n > 0}.sort
@@ -177,11 +182,11 @@ private
   # (record found in database or new record with default value)
   def self.find_or_default(name)
     name = name.to_s
-    raise "There's no setting named #{name}" unless @@available_settings.has_key?(name)
+    raise "There's no setting named #{name}" unless exists? name
     find_by_name(name) or new do |s|
       s.name  = name
       s.value = @@available_settings[name]['default']
-    end if @@available_settings.has_key? name
+    end
   end
 
   def self.cache_key(name)

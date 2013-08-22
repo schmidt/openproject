@@ -37,26 +37,44 @@ module Redmine::Acts::Journalized
       base.extend ClassMethods
 
       base.class_eval do
-        before_save :init_journal
-        after_save :reset_instance_variables
+        after_save :save_journals
         
         attr_accessor :journal_notes, :journal_user, :extra_journal_attributes
       end
     end
 
+    def save_journals
+      @journaled_user ||= User.current
+      @journaled_notes ||= ""
+
+      add_journal = journals.empty? || JournalManager.changed?(self) || !@journaled_notes.empty?
+
+      JournalManager.add_journal self, @journaled_user, @journaled_notes if add_journal
+
+      journals.select{|j| j.new_record?}.each {|j| j.save}
+
+      @journaled_user = nil
+      @journaled_notes = nil
+    end
+
+    def add_journal(user = User.current, notes = "")
+      @journaled_user ||= user
+      @journaled_notes ||= notes
+    end
+
     # Saves the current custom values, notes and journal to include them in the next journal
     # Called before save
-    def init_journal(user = User.current, notes = "")
-      @journal_notes ||= notes
-      @journal_user ||= user
-      @associations_before_save ||= {}
+    #def init_journal(user = User.current, notes = "")
+    #  @journal_notes ||= notes
+    #  @journal_user ||= user
+    #  @associations_before_save ||= {}
 
-      @associations = {}
-      save_possible_association :custom_values, :key => :custom_field_id, :value => :value
-      save_possible_association :attachments, :key => :id, :value => :filename
+    #  @associations = {}
+    #  save_possible_association :custom_values, :key => :custom_field_id, :value => :value
+    #  save_possible_association :attachments, :key => :id, :value => :filename
 
-      @current_journal ||= last_journal
-    end
+    #  @current_journal ||= last_journal
+    #end
 
     # Saves the notes and custom value changes in the last Journal
     # Called before create_journal

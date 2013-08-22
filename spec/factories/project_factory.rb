@@ -16,21 +16,27 @@ FactoryGirl.define do
     sequence(:identifier) { |n| "myproject_no_#{n}" }
     enabled_module_names Redmine::AccessControl.available_project_modules
 
+    before :create do |project|
+      unless Type.find(:first, conditions: { is_standard: true })
+        project.types << FactoryGirl.build(:type_standard)
+      end
+    end
+
     factory :public_project do
       is_public true
     end
 
-    factory :project_with_trackers do
+    factory :project_with_types do
       after :build do |project|
-        project.trackers << FactoryGirl.build(:tracker)
+        project.types << FactoryGirl.build(:type)
       end
       after :create do |project|
-        project.trackers.each { |tracker| tracker.save! }
+        project.types.each { |type| type.save! }
       end
 
       factory :valid_project do
         after :build do |project|
-          project.trackers << FactoryGirl.build(:tracker_with_workflow)
+          project.types << FactoryGirl.build(:type_with_workflow)
         end
       end
     end
@@ -69,15 +75,15 @@ FactoryGirl.define do
     after_create do |project|
 
       start_date = rand(18.months).ago
-      end_date = start_date
+      due_date = start_date
 
       (5 + rand(20)).times do
 
-        end_date = start_date + (rand(30) + 10).days
+        due_date = start_date + (rand(30) + 10).days
         FactoryGirl.create(:planning_element, :project => project,
-                                                    :start_date => start_date,
-                                                    :end_date => end_date)
-        start_date = end_date
+                                              :start_date => start_date,
+                                              :due_date => due_date)
+        start_date = due_date
 
       end
     end

@@ -22,7 +22,7 @@ module Redmine
         # otherwise false
         def no_data?
           !Role.find(:first, :conditions => {:builtin => 0}) &&
-            !Tracker.find(:first) &&
+            !Type.find(:first, :conditions => {is_standard: false}) &&
             !IssueStatus.find(:first) &&
             !Enumeration.find(:first)
         end
@@ -55,15 +55,12 @@ module Redmine
                                                       :log_time,
                                                       :view_time_entries,
                                                       :comment_news,
-                                                      :view_documents,
                                                       :view_wiki_pages,
                                                       :view_wiki_edits,
                                                       :edit_wiki_pages,
                                                       :delete_wiki_pages,
                                                       :add_messages,
                                                       :edit_own_messages,
-                                                      :view_files,
-                                                      :manage_files,
                                                       :browse_repository,
                                                       :view_changesets,
                                                       :commit_access]
@@ -78,12 +75,10 @@ module Redmine
                                                     :log_time,
                                                     :view_time_entries,
                                                     :comment_news,
-                                                    :view_documents,
                                                     :view_wiki_pages,
                                                     :view_wiki_edits,
                                                     :add_messages,
                                                     :edit_own_messages,
-                                                    :view_files,
                                                     :browse_repository,
                                                     :view_changesets]
 
@@ -95,11 +90,9 @@ module Redmine
                                                             :view_calendar,
                                                             :view_time_entries,
                                                             :comment_news,
-                                                            :view_documents,
                                                             :view_wiki_pages,
                                                             :view_wiki_edits,
                                                             :add_messages,
-                                                            :view_files,
                                                             :browse_repository,
                                                             :view_changesets]
 
@@ -107,55 +100,100 @@ module Redmine
                                              :permissions => [:view_issues,
                                                            :view_calendar,
                                                            :view_time_entries,
-                                                           :view_documents,
                                                            :view_wiki_pages,
                                                            :view_wiki_edits,
-                                                           :view_files,
                                                            :browse_repository,
                                                            :view_changesets]
 
-            # Trackers
-            Tracker.create!(:name => l(:default_tracker_bug),     :is_in_chlog => true,  :is_in_roadmap => false, :position => 1)
-            Tracker.create!(:name => l(:default_tracker_feature), :is_in_chlog => true,  :is_in_roadmap => true,  :position => 2)
-            Tracker.create!(:name => l(:default_tracker_support), :is_in_chlog => false, :is_in_roadmap => false, :position => 3)
+            # Colors
+            colors_list = PlanningElementTypeColor.ms_project_colors
+            colors = Hash[*(colors_list.map do |color|
+              color.save
+              color.reload
+              [color.name.to_sym, color.id]
+            end).flatten]
+
+            # Types
+            Type.create! :name           => l(:default_type_bug),
+                         :color_id       => colors[:pjRed],
+                         :is_default     => true,
+                         :is_in_chlog    => true,
+                         :is_in_roadmap  => false,
+                         :in_aggregation => true,
+                         :is_milestone   => false,
+                         :position       => 1
+
+            Type.create! :name           => l(:default_type_feature),
+                         :is_default     => true,
+                         :color_id       => colors[:pjLime],
+                         :is_in_chlog    => true,
+                         :is_in_roadmap  => true,
+                         :in_aggregation => true,
+                         :is_milestone   => false,
+                         :position       => 2
+
+            Type.create! :name           => l(:default_type_support),
+                         :is_default     => true,
+                         :color_id       => colors[:pjBlue],
+                         :is_in_chlog    => false,
+                         :is_in_roadmap  => false,
+                         :in_aggregation => true,
+                         :is_milestone   => false,
+                         :position       => 3
+
+            Type.create! :name           => l(:default_type_phase),
+                         :is_default     => true,
+                         :color_id       => colors[:pjSilver],
+                         :is_in_chlog    => false,
+                         :is_in_roadmap  => false,
+                         :in_aggregation => true,
+                         :is_milestone   => false,
+                         :position       => 4
+
+            Type.create! :name           => l(:default_type_milestone),
+                         :is_default     => true,
+                         :color_id       => colors[:pjPurple],
+                         :is_in_chlog    => false,
+                         :is_in_roadmap  => true,
+                         :in_aggregation => true,
+                         :is_milestone   => true,
+                         :position       => 5
 
             # Issue statuses
-            new       = IssueStatus.create!(:name => l(:default_issue_status_new), :is_closed => false, :is_default => true, :position => 1)
-            in_progress  = IssueStatus.create!(:name => l(:default_issue_status_in_progress), :is_closed => false, :is_default => false, :position => 2)
+            new      = IssueStatus.create!(:name => l(:default_issue_status_new), :is_closed => false, :is_default => true, :position => 1)
+            in_progress  = IssueStatus.create!(:name => l(:default_issue_status_in_progress), :is_closed => false, :is_default => false, :position => 3)
             resolved  = IssueStatus.create!(:name => l(:default_issue_status_resolved), :is_closed => false, :is_default => false, :position => 3)
             feedback  = IssueStatus.create!(:name => l(:default_issue_status_feedback), :is_closed => false, :is_default => false, :position => 4)
             closed    = IssueStatus.create!(:name => l(:default_issue_status_closed), :is_closed => true, :is_default => false, :position => 5)
             rejected  = IssueStatus.create!(:name => l(:default_issue_status_rejected), :is_closed => true, :is_default => false, :position => 6)
 
             # Workflow
-            Tracker.find(:all).each { |t|
+            Type.find(:all).each { |t|
               IssueStatus.find(:all).each { |os|
                 IssueStatus.find(:all).each { |ns|
-                  Workflow.create!(:tracker_id => t.id, :role_id => manager.id, :old_status_id => os.id, :new_status_id => ns.id) unless os == ns
+                  Workflow.create!(:type_id => t.id, :role_id => manager.id, :old_status_id => os.id, :new_status_id => ns.id) unless os == ns
                 }
               }
             }
 
-            Tracker.find(:all).each { |t|
+            Type.find(:all).each { |t|
               [new, in_progress, resolved, feedback].each { |os|
                 [in_progress, resolved, feedback, closed].each { |ns|
-                  Workflow.create!(:tracker_id => t.id, :role_id => developer.id, :old_status_id => os.id, :new_status_id => ns.id) unless os == ns
+                  Workflow.create!(:type_id => t.id, :role_id => developer.id, :old_status_id => os.id, :new_status_id => ns.id) unless os == ns
                 }
               }
             }
 
-            Tracker.find(:all).each { |t|
+            Type.find(:all).each { |t|
               [new, in_progress, resolved, feedback].each { |os|
                 [closed].each { |ns|
-                  Workflow.create!(:tracker_id => t.id, :role_id => reporter.id, :old_status_id => os.id, :new_status_id => ns.id) unless os == ns
+                  Workflow.create!(:type_id => t.id, :role_id => reporter.id, :old_status_id => os.id, :new_status_id => ns.id) unless os == ns
                 }
               }
-              Workflow.create!(:tracker_id => t.id, :role_id => reporter.id, :old_status_id => resolved.id, :new_status_id => feedback.id)
+              Workflow.create!(:type_id => t.id, :role_id => reporter.id, :old_status_id => resolved.id, :new_status_id => feedback.id)
             }
 
             # Enumerations
-            DocumentCategory.create!(:name => l(:default_doc_category_user), :position => 1)
-            DocumentCategory.create!(:name => l(:default_doc_category_tech), :position => 2)
 
             IssuePriority.create!(:name => l(:default_priority_low), :position => 1)
             IssuePriority.create!(:name => l(:default_priority_normal), :position => 2, :is_default => true)

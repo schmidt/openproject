@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem "rails", :git => "https://github.com/rails/rails.git", :branch => "3-2-stable"
+gem "rails", "~> 3.2.14"
 
 gem "coderay", "~> 1.0.5"
 gem "rubytree", "~> 0.8.3"
@@ -52,7 +52,7 @@ end
 gem "prototype-rails"
 # remove once we no longer use the deprecated "link_to_remote", "remote_form_for" and alike methods
 # replace those with :remote => true
-gem 'prototype_legacy_helper', '0.0.0', :git => 'git://github.com/rails/prototype_legacy_helper.git'
+gem 'prototype_legacy_helper', '0.0.0', :git => 'https://github.com/rails/prototype_legacy_helper.git'
 
 gem 'jquery-rails', '~> 2.0.3'
 # branch rewrite has commit 6bfdcd7e14df1efffc00b2bbdf4e14e614d00418 which adds
@@ -73,7 +73,7 @@ group :test do
   gem 'rspec', '~> 2.0'
   # also add to development group, so "spec" rake task gets loaded
   gem "rspec-rails", "~> 2.0", :group => :development
-  gem 'rspec-example_disabler', :git => 'https://github.com/finnlabs/rspec-example_disabler.git'
+  gem 'rspec-example_disabler'
   gem 'capybara'
   gem 'capybara-screenshot'
   gem 'selenium-webdriver'
@@ -83,7 +83,10 @@ group :test do
   # why in Gemfile? see: https://github.com/guard/guard-test
   gem 'ruby-prof'
   gem 'simplecov', ">= 0.8.pre"
-  gem 'coveralls', :require => false
+end
+
+group :ldap do
+  gem "net-ldap", '~> 0.2.2'
 end
 
 group :openid do
@@ -91,8 +94,6 @@ group :openid do
 end
 
 group :development do
-  gem 'rails-footnotes', '>= 3.7.5.rc4'
-  gem 'bullet'
   gem 'letter_opener', '~> 1.0.0'
   gem 'pry-rails'
   gem 'pry-stack_explorer'
@@ -103,7 +104,6 @@ group :development do
   gem 'guard-rspec'
   gem 'guard-cucumber'
   gem 'rb-fsevent', :group => :test
-  gem 'rack-mini-profiler'
   gem 'thin'
 end
 

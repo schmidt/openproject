@@ -15,10 +15,6 @@ require "digest/md5"
 class Attachment < ActiveRecord::Base
   belongs_to :container, :polymorphic => true
 
-  # FIXME: Remove these once the Versions, Documents and Projects themselves can provide file events
-  belongs_to :version, :foreign_key => "container_id"
-  belongs_to :document, :foreign_key => "container_id"
-
   belongs_to :author, :class_name => "User", :foreign_key => "author_id"
 
   attr_protected :author_id
@@ -33,31 +29,10 @@ class Attachment < ActiveRecord::Base
   after_destroy :delete_file_on_disk
 
   acts_as_journalized :event_title => :filename,
-        :event_url => (Proc.new do |o|
-          { :controller => '/attachments', :action => 'download',
-            :id => o.journaled_id, :filename => o.filename }
-        end),
-        :activity_type => 'files',
-        :activity_permission => :view_files,
-        :activity_find_options => { :include => { :version => :project } }
-
-  acts_as_activity :type => 'documents', :permission => :view_documents,
-        :find_options => { :include => { :document => :project } }
-
-  # This method is called on save by the AttachmentJournal in order to
-  # decide which kind of activity we are dealing with. When that activity
-  # is retrieved later, we don't need to check the container_type in
-  # SQL anymore as that will be just the one we have specified here.
-  def activity_type
-    case container_type
-    when "Document"
-      "documents"
-    when "Version"
-      "files"
-    else
-      super
-    end
-  end
+       :event_url => (Proc.new do |o|
+         { :controller => '/attachments', :action => 'download',
+           :id => o.journaled_id, :filename => o.filename }
+       end), :acts_as_activity => false
 
   cattr_accessor :storage_path
   @@storage_path = Redmine::Configuration['attachments_storage_path'] || Rails.root.join('files').to_s
@@ -144,7 +119,8 @@ class Attachment < ActiveRecord::Base
   end
 
   def project
-    container.project
+    #not every container has a project (example: LandingPage)
+    container.respond_to?(:project)? container.project : nil
   end
 
   def visible?(user=User.current)
@@ -200,6 +176,7 @@ class Attachment < ActiveRecord::Base
   end
 
 private
+
   def sanitize_filename(value)
     # get only the filename, not the whole path
     just_filename = value.gsub(/^.*(\\|\/)/, '')

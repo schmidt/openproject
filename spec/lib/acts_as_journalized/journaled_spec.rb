@@ -13,8 +13,8 @@ require 'spec_helper'
 
 describe "Journalized Objects" do
   before(:each) do
-    @tracker ||= FactoryGirl.create(:tracker_feature)
-    @project ||= FactoryGirl.create(:project_with_trackers)
+    @type ||= FactoryGirl.create(:type_feature)
+    @project ||= FactoryGirl.create(:project_with_types)
     @current = FactoryGirl.create(:user, :login => "user1", :mail => "user1@users.com")
     User.stub!(:current).and_return(@current)
   end
@@ -22,8 +22,7 @@ describe "Journalized Objects" do
 
   it 'should work with issues' do
     @status_open ||= FactoryGirl.create(:issue_status, :name => "Open", :is_default => true)
-    @issue ||= FactoryGirl.create(:issue, :project => @project, :status => @status_open, :tracker => @tracker, :author => @current)
-
+    @issue ||= FactoryGirl.create(:issue, :project => @project, :status => @status_open, :type => @type, :author => @current)
 
     initial_journal = @issue.journals.first
     recreated_journal = @issue.recreate_initial_journal!
@@ -61,7 +60,7 @@ describe "Journalized Objects" do
 
   it 'should work with time entries' do
     @status_open ||= FactoryGirl.create(:issue_status, :name => "Open", :is_default => true)
-    @issue ||= FactoryGirl.create(:issue, :project => @project, :status => @status_open, :tracker => @tracker, :author => @current)
+    @issue ||= FactoryGirl.create(:issue, :project => @project, :status => @status_open, :type => @type, :author => @current)
 
     @time_entry ||= FactoryGirl.create(:time_entry, :work_package => @issue, :project => @project, :spent_on => Time.now, :hours => 5, :user => @current, :activity => FactoryGirl.create(:time_entry_activity))
 
@@ -71,17 +70,8 @@ describe "Journalized Objects" do
     initial_journal.should be_identical(recreated_journal)
   end
 
-  it 'should work with documents' do
-    @document ||= FactoryGirl.create(:document)
-
-    initial_journal = @document.journals.first
-    recreated_journal = @document.recreate_initial_journal!
-
-    initial_journal.should be_identical(recreated_journal)
-  end
-
   it 'should work with attachments' do
-    @attachment ||= FactoryGirl.create(:attachment, :container => FactoryGirl.create(:document), :author => @current)
+    @attachment ||= FactoryGirl.create(:attachment, :container => FactoryGirl.create(:issue), :author => @current)
 
     initial_journal = @attachment.journals.first
     recreated_journal = @attachment.recreate_initial_journal!

@@ -12,18 +12,18 @@
 require 'spec_helper'
 
 describe User, 'deletion' do
-  let(:project) { FactoryGirl.create(:project_with_trackers) }
+  let(:project) { FactoryGirl.create(:project_with_types) }
   let(:user) { FactoryGirl.build(:user, :member_in_project => project) }
   let(:user2) { FactoryGirl.build(:user) }
   let(:member) { project.members.first }
   let(:role) { member.roles.first }
   let(:issue_status) { FactoryGirl.create(:issue_status) }
-  let(:issue) { FactoryGirl.create(:issue, :tracker => project.trackers.first,
+  let(:issue) { FactoryGirl.create(:issue, :type => project.types.first,
                                        :author => user,
                                        :project => project,
                                        :status => issue_status,
                                        :assigned_to => user) }
-  let(:issue2) { FactoryGirl.create(:issue, :tracker => project.trackers.first,
+  let(:issue2) { FactoryGirl.create(:issue, :type => project.types.first,
                                         :author => user2,
                                         :project => project,
                                         :status => issue_status,
@@ -48,13 +48,13 @@ describe User, 'deletion' do
 
   shared_examples_for "updated journalized associated object" do
     before do
-      User.current = user2
+      User.stub(:current).and_return user2
       associations.each do |association|
         associated_instance.send(association.to_s + "=", user2)
       end
       associated_instance.save!
 
-      User.current = user # in order to have the content journal created by the user
+      User.stub(:current).and_return user # in order to have the content journal created by the user
       associated_instance.reload
       associations.each do |association|
         associated_instance.send(association.to_s + "=", user)
@@ -74,15 +74,19 @@ describe User, 'deletion' do
     it { associated_instance.journals.first.user.should == user2 }
     it "should update first journal changes" do
       associations.each do |association|
-        associated_instance.journals.first.changed_data[association.to_s + "_id"].last.should == user2.id
+        associated_instance.journals.first.changed_data[association_key association].last.should == user2.id
       end
     end
     it { associated_instance.journals.last.user.should == substitute_user }
     it "should update second journal changes" do
       associations.each do |association|
-        associated_instance.journals.last.changed_data[association.to_s + "_id"].last.should == substitute_user.id
+        associated_instance.journals.last.changed_data[association_key association].last.should == substitute_user.id
       end
     end
+  end
+
+  def association_key(association)
+    "#{association.to_s}_id".parameterize.underscore.to_sym
   end
 
   shared_examples_for "created associated object" do
@@ -106,13 +110,13 @@ describe User, 'deletion' do
 
   shared_examples_for "created journalized associated object" do
     before do
-      User.current = user # in order to have the content journal created by the user
+      User.stub(:current).and_return user # in order to have the content journal created by the user
       associations.each do |association|
         associated_instance.send(association.to_s + "=", user)
       end
       associated_instance.save!
 
-      User.current = user2
+      User.stub(:current).and_return user2
       associated_instance.reload
       associations.each do |association|
         associated_instance.send(association.to_s + "=", user2)
@@ -132,14 +136,14 @@ describe User, 'deletion' do
     it { associated_instance.journals.first.user.should == substitute_user }
     it "should update the first journal" do
       associations.each do |association|
-        associated_instance.journals.first.changed_data[association.to_s + "_id"].last.should == substitute_user.id
+        associated_instance.journals.first.changed_data[association_key association].last.should == substitute_user.id
       end
     end
     it { associated_instance.journals.last.user.should == user2 }
     it "should update the last journal" do
       associations.each do |association|
-        associated_instance.journals.last.changed_data[association.to_s + "_id"].first.should == substitute_user.id
-        associated_instance.journals.last.changed_data[association.to_s + "_id"].last.should == user2.id
+        associated_instance.journals.last.changed_data[association_key association].first.should == substitute_user.id
+        associated_instance.journals.last.changed_data[association_key association].last.should == user2.id
       end
     end
   end
@@ -161,7 +165,7 @@ describe User, 'deletion' do
   end
 
   describe "WHEN the user has an issue created and assigned" do
-    let(:associated_instance) { FactoryGirl.build(:issue, :tracker => project.trackers.first,
+    let(:associated_instance) { FactoryGirl.build(:issue, :type => project.types.first,
                                                       :project => project,
                                                       :status => issue_status) }
     let(:associated_class) { Issue }
@@ -171,19 +175,19 @@ describe User, 'deletion' do
   end
 
   describe "WHEN the user has an issue updated and assigned" do
-    let(:associated_instance) { FactoryGirl.build(:issue, :tracker => project.trackers.first,
+    let(:associated_instance) { FactoryGirl.build(:issue, :type => project.types.first,
                                                       :project => project,
                                                       :status => issue_status) }
     let(:associated_class) { Issue }
     let(:associations) { [:author, :assigned_to] }
 
     before do
-      User.current = user2
+      User.stub(:current).and_return user2
       associated_instance.author = user2
       associated_instance.assigned_to = user2
       associated_instance.save!
 
-      User.current = user # in order to have the content journal created by the user
+      User.stub(:current).and_return user # in order to have the content journal created by the user
       associated_instance.reload
       associated_instance.author = user
       associated_instance.assigned_to = user
@@ -201,13 +205,13 @@ describe User, 'deletion' do
     it { associated_instance.journals.first.user.should == user2 }
     it "should update first journal changes" do
       associations.each do |association|
-        associated_instance.journals.first.changed_data[association.to_s + "_id"].last.should == user2.id
+        associated_instance.journals.first.changed_data[association_key association].last.should == user2.id
       end
     end
     it { associated_instance.journals.last.user.should == substitute_user }
     it "should update second journal changes" do
       associations.each do |association|
-        associated_instance.journals.last.changed_data[association.to_s + "_id"].last.should == substitute_user.id
+        associated_instance.journals.last.changed_data[association_key association].last.should == substitute_user.id
       end
     end
   end
@@ -379,11 +383,11 @@ describe User, 'deletion' do
 
     before do
       Setting.enabled_scm = Setting.enabled_scm << "Filesystem"
-      User.current = user2
+      User.stub(:current).and_return user2
       associated_instance.user = user2
       associated_instance.save!
 
-      User.current = user # in order to have the content journal created by the user
+      User.stub(:current).and_return user # in order to have the content journal created by the user
       associated_instance.reload
       associated_instance.user = user
       associated_instance.save!
@@ -398,11 +402,11 @@ describe User, 'deletion' do
     end
     it { associated_instance.journals.first.user.should == user2 }
     it "should update first journal changes" do
-      associated_instance.journals.first.changed_data["user_id"].last.should == user2.id
+      associated_instance.journals.first.changed_data[:user_id].last.should == user2.id
     end
     it { associated_instance.journals.last.user.should == substitute_user }
     it "should update second journal changes" do
-      associated_instance.journals.last.changed_data["user_id"].last.should == substitute_user.id
+      associated_instance.journals.last.changed_data[:user_id].last.should == substitute_user.id
     end
   end
 

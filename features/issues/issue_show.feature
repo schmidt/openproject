@@ -16,7 +16,7 @@ Feature: Watch issues
       | name        | parent      |
       | identifier  | parent      |
     And I am working in project "parent"
-    And the project "parent" has the following trackers:
+    And the project "parent" has the following types:
       | name | position |
       | Bug  |     1    |
     And there is a default issuepriority with:
@@ -55,11 +55,11 @@ Feature: Watch issues
   @javascript
   Scenario: Add a watcher to an issue
     When I go to the page of the issue "issue1"
-    Then I should see "Add watcher" within "#content > .issue > #watchers"
-    When I click on "Add watcher" within "#content > .issue > #watchers"
-    And I select "Bob Bobbit" from "watcher_user_id" within "#content > .issue > #watchers"
-    And I press "Add" within "#content > .issue > #watchers"
-    Then I should see "Bob Bobbit" within "#content > .issue > #watchers > ul"
+    Then I should see "Add watcher" within "#watchers"
+    When I click on "Add watcher" within "#watchers"
+    And I select "Bob Bobbit" from "watcher_user_id" within "#watchers"
+    And I press "Add" within "#watchers"
+    Then I should see "Bob Bobbit" within "#watchers > ul"
     Then the issue "issue1" should have 1 watchers
 
   @javascript
@@ -67,7 +67,7 @@ Feature: Watch issues
     Given the issue "issue1" is watched by:
       | bob |
     When I go to the page of the issue "issue1"
-    Then I should see "Bob Bobbit" within "#content > .issue > #watchers > ul"
-    When I click on "Delete" within "#content > .issue > #watchers > ul"
-    Then I should not see "Bob Bobbit" within "#content > .issue > #watchers"
+    Then I should see "Bob Bobbit" within "#watchers > ul"
+    When I click on "Delete" within "#watchers > ul"
+    Then I should not see "Bob Bobbit" within "#watchers"
     Then the issue "issue1" should have 0 watchers

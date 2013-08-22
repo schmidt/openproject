@@ -41,6 +41,7 @@
 //= require calendar
 //= require ajaxappender
 //= require issues
+//= require work_packages
 //= require settings
 
 //source: http://stackoverflow.com/questions/8120065/jquery-and-prototype-dont-work-together-with-array-prototype-reverse
@@ -373,14 +374,28 @@ function observeProjectIdentifier() {
 }
 
 function observeParentIssueField(url) {
-  new Ajax.Autocompleter('issue_parent_issue_id',
+  new Ajax.Autocompleter('issue_parent_id',
                          'parent_issue_candidates',
                          url,
                          { minChars: 1,
                            frequency: 0.5,
                            paramName: 'q',
                            updateElement: function(value) {
-                             document.getElementById('issue_parent_issue_id').value = value.id;
+                             document.getElementById('issue_parent_id').value = value.id;
+                           },
+                           parameters: 'scope=all'
+                           });
+}
+
+function observeWorkPackageParentField(url) {
+  new Ajax.Autocompleter('work_package_parent_id',
+                         'parent_issue_candidates',
+                         url,
+                         { minChars: 1,
+                           frequency: 0.5,
+                           paramName: 'q',
+                           updateElement: function(value) {
+                             document.getElementById('work_package_parent_id').value = value.id;
                            },
                            parameters: 'scope=all'
                            });
@@ -407,9 +422,9 @@ function setVisible(id, visible) {
 
 function observeProjectModules() {
   var f = function() {
-    /* Hides trackers and issues custom fields on the new project form when issue_tracking module is disabled */
+    /* Hides types and issues custom fields on the new project form when issue_tracking module is disabled */
     var c = ($('project_enabled_module_names_issue_tracking').checked == true);
-    setVisible('project_trackers', c);
+    setVisible('project_types', c);
     setVisible('project_issue_custom_fields', c);
   };
 

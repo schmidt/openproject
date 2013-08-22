@@ -30,13 +30,7 @@ rescue LoadError
   # RMagick is not available
 end
 
-if RUBY_VERSION < '1.9'
-  require 'fastercsv'
-else
-  require 'csv'
-  FCSV = CSV
-end
-
+require 'csv'
 require 'globalize'
 
 Redmine::Scm::Base.add "Subversion"
@@ -59,7 +53,7 @@ end
 Redmine::AccessControl.map do |map|
   map.permission :view_project,
                  {
-                   :planning_element_types => [:index, :show],
+                   :types => [:index, :show],
                    :projects => [:show],
                    :scenarios => [:index, :show],
                    :projects => [:show],
@@ -84,18 +78,23 @@ Redmine::AccessControl.map do |map|
     map.permission :manage_categories, {:projects => :settings, :issue_categories => [:new, :create, :edit, :update, :destroy]}, :require => :member
     # Issues
     map.permission :view_work_packages, {:'issues' => [:index, :all, :show],
-                                  :auto_complete => [:issues],
-                                  :context_menus => [:issues],
-                                  :versions => [:index, :show, :status_by],
-                                  :journals => [:index, :diff],
-                                  :queries => :index,
-                                  :'issues/reports' => [:report, :report_details]}
+                                         :auto_complete => [:issues],
+                                         :context_menus => [:issues],
+                                         :versions => [:index, :show, :status_by],
+                                         :journals => [:index, :diff],
+                                         :queries => :index,
+                                         :work_packages => [:show],
+                                         :'issues/reports' => [:report, :report_details]}
     map.permission :export_issues, {:'issues' => [:index, :all]}
     map.permission :add_issues, {:issues => [:new, :create, :update_form],
                                  :'issues/previews' => :create}
-    map.permission :edit_work_packages, {:issues => [:edit, :update, :bulk_edit, :bulk_update, :update_form, :quoted],
-                                  :'issues/previews' => :create}
+    map.permission :add_work_packages, { :work_packages => [:new, :new_type, :preview, :create] }
+    map.permission :move_work_packages, {:'work_packages/moves' => [:new, :create]}, :require => :loggedin
+    map.permission :edit_work_packages, { :issues => [:edit, :update, :bulk_edit, :bulk_update, :update_form, :quoted],
+                                          :work_packages => [:edit, :update, :new_type, :preview],
+                                          :'issues/previews' => :create}
     map.permission :manage_issue_relations, {:issue_relations => [:create, :destroy]}
+    map.permission :manage_work_package_relations, {:work_package_relations => [:create, :destroy]}
     map.permission :manage_subtasks, {}
     map.permission :add_issue_notes, {:issues => [:edit, :update], :journals => [:new]}
     map.permission :edit_issue_notes, {:journals => [:edit, :update]}, :require => :loggedin
@@ -107,7 +106,8 @@ Redmine::AccessControl.map do |map|
     map.permission :save_queries, {:queries => [:new, :edit, :destroy]}, :require => :loggedin
     # Watchers
     map.permission :view_issue_watchers, {}
-    map.permission :add_issue_watchers, {:watchers => [:new, :create]}
+    map.permission :view_work_package_watchers, {}
+    map.permission :add_work_package_watchers, {:watchers => [:new, :create]}
     map.permission :delete_issue_watchers, {:watchers => :destroy}
   end
 
@@ -123,16 +123,6 @@ Redmine::AccessControl.map do |map|
     map.permission :manage_news, {:news => [:new, :create, :edit, :update, :destroy], :'news/comments' => [:destroy]}, :require => :member
     map.permission :view_news, {:news => [:index, :show]}, :public => true
     map.permission :comment_news, {:'news/comments' => :create}
-  end
-
-  map.project_module :documents do |map|
-    map.permission :manage_documents, {:documents => [:new, :create, :edit, :update, :destroy, :add_attachment]}, :require => :loggedin
-    map.permission :view_documents, :documents => [:index, :show, :download]
-  end
-
-  map.project_module :files do |map|
-    map.permission :manage_files, {:files => [:new, :create]}, :require => :loggedin
-    map.permission :view_files, :files => :index, :versions => :download
   end
 
   map.project_module :wiki do |map|
@@ -170,6 +160,8 @@ Redmine::AccessControl.map do |map|
     map.permission :view_calendar, :'issues/calendars' => [:index]
   end
 
+  map.project_module :activity
+
   map.project_module :timelines do |map|
     map.permission :manage_project_configuration,
                    :require => :member
@@ -193,7 +185,8 @@ Redmine::AccessControl.map do |map|
                    {:require => :member}
 
     map.permission :view_planning_elements,
-                   {:planning_elements => [:index, :all, :show,
+                   {:work_packages => [:show],
+                    :planning_elements => [:index, :all, :show,
                                            :recycle_bin],
                     :planning_element_journals => [:index]}
     map.permission :edit_planning_elements,
@@ -254,7 +247,7 @@ Redmine::MenuManager.map :admin_menu do |menu|
   menu.push :users, {:controller => '/users'}, :caption => :label_user_plural
   menu.push :groups, {:controller => '/groups'}, :caption => :label_group_plural
   menu.push :roles, {:controller => '/roles'}, :caption => :label_role_and_permissions
-  menu.push :trackers, {:controller => '/trackers'}, :caption => :label_tracker_plural
+  menu.push :types, {:controller => '/types'}, :caption => :label_type_plural
   menu.push :issue_statuses, {:controller => '/issue_statuses'}, :caption => :label_issue_status_plural,
             :html => {:class => 'issue_statuses'}
   menu.push :workflows, {:controller => '/workflows', :action => 'edit'}, :caption => Proc.new { Workflow.model_name.human }
@@ -269,9 +262,6 @@ Redmine::MenuManager.map :admin_menu do |menu|
   menu.push :colors,
             {:controller => '/planning_element_type_colors', :action => 'index'},
             {:caption    => :'timelines.admin_menu.colors' }
-  menu.push :planning_element_types,
-            {:controller => '/planning_element_types', :action => 'index'},
-            {:caption    => :'timelines.admin_menu.planning_element_types' }
   menu.push :project_types,
             {:controller => '/project_types', :action => 'index'},
             {:caption    => :'timelines.admin_menu.project_types' }
@@ -279,12 +269,13 @@ end
 
 Redmine::MenuManager.map :project_menu do |menu|
   menu.push :overview, { :controller => '/projects', :action => 'show' }
-  menu.push :activity, { :controller => '/activities', :action => 'index' }, :param => :project_id
+  menu.push :activity, { :controller => '/activities', :action => 'index' }, :param => :project_id,
+              :if => Proc.new { |p| p.module_enabled?("activity") }
   menu.push :roadmap, { :controller => '/versions', :action => 'index' }, :param => :project_id,
               :if => Proc.new { |p| p.shared_versions.any? }
 
   menu.push :issues, { :controller => '/issues', :action => 'index' }, :param => :project_id, :caption => :label_issue_plural
-  menu.push :new_issue, { :controller => '/issues', :action => 'new' }, :param => :project_id, :caption => :label_issue_new, :parent => :issues,
+  menu.push :new_issue, { :controller => '/work_packages', :action => 'new', :sti_type => 'Issue' }, :param => :project_id, :caption => :label_issue_new, :parent => :issues,
               :html => { :accesskey => Redmine::AccessKeys.key_for(:new_issue) }
   menu.push :view_all_issues, { :controller => '/issues', :action => 'all' }, :param => :project_id, :caption => :label_issue_view_all, :parent => :issues
   menu.push :summary_field, {:controller => '/issues/reports', :action => 'report'}, :param => :project_id, :caption => :label_workflow_summary, :parent => :issues
@@ -292,10 +283,8 @@ Redmine::MenuManager.map :project_menu do |menu|
   menu.push :news, { :controller => '/news', :action => 'index' }, :param => :project_id, :caption => :label_news_plural
   menu.push :new_news, { :controller => '/news', :action => 'new' }, :param => :project_id, :caption => :label_news_new, :parent => :news,
               :if => Proc.new { |p| User.current.allowed_to?(:manage_news, p.project) }
-  menu.push :documents, { :controller => '/documents', :action => 'index' }, :param => :project_id, :caption => :label_document_plural
   menu.push :boards, { :controller => '/boards', :action => 'index', :id => nil }, :param => :project_id,
               :if => Proc.new { |p| p.boards.any? }, :caption => :label_board_plural
-  menu.push :files, { :controller => '/files', :action => 'index' }, :caption => :label_file_plural, :param => :project_id
   menu.push :repository, { :controller => '/repositories', :action => 'show' },
               :if => Proc.new { |p| p.repository && !p.repository.new_record? }
   menu.push :settings, { :controller => '/projects', :action => 'settings' }, :caption => :label_project_settings, :last => true
@@ -346,8 +335,6 @@ Redmine::Activity.map do |activity|
   activity.register :work_packages, :class_name => 'WorkPackage'
   activity.register :changesets
   activity.register :news
-  activity.register :documents, :class_name => %w(Document Attachment)
-  activity.register :files, :class_name => 'Attachment'
   activity.register :wiki_edits, :class_name => 'WikiContent', :default => false
   activity.register :messages, :default => false
   activity.register :time_entries, :default => false
@@ -356,7 +343,6 @@ end
 Redmine::Search.map do |search|
   search.register :work_packages
   search.register :news
-  search.register :documents
   search.register :changesets
   search.register :wiki_pages
   search.register :messages

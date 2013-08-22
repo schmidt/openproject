@@ -53,8 +53,6 @@ class User < Principal
     ['none', :label_user_mail_option_none]
   ]
 
-  USER_DELETION_JOURNAL_BUCKET_SIZE = 1000;
-
   has_many :group_users
   has_many :groups, :through => :group_users,
                     :after_add => Proc.new {|user, group| group.user_added(user)},
@@ -156,6 +154,10 @@ class User < Principal
     self.passwords.first
   end
 
+  def password_expired?
+    current_password.expired?
+  end
+
   # create new password if password was set
   def update_password
     if password && auth_source_id.blank?
@@ -236,11 +238,12 @@ class User < Principal
     return nil if !user.active?
     if user.auth_source
       # user has an external authentication method
-      return nil unless user.auth_source.authenticate(login, password)
+      return nil unless user.auth_source.authenticate(user.login, password)
     else
       # authentication with local password
       return nil unless user.check_password?(password)
       return nil if user.force_password_change
+      return nil if user.password_expired?
     end
     user
   end
@@ -341,10 +344,17 @@ class User < Principal
     return auth_source.allow_password_changes?
   end
 
+  #
   # Generate and set a random password.
+  #
+  # Also force a password change on the next login, since random passwords
+  # are at some point given to the user, we do this via email. These passwords
+  # are stored unencrypted in mail accounts, so they must only be valid for
+  # a short time.
   def random_password!
     self.password = OpenProject::Passwords::Generator.random_password
     self.password_confirmation = self.password
+    self.force_password_change = true
     self
   end
 
@@ -772,29 +782,7 @@ class User < Principal
       klass.update_all ['user_id = ?', substitute.id], ['user_id = ?', id]
     end
 
-    foreign_keys = ['author_id', 'user_id', 'assigned_to_id']
-
-    # as updating the journals will take some time we do it in batches
-    # so that journals created later are also accounted for
-    while (journal_subset = Journal.all(:conditions => ["id > ?", current_id ||= 0],
-                                        :order => "id ASC",
-                                        :limit => USER_DELETION_JOURNAL_BUCKET_SIZE)).size > 0 do
-
-      journal_subset.each do |journal|
-        change = journal.changed_data.dup
-
-        foreign_keys.each do |foreign_key|
-          if journal.changed_data[foreign_key].present?
-            change[foreign_key] = change[foreign_key].map { |a_id| a_id == id ? substitute.id : a_id }
-          end
-        end
-
-        journal.changed_data = change
-        journal.save if journal.changed?
-      end
-
-      current_id = journal_subset.last.id
-    end
+    JournalManager.update_user_references id, substitute.id
   end
 
   def delete_associated_public_queries
@@ -851,6 +839,10 @@ class User < Principal
 
   def log_failed_login_timestamp
     self.last_failed_login_on = Time.now
+  end
+
+  def self.default_admin_account_changed?
+    !User.active.find_by_login('admin').try(:current_password).try(:same_as_plain_password?, 'admin')
   end
 end
 
